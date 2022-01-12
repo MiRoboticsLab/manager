@@ -17,10 +17,12 @@
 #include <map>
 #include <functional>
 #include <memory>
+#include <thread>
 #include "rclcpp/node.hpp"
 #include "cyberdog_system/robot_code.hpp"
 #include "cyberdog_system/robot_state.hpp"
 #include "protocol/msg/manager_state.hpp"
+#include "protocol/msg/heartbeats.hpp"
 #include "protocol/srv/manager_init.hpp"
 
 
@@ -35,6 +37,7 @@ namespace manager
 class ManagerBase
 {
   using ManagerStateMsg = protocol::msg::ManagerState;
+  using ManagerHeartbeatsMsg = protocol::msg::Heartbeats;
   using ManagerInitSrv = protocol::srv::ManagerInit;
   using StateFunction = std::function<void ()>;
 
@@ -66,9 +69,8 @@ public:
   virtual void OnProtected() = 0;
   virtual void OnActive() = 0;
 
-  bool RegisterRosHandler(
-    rclcpp::Node::SharedPtr node_ptr,
-    bool need_self_check_server = true)
+  bool RegisterStateHandler(
+    rclcpp::Node::SharedPtr node_ptr)
   {
     if (node_ptr == nullptr) {
       return false;
@@ -82,17 +84,36 @@ public:
       "manager_set_state",
       rclcpp::SystemDefaultsQoS());
 
-    std::string server_name = std::string("manager_init_") + GetName();
-    if (need_self_check_server) {
-      init_server_ = node_ptr->create_service<ManagerInitSrv>(
-        server_name,
-        std::bind(
-          &ManagerBase::ManagerServiceCall, this, std::placeholders::_1,
-          std::placeholders::_2));
+    return true;
+  }
+
+  bool RegisterInitHandler(rclcpp::Node::SharedPtr node_ptr)
+  {
+    if (node_ptr == nullptr) {
+      return false;
     }
 
-    is_registered = true;
+    std::string server_name = std::string("manager_check_") + name_;
+    init_server_ = node_ptr->create_service<ManagerInitSrv>(
+      server_name,
+      std::bind(
+        &ManagerBase::ManagerServiceCall, this, std::placeholders::_1,
+        std::placeholders::_2));
     return true;
+  }
+
+  bool RegisterHeartbeats(rclcpp::Node::SharedPtr node_ptr)
+  {
+    if (node_ptr == nullptr) {
+      return false;
+    }
+    heartbeats_pub_ = node_ptr->create_publisher<ManagerHeartbeatsMsg>(
+      "manager_heartbeats",
+      rclcpp::SystemDefaultsQoS());
+    heartbeats_timer_ = node_ptr->create_wall_timer(
+      std::chrono::seconds(2),
+      std::bind(&ManagerBase::HeartbeatsFunction, this)
+    );
   }
 
   bool SetState(int8_t state)
@@ -113,12 +134,12 @@ public:
 
   bool IsRegistered()
   {
-    return is_registered;
+    return (state_pub_ != nullptr) && (state_sub_ != nullptr);
   }
 
-  std::string GetName()
+  void GetName(std::string & name)
   {
-    return name_;
+    name = name_;
   }
 
 private:
@@ -153,6 +174,16 @@ private:
     }
   }
 
+  void HeartbeatsFunction()
+  {
+    auto msg = protocol::msg::Heartbeats();
+    msg.name = name_;
+    // update msg code and params
+    msg.state = (int8_t)state_;
+    msg.params = std::string("OK");
+    heartbeats_pub_->publish(msg);
+  }
+
   void BuildStateMap()
   {
     state_map_.insert(
@@ -179,13 +210,14 @@ private:
 
 private:
   std::string name_;
-  std::atomic_bool is_registered {false};
   system::ManagerState state_;
   std::map<system::ManagerState, StateFunction> state_map_;
+  rclcpp::TimerBase::SharedPtr heartbeats_timer_;
+  rclcpp::Publisher<ManagerHeartbeatsMsg>::SharedPtr heartbeats_pub_ {nullptr};
   // rclcpp::Node::WeakPtr node_ {nullptr};
-  rclcpp::Subscription<ManagerStateMsg>::SharedPtr state_sub_;
-  rclcpp::Publisher<ManagerStateMsg>::SharedPtr state_pub_;
-  rclcpp::Service<ManagerInitSrv>::SharedPtr init_server_;
+  rclcpp::Subscription<ManagerStateMsg>::SharedPtr state_sub_ {nullptr};
+  rclcpp::Publisher<ManagerStateMsg>::SharedPtr state_pub_ {nullptr};
+  rclcpp::Service<ManagerInitSrv>::SharedPtr init_server_ {nullptr};
 };  // class ManagerBase
 }  // namespace manager
 }  // namespace cyberdog
