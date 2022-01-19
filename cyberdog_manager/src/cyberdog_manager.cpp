@@ -19,9 +19,15 @@
 #include "cyberdog_manager/cyberdog_manager.hpp"
 
 cyberdog::manager::CyberdogManager::CyberdogManager(const std::string& name)
-  : ManagerBase(name)
+  : ManagerBase(name),
+  name_(name)
+  
 {
-  node_ptr = rclcpp::Node::make_shared(GetName());
+  node_ptr = rclcpp::Node::make_shared(name_);
+  manager_vec_.emplace_back("device");
+  manager_vec_.emplace_back("sensor");
+  manager_vec_.emplace_back("motion");
+  manager_vec_.emplace_back("perception");
 }
 
 cyberdog::manager::CyberdogManager::~CyberdogManager()
@@ -37,26 +43,44 @@ void cyberdog::manager::CyberdogManager::Config()
 bool cyberdog::manager::CyberdogManager::Init()
 {
   std::cout << "init\n";
-  if( !RegisterRosHandler(node_ptr, false))
+  if( !RegisterStateHandler(node_ptr))
   {
     return false;
   }
   if( !SelfCheck() ) {
     return false;
+  } else {
+    std::for_each(manager_vec_.cbegin(), manager_vec_.cend(),
+    [this](const std::string& name) {
+      HeartbeatsRecorder heartbeats_recorder;
+      heartbeats_recorder.timestamp = GetMsTime();
+      heartbeats_recorder.counter = 0;
+      this->heartbeats_map_.insert(
+        std::make_pair(name, heartbeats_recorder)
+      );
+    }
+    );
+    heartbeats_sub_ = node_ptr->create_subscription<ManagerHeartbeatsMsg>(
+      "manager_heartbeats",
+      rclcpp::SystemDefaultsQoS(),
+      std::bind(&CyberdogManager::HeartbeatsCallback, this, std::placeholders::_1));
   }
+
+  // start heartbeats check work
+  heartbeats_timer_ = node_ptr->create_wall_timer(
+      std::chrono::seconds(2),
+      std::bind(&CyberdogManager::HeartbeatsCheck, this)
+    );
+  SetState((int8_t)system::ManagerState::kActive);
   return true;
 }
 
 bool cyberdog::manager::CyberdogManager::SelfCheck()
 {
-  std::vector<std::string> manager_vec;
-  manager_vec.emplace_back("device");
-  manager_vec.emplace_back("sensor");
-  manager_vec.emplace_back("motion");
-  manager_vec.emplace_back("perception");
+  // std::vector<std::string> manager_vec;
 
   std::vector<rclcpp::Client<protocol::srv::ManagerInit>::SharedPtr> manager_client;
-  auto wait_result = std::all_of(manager_vec.cbegin(), manager_vec.cend(),
+  auto wait_result = std::all_of(manager_vec_.cbegin(), manager_vec_.cend(),
     [this, &manager_client](const std::string& manager_name) {
       std::string server_name = std::string("manager_init_") + manager_name;
       auto client = this->node_ptr->create_client<protocol::srv::ManagerInit>(server_name);
@@ -73,6 +97,7 @@ bool cyberdog::manager::CyberdogManager::SelfCheck()
   if( !wait_result ) {
     // error msg
     manager_client.clear();
+    return false;
   }
 
   auto check_result = std::all_of(manager_client.cbegin(), manager_client.cend(), 
@@ -98,6 +123,36 @@ bool cyberdog::manager::CyberdogManager::SelfCheck()
   }
 
   return true;
+}
+
+void cyberdog::manager::CyberdogManager::HeartbeatsCallback(
+  const ManagerHeartbeatsMsg::SharedPtr msg)
+{
+  auto iter = heartbeats_map_.find(msg->name);
+  if(iter == heartbeats_map_.end())
+    return;
+  iter->second.timestamp = msg->timestamp;
+  // iter->second.counter = 0;
+}
+
+void cyberdog::manager::CyberdogManager::HeartbeatsCheck()
+{
+  auto current_time = GetMsTime();
+  std::for_each(heartbeats_map_.begin(), heartbeats_map_.end(),
+    [this, &current_time](
+      std::map<std::string, HeartbeatsRecorder>::reference recorder) {
+        if(current_time - recorder.second.timestamp > 500) {
+          if(++recorder.second.counter > 5) {
+            // error msg
+            this->SetState((int8_t)system::ManagerState::kError);
+          } else {
+            // error msg
+          }
+        } else {
+          recorder.second.counter = 0;
+        }
+    }
+  );
 }
 
 void cyberdog::manager::CyberdogManager::Run()
