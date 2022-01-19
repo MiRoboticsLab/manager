@@ -14,6 +14,7 @@
 #ifndef MANAGER_BASE__MANAGER_BASE_HPP_
 #define MANAGER_BASE__MANAGER_BASE_HPP_
 #include <string>
+#include <chrono>
 #include <map>
 #include <functional>
 #include <memory>
@@ -30,6 +31,11 @@ namespace cyberdog
 {
 namespace manager
 {
+
+inline int64_t GetMsTime() {
+  return (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
 /**
  * @brief Base class for all cyberdog managers.
  *
@@ -60,8 +66,7 @@ public:
   virtual void Run() = 0;
   virtual bool SelfCheck() = 0;
 
-// state machine functions
-
+/* state machine functions */
 public:
   virtual void OnError() = 0;
   virtual void OnLowPower() = 0;
@@ -114,6 +119,7 @@ public:
       std::chrono::seconds(2),
       std::bind(&ManagerBase::HeartbeatsFunction, this)
     );
+    return true;
   }
 
   bool SetState(int8_t state)
@@ -180,6 +186,7 @@ private:
     msg.name = name_;
     // update msg code and params
     msg.state = (int8_t)state_;
+    msg.timestamp = GetMsTime();
     msg.params = std::string("OK");
     heartbeats_pub_->publish(msg);
   }

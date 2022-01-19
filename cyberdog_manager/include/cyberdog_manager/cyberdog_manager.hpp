@@ -13,14 +13,23 @@
 // limitations under the License.
 #ifndef CYBERDOG_MANAGER__CYBERDOG_MANAGER_HPP_
 #define CYBERDOG_MANAGER__CYBERDOG_MANAGER_HPP_
+#include <vector>
 #include "manager_base/manager_base.hpp"
 
 namespace cyberdog
 {
 namespace manager
 {
+struct HeartbeatsRecorder
+{
+  // std::string name;
+  int64_t timestamp;
+  int counter = 0;
+};  // struct HeartbeatsRecorder
+
 class CyberdogManager : public ManagerBase
 {
+  using ManagerHeartbeatsMsg = protocol::msg::Heartbeats;
 public:
   CyberdogManager(const std::string& name);
   ~CyberdogManager();
@@ -29,6 +38,8 @@ public:
   bool Init() override;
   void Run() override;
   bool SelfCheck() override;
+  void HeartbeatsCheck();
+  void HeartbeatsCallback(const ManagerHeartbeatsMsg::SharedPtr msg);
 
 public:
   void OnError() override;
@@ -38,8 +49,13 @@ public:
   void OnActive() override;
 
 private:
-  rclcpp::Node::SharedPtr node_ptr {nullptr};
   std::string name_;
+  std::vector<std::string> manager_vec_;
+  // std::vector<std::string> heartbeats_vec_;
+  std::map<std::string, HeartbeatsRecorder> heartbeats_map_;
+  rclcpp::Node::SharedPtr node_ptr {nullptr};
+  rclcpp::Subscription<ManagerHeartbeatsMsg>::SharedPtr heartbeats_sub_{nullptr};
+  rclcpp::TimerBase::SharedPtr heartbeats_timer_;
 // TODO: black box handler
 };  // class CyberdogManager
 }  // namespace manager
