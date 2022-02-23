@@ -32,8 +32,10 @@ namespace cyberdog
 namespace manager
 {
 
-inline int64_t GetMsTime() {
-  return (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+inline int64_t GetMsTime()
+{
+  return (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
 /**
@@ -67,6 +69,7 @@ public:
   virtual bool SelfCheck() = 0;
 
 /* state machine functions */
+
 public:
   virtual void OnError() = 0;
   virtual void OnLowPower() = 0;

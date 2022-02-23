@@ -14,8 +14,8 @@
 #ifndef BLACK_BOX__BLACK_BOX_HPP_
 #define BLACK_BOX__BLACK_BOX_HPP_
 #include <string>
-#include <rclcpp/node.hpp>
-#include <rclcpp/subscription.hpp>
+#include "rclcpp/node.hpp"
+#include "rclcpp/subscription.hpp"
 #include "protocol/msg/touch_status.hpp"
 
 namespace cyberdog
@@ -25,28 +25,36 @@ namespace manager
 class BlackBox final
 {
   using TouchStatusMsg = protocol::msg::TouchStatus;
+
 public:
-  BlackBox(rclcpp::Node::SharedPtr node_ptr) {
-    if(node_ptr != nullptr)
-      node_ptr_  = node_ptr;
+  explicit BlackBox(rclcpp::Node::SharedPtr node_ptr)
+  {
+    if (node_ptr != nullptr) {
+      node_ptr_ = node_ptr;
+    }
   }
   ~BlackBox() {}
 
-  void Config() {
+  void Config()
+  {
     // 读取toml配置， 选择订阅哪些消息数据
-    
   }
 
-  bool Init() {
+  bool Init()
+  {
     // 初始化数据库及ros消息回调，允许失败时返回false
-    if(node_ptr_ == nullptr) {
+    if (node_ptr_ == nullptr) {
       // error msg
       return false;
     }
     Config();
-    touch_status_sub_ = node_ptr_->create_subscription<TouchStatusMsg>("touch_status", rclcpp::SystemDefaultsQoS(), std::bind(&BlackBox::TouchStatusCallback, this, std::placeholders::_1));
+    touch_status_sub_ = node_ptr_->create_subscription<TouchStatusMsg>(
+      "touch_status",
+      rclcpp::SystemDefaultsQoS(),
+      std::bind(&BlackBox::TouchStatusCallback, this, std::placeholders::_1));
     return true;
   }
+
 private:
   /* ros implementation, node and subscribers */
   rclcpp::Node::SharedPtr node_ptr_ {nullptr};
@@ -54,10 +62,11 @@ private:
 
 private:
   /* topic callback */
-  void TouchStatusCallback(const TouchStatusMsg::SharedPtr msg) {
+  void TouchStatusCallback(const TouchStatusMsg::SharedPtr msg)
+  {
     // save msg data
+    (void)msg;
   }
-
 };  // class BlackBox
 }  // namespace manager
 }  // namespace cyberdog

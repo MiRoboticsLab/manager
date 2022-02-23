@@ -11,6 +11,7 @@
   <depend>rclcpp</depend>
   <depend>cyberdog_system</depend>
   <depend>manager_base</depend>
+  <depend>black_box</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

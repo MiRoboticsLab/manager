@@ -14,7 +14,14 @@
 #ifndef CYBERDOG_MANAGER__CYBERDOG_MANAGER_HPP_
 #define CYBERDOG_MANAGER__CYBERDOG_MANAGER_HPP_
 #include <vector>
+#include <map>
+#include <algorithm>
+#include <chrono>
+#include <memory>
+#include <utility>
+#include <string>
 #include "manager_base/manager_base.hpp"
+#include "black_box/black_box.hpp"
 
 namespace cyberdog
 {
@@ -30,8 +37,9 @@ struct HeartbeatsRecorder
 class CyberdogManager : public ManagerBase
 {
   using ManagerHeartbeatsMsg = protocol::msg::Heartbeats;
+
 public:
-  CyberdogManager(const std::string& name);
+  explicit CyberdogManager(const std::string & name);
   ~CyberdogManager();
 
   void Config() override;
@@ -53,10 +61,11 @@ private:
   std::vector<std::string> manager_vec_;
   // std::vector<std::string> heartbeats_vec_;
   std::map<std::string, HeartbeatsRecorder> heartbeats_map_;
-  rclcpp::Node::SharedPtr node_ptr {nullptr};
+  rclcpp::Node::SharedPtr node_ptr_ {nullptr};
   rclcpp::Subscription<ManagerHeartbeatsMsg>::SharedPtr heartbeats_sub_{nullptr};
   rclcpp::TimerBase::SharedPtr heartbeats_timer_;
-// TODO: black box handler
+
+  std::shared_ptr<BlackBox> black_box_ptr_ {nullptr};
 };  // class CyberdogManager
 }  // namespace manager
 }  // namespace cyberdog
