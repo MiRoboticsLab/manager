@@ -11,20 +11,3 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include <memory>
-#include "cyberdog_manager/cyberdog_manager.hpp"
-#include "manager_base/manager_base.hpp"
-
-
-int main(int argc, char ** argv)
-{
-  rclcpp::init(argc, argv);
-  std::shared_ptr<cyberdog::manager::CyberdogManager> manager =
-    std::make_shared<cyberdog::manager::CyberdogManager>("cyberdog_manager");
-  if (!manager->Init()) {
-    std::cout << "init error\n";
-  }
-  manager->Run();
-
-  return 0;
-}

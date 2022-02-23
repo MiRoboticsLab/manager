@@ -18,17 +18,18 @@ find_package(rclcpp REQUIRED)
 find_package(manager_base REQUIRED)
 find_package(protocol REQUIRED)
 find_package(cyberdog_system REQUIRED)
+find_package(black_box REQUIRED)
 
 include_directories(include)
 
 add_executable(${PROJECT_NAME} src/cyberdog_manager.cpp src/main.cpp)
 
-ament_target_dependencies(${PROJECT_NAME}
+ament_target_dependencies( ${PROJECT_NAME}
   rclcpp
   protocol
   manager_base
   cyberdog_system
-  )
+  black_box )
 
 install(TARGETS ${PROJECT_NAME}
   DESTINATION lib)
