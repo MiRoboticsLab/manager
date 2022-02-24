@@ -13,60 +13,55 @@
 // limitations under the License.
 #ifndef BLACK_BOX__BLACK_BOX_HPP_
 #define BLACK_BOX__BLACK_BOX_HPP_
+#include <sqlite3.h>
+#include <rclcpp/node.hpp>
+#include <rclcpp/subscription.hpp>
+#include <protocol/msg/touch_status.hpp>
+#include <rclcpp/serialization.hpp>
+#include <ament_index_cpp/get_package_share_directory.hpp>
+#include <cyberdog_common/cyberdog_toml.hpp>
+#include <fstream>
+#include <vector>
+#include <map>
+#include <memory>
 #include <string>
-#include "rclcpp/node.hpp"
-#include "rclcpp/subscription.hpp"
-#include "protocol/msg/touch_status.hpp"
-
 namespace cyberdog
 {
 namespace manager
 {
+
 class BlackBox final
 {
   using TouchStatusMsg = protocol::msg::TouchStatus;
 
 public:
-  explicit BlackBox(rclcpp::Node::SharedPtr node_ptr)
-  {
-    if (node_ptr != nullptr) {
-      node_ptr_ = node_ptr;
-    }
-  }
+  explicit BlackBox(rclcpp::Node::SharedPtr node_ptr);
+  BlackBox(const BlackBox &) = delete;
+  BlackBox & operator=(const BlackBox &) = delete;
   ~BlackBox() {}
 
-  void Config()
-  {
-    // 读取toml配置， 选择订阅哪些消息数据
-  }
-
-  bool Init()
-  {
-    // 初始化数据库及ros消息回调，允许失败时返回false
-    if (node_ptr_ == nullptr) {
-      // error msg
-      return false;
-    }
-    Config();
-    touch_status_sub_ = node_ptr_->create_subscription<TouchStatusMsg>(
-      "touch_status",
-      rclcpp::SystemDefaultsQoS(),
-      std::bind(&BlackBox::TouchStatusCallback, this, std::placeholders::_1));
-    return true;
-  }
+  bool Config();
+  bool Init();
 
 private:
   /* ros implementation, node and subscribers */
   rclcpp::Node::SharedPtr node_ptr_ {nullptr};
   rclcpp::Subscription<TouchStatusMsg>::SharedPtr touch_status_sub_ {nullptr};
+  sqlite3 * ppDb_;
+  std::string DB_URL_;
+  std::stringstream errmsg_;
+  std::vector<rclcpp::GenericSubscription::SharedPtr> general_subs_;
+  std::vector<std::string> topic_names_;
+  std::map<std::string, std::string> topics_map_;
+  std::string CREAT_TABLES_SQL_;
 
 private:
-  /* topic callback */
-  void TouchStatusCallback(const TouchStatusMsg::SharedPtr msg)
-  {
-    // save msg data
-    (void)msg;
-  }
+  void GeneralMsgCallback(
+    std::shared_ptr<rclcpp::SerializedMessage> msg,
+    const std::string topic_type);
+  bool ConnetDB(std::string & DB_URL);
+  bool InsertTouchStatus(const TouchStatusMsg & msg);
+  bool FileExists(const std::string & filePath);
 };  // class BlackBox
 }  // namespace manager
 }  // namespace cyberdog
