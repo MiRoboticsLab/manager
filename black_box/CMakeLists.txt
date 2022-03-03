@@ -14,6 +14,7 @@ if(NOT CMAKE_CXX_STANDARD)
 endif()
 
 # find dependencies
+find_package(Boost COMPONENTS system filesystem REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(protocol REQUIRED)
@@ -28,7 +29,7 @@ find_package(params REQUIRED)
 include_directories(include)
 
 add_library(black_box SHARED src/black_box.cpp)
-target_link_libraries(black_box ${SQLite3_LIBRARIES})
+target_link_libraries(black_box ${SQLite3_LIBRARIES} ${Boost_FILESYSTEM_LIBRARY})
 ament_target_dependencies(black_box rclcpp protocol cyberdog_common params)
 
 # target_include_directories(black_box

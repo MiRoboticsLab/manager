@@ -13,18 +13,19 @@
 // limitations under the License.
 
 #include <black_box/black_box.hpp>
+#include <cyberdog_common/cyberdog_log.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <vector>
 #include <string>
 #include <memory>
-
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
+  LOGGER_MAIN_INSTANCE("Global_Name");
   auto node = rclcpp::Node::make_shared("test");
   auto black_box_ptr = std::make_shared<cyberdog::manager::BlackBox>(node);
   auto result = black_box_ptr->Init();
-  std::cout << "init: " << result << std::endl;
+  INFO("init: %d", result);
   rclcpp::executors::SingleThreadedExecutor exec;
   exec.add_node(node);
   exec.spin();
