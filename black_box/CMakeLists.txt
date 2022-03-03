@@ -59,6 +59,6 @@ install(TARGETS black_box test_black_box
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 ament_export_include_directories(include)
-ament_export_dependencies(SQLite3)
+ament_export_dependencies(sqlite3_vendor SQLite3)
 ament_export_libraries(black_box)
 ament_package()
