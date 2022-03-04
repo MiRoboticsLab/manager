@@ -20,15 +20,24 @@
 #include <rclcpp/serialization.hpp>
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <cyberdog_common/cyberdog_toml.hpp>
+#include <cyberdog_common/cyberdog_log.hpp>
 #include <fstream>
 #include <vector>
 #include <map>
 #include <memory>
 #include <string>
+#include <mutex>
 namespace cyberdog
 {
 namespace manager
 {
+
+struct Table
+{
+  std::string name;
+  std::string key;
+  std::vector<std::vector<std::string>> fields;
+};
 
 class BlackBox final
 {
@@ -52,16 +61,20 @@ private:
   std::stringstream errmsg_;
   std::vector<rclcpp::GenericSubscription::SharedPtr> general_subs_;
   std::vector<std::string> topic_names_;
+  std::map<std::string, Table> tables_;
   std::map<std::string, std::string> topics_map_;
   std::string CREAT_TABLES_SQL_;
+  std::mutex query_mutex_;
+  size_t db_size_threshold_;
 
 private:
   void GeneralMsgCallback(
     std::shared_ptr<rclcpp::SerializedMessage> msg,
     const std::string topic_type);
   bool ConnetDB(std::string & DB_URL);
-  bool InsertTouchStatus(const TouchStatusMsg & msg);
-  bool FileExists(const std::string & filePath);
+  bool InsertTouchStatus(const TouchStatusMsg & msg, const std::string & topic_name);
+  void RollOverDB();
+  std::string GetTime();
 };  // class BlackBox
 }  // namespace manager
 }  // namespace cyberdog

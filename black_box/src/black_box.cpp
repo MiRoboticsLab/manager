@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include <black_box/black_box.hpp>
+#include <boost/filesystem.hpp>
+#include <sys/time.h>
 #include <string>
 #include <vector>
 #include <memory>
@@ -22,17 +24,41 @@ cyberdog::manager::BlackBox::BlackBox(rclcpp::Node::SharedPtr node_ptr)
   if (node_ptr != nullptr) {
     node_ptr_ = node_ptr;
   }
+  std::thread{std::bind(&cyberdog::manager::BlackBox::RollOverDB, this)}.detach();
 }
 
-bool cyberdog::manager::BlackBox::FileExists(const std::string & filePath)
+std::string cyberdog::manager::BlackBox::GetTime()
 {
-  bool fileExists = false;
-  std::ifstream in(filePath.c_str(), std::ios::in);
-  if (in.is_open()) {
-    fileExists = true;
-    in.close();
+  struct timeval tv;
+  char buf[32];
+  gettimeofday(&tv, NULL);
+  strftime(buf, 32, "%Y_%m_%d-%H_%M_%S", localtime(&tv.tv_sec));
+  std::string s(buf);
+  return s;
+}
+
+void cyberdog::manager::BlackBox::RollOverDB()
+{
+  while (rclcpp::ok()) {
+    rclcpp::Rate(1).sleep();
+    if (!boost::filesystem::exists(DB_URL_)) {continue;}
+    if (boost::filesystem::file_size(DB_URL_) < db_size_threshold_ * 1024 * 1024) {continue;}
+
+    std::stringstream cmd;
+    cmd << "tar -cvf " << DB_URL_ << "-" << GetTime() << ".tgz" << " " << DB_URL_;
+    std::stringstream query;
+    for (auto table : tables_) {
+      query << " DELETE FROM " << table.second.name << ";";
+    }
+    std::lock_guard<std::mutex> lock(query_mutex_);
+    system(cmd.str().c_str());
+    // TODO(Harvey): rm the path in tgz; upload tgz files
+    if (ppDb_) {
+      int rc = SQLITE_OK;
+      rc = sqlite3_exec(ppDb_, query.str().c_str(), 0, 0, 0);
+      if (rc != SQLITE_OK) {ERROR("Failed to clear %s", DB_URL_.c_str());}
+    }
   }
-  return fileExists;
 }
 
 bool cyberdog::manager::BlackBox::Config()
@@ -52,6 +78,9 @@ bool cyberdog::manager::BlackBox::Config()
   if (!cyberdog::common::CyberdogToml::Get(value, "DB_URL", DB_URL_)) {
     return false;
   }
+  if (!cyberdog::common::CyberdogToml::Get(value, "DB_size", db_size_threshold_)) {
+    return false;
+  }
   toml::value tables;
   if (!cyberdog::common::CyberdogToml::Get(value, "tables", tables)) {
     return false;
@@ -59,17 +88,25 @@ bool cyberdog::manager::BlackBox::Config()
   std::stringstream sql;
   for (uint8_t i = 0; i < tables.size(); i++) {
     sql << "CREATE TABLE IF NOT EXISTS ";
-    std::string name, key;
+    Table table;
+    std::string topic, name, key;
     std::vector<std::vector<std::string>> fields;
+    if (!cyberdog::common::CyberdogToml::Get(tables[i], "topic", topic)) {
+      return false;
+    }
     if (!cyberdog::common::CyberdogToml::Get(tables[i], "name", name)) {
       return false;
     }
+    table.name = name;
     if (!cyberdog::common::CyberdogToml::Get(tables[i], "key", key)) {
       return false;
     }
+    table.key = key;
     if (!cyberdog::common::CyberdogToml::Get(tables[i], "fields", fields)) {
       return false;
     }
+    table.fields = fields;
+    tables_.emplace(topic, table);
     sql << name << "(";
     for (auto field : fields) {
       for (auto f : field) {
@@ -104,9 +141,7 @@ bool cyberdog::manager::BlackBox::Init()
 
   for (auto topic_name : topic_names_) {
     if (topics_map_.find(topic_name) == topics_map_.end()) {
-      RCLCPP_WARN(
-        rclcpp::get_logger("black_box"),
-        "Topic %s is not in topics map, omitted!", topic_name.c_str());
+      WARN("Topic %s is not in topics map, omitted!", topic_name.c_str());
       continue;
     }
     general_subs_.push_back(
@@ -127,11 +162,10 @@ bool cyberdog::manager::BlackBox::ConnetDB(std::string & DB_URL)
   ppDb_ = 0;
   if (std::string(getenv("USER")) != "mi") {
     DB_URL = std::string(getenv("HOME")) + std::string("/black_box.db");
-    RCLCPP_WARN(
-      rclcpp::get_logger("black_box"),
-      "Not running on Cyberdog, DB URL is redirected to %s!", DB_URL.c_str());
+    WARN("Not running on Cyberdog, DB URL is redirected to %s!", DB_URL.c_str());
   }
-  dbFileExist = FileExists(DB_URL);
+  DB_URL_ = DB_URL;
+  dbFileExist = boost::filesystem::exists(DB_URL);
   rc = sqlite3_open(DB_URL.c_str(), &ppDb_);
   if (dbFileExist && rc == SQLITE_OK) {
     // TODO(Harvey)
@@ -144,15 +178,24 @@ bool cyberdog::manager::BlackBox::ConnetDB(std::string & DB_URL)
   return true;
 }
 
-bool cyberdog::manager::BlackBox::InsertTouchStatus(const TouchStatusMsg & msg)
+bool cyberdog::manager::BlackBox::InsertTouchStatus(
+  const TouchStatusMsg & msg,
+  const std::string & topic_name)
 {
   std::stringstream query;
-  query << "INSERT INTO TouchStatus(timestamp, touch_state) VALUES(" <<
+  std::stringstream fields_tmp;
+  for (auto field : tables_[topic_name].fields) {
+    fields_tmp << field.front() << ",";
+  }
+  std::string fields = fields_tmp.str();
+  fields.erase(fields.size() - 1);
+  query << "INSERT INTO " << tables_[topic_name].name << "(" << fields << ")VALUES(" <<
     msg.timestamp << "," <<
     msg.touch_state << ");";
   if (!ppDb_) {
     return false;
   }
+  std::lock_guard<std::mutex> lock(query_mutex_);
   int rc = sqlite3_exec(ppDb_, query.str().c_str(), 0, 0, 0);
   if (rc != SQLITE_OK) {
     return false;
@@ -169,6 +212,6 @@ void cyberdog::manager::BlackBox::GeneralMsgCallback(
     TouchStatusMsg touch_status_msg;
     rclcpp::Serialization<TouchStatusMsg> serializer;
     serializer.deserialize_message(msg.get(), &touch_status_msg);
-    InsertTouchStatus(touch_status_msg);
+    InsertTouchStatus(touch_status_msg, topic_name);
   }
 }
