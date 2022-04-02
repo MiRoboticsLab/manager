@@ -21,6 +21,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/node.hpp"
 #include "cyberdog_manager/cyberdog_manager.hpp"
+#include "cyberdog_common/cyberdog_log.hpp"
 
 cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
 : ManagerBase(name),
@@ -42,12 +43,11 @@ cyberdog::manager::CyberdogManager::~CyberdogManager()
 
 void cyberdog::manager::CyberdogManager::Config()
 {
-  std::cout << "config\n";
+  INFO("config");
 }
 
 bool cyberdog::manager::CyberdogManager::Init()
 {
-  std::cout << "init\n";
   if (!RegisterStateHandler(node_ptr_)) {
     return false;
   }
@@ -181,25 +181,25 @@ void cyberdog::manager::CyberdogManager::Run()
 
 void cyberdog::manager::CyberdogManager::OnError()
 {
-  std::cout << "on error\n";
+  ERROR("on error");
 }
 
 void cyberdog::manager::CyberdogManager::OnLowPower()
 {
-  std::cout << "on lowpower\n";
+  ERROR("on lowpower");
 }
 
 void cyberdog::manager::CyberdogManager::OnSuspend()
 {
-  std::cout << "on suspend\n";
+  ERROR("on suspend");
 }
 
 void cyberdog::manager::CyberdogManager::OnProtected()
 {
-  std::cout << "on protect\n";
+  ERROR("on protect");
 }
 
 void cyberdog::manager::CyberdogManager::OnActive()
 {
-  std::cout << "on active\n";
+  ERROR("on active");
 }
