@@ -18,6 +18,7 @@ find_package(rclcpp REQUIRED)
 find_package(manager_base REQUIRED)
 find_package(protocol REQUIRED)
 find_package(cyberdog_system REQUIRED)
+find_package(cyberdog_common REQUIRED)
 find_package(black_box REQUIRED)
 
 include_directories(include)
@@ -29,6 +30,7 @@ ament_target_dependencies( ${PROJECT_NAME}
   protocol
   manager_base
   cyberdog_system
+  cyberdog_common
   black_box )
 
 install(TARGETS ${PROJECT_NAME}
