@@ -34,7 +34,7 @@ ament_target_dependencies( ${PROJECT_NAME}
   black_box )
 
 install(TARGETS ${PROJECT_NAME}
-  DESTINATION lib)
+  DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
