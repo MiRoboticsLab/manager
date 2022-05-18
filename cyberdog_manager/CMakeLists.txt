@@ -20,6 +20,7 @@ find_package(protocol REQUIRED)
 find_package(cyberdog_system REQUIRED)
 find_package(cyberdog_common REQUIRED)
 find_package(black_box REQUIRED)
+find_package(cyberdog_machine REQUIRED)
 
 include_directories(include)
 
@@ -31,7 +32,8 @@ ament_target_dependencies( ${PROJECT_NAME}
   manager_base
   cyberdog_system
   cyberdog_common
-  black_box )
+  black_box
+  cyberdog_machine )
 
 install(TARGETS ${PROJECT_NAME}
   DESTINATION lib/${PROJECT_NAME})

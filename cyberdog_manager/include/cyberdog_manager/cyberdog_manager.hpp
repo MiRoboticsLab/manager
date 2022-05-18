@@ -22,6 +22,7 @@
 #include <string>
 #include "manager_base/manager_base.hpp"
 #include "black_box/black_box.hpp"
+#include "cyberdog_machine/cyberdog_heartbeats.hpp"
 
 namespace cyberdog
 {
@@ -31,7 +32,8 @@ struct HeartbeatsRecorder
 {
   // std::string name;
   int64_t timestamp;
-  int counter = 0;
+  // int counter = 0;
+  bool lost = false;
 };  // struct HeartbeatsRecorder
 
 class CyberdogManager : public ManagerBase
@@ -46,7 +48,7 @@ public:
   bool Init() override;
   void Run() override;
   bool SelfCheck() override;
-  void HeartbeatsCheck();
+  // void HeartbeatsCheck();
   void HeartbeatsCallback(const ManagerHeartbeatsMsg::SharedPtr msg);
 
 public:
@@ -57,15 +59,21 @@ public:
   void OnActive() override;
 
 private:
+  void NodeStateConfirm(const std::string & name, bool lost);
+  void HeartbeatsStateNotify();
+
+private:
   std::string name_;
+  bool has_error_;
   std::vector<std::string> manager_vec_;
   // std::vector<std::string> heartbeats_vec_;
   std::map<std::string, HeartbeatsRecorder> heartbeats_map_;
   rclcpp::Node::SharedPtr node_ptr_ {nullptr};
   rclcpp::Subscription<ManagerHeartbeatsMsg>::SharedPtr heartbeats_sub_{nullptr};
-  rclcpp::TimerBase::SharedPtr heartbeats_timer_;
+  // rclcpp::TimerBase::SharedPtr heartbeats_timer_;
 
   std::shared_ptr<BlackBox> black_box_ptr_ {nullptr};
+  std::unique_ptr<cyberdog::machine::HeartBeats> heart_beats_ptr_ {nullptr};
 };  // class CyberdogManager
 }  // namespace manager
 }  // namespace cyberdog
