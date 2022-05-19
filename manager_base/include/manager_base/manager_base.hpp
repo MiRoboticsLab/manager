@@ -125,13 +125,14 @@ public:
     return true;
   }
 
-  bool SetState(int8_t state)
+  bool SetState(int8_t state, std::string json_data = "{}")
   {
     if (!IsRegistered() ) {
       return false;
     }
     auto msg = ManagerStateMsg();
     msg.state = state;
+    msg.err_msg = json_data;
     this->state_pub_->publish(msg);
     return true;
   }

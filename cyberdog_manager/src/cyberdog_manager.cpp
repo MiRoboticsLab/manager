@@ -22,10 +22,15 @@
 #include "rclcpp/node.hpp"
 #include "cyberdog_manager/cyberdog_manager.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
+#include "cyberdog_common/cyberdog_json.hpp"
+
+using cyberdog::common::CyberdogJson;
+using rapidjson::Document;
+using rapidjson::kObjectType;
 
 cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
 : ManagerBase(name),
-  name_(name)
+  name_(name), has_error_(false)
 {
   node_ptr_ = rclcpp::Node::make_shared(name_);
   manager_vec_.emplace_back("device");
@@ -34,6 +39,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   manager_vec_.emplace_back("perception");
 
   black_box_ptr_ = std::make_shared<BlackBox>(node_ptr_);
+  heart_beats_ptr_ = std::make_unique<cyberdog::machine::HeartBeats>(500, 5);
 }
 
 cyberdog::manager::CyberdogManager::~CyberdogManager()
@@ -59,11 +65,20 @@ bool cyberdog::manager::CyberdogManager::Init()
       [this](const std::string & name) {
         HeartbeatsRecorder heartbeats_recorder;
         heartbeats_recorder.timestamp = GetMsTime();
-        heartbeats_recorder.counter = 0;
+        // heartbeats_recorder.counter = 0;
+        heartbeats_recorder.lost = false;
         this->heartbeats_map_.insert(
           std::make_pair(name, heartbeats_recorder)
         );
       }
+    );
+    heart_beats_ptr_->HeartConfig(
+      manager_vec_,
+      std::bind(&cyberdog::manager::CyberdogManager::HeartbeatsStateNotify, this), 6);
+    heart_beats_ptr_->RegisterLostCallback(
+      std::bind(
+        &cyberdog::manager::CyberdogManager::NodeStateConfirm, this,
+        std::placeholders::_1, std::placeholders::_2)
     );
     heartbeats_sub_ = node_ptr_->create_subscription<ManagerHeartbeatsMsg>(
       "manager_heartbeats",
@@ -72,10 +87,11 @@ bool cyberdog::manager::CyberdogManager::Init()
   }
 
   // start heartbeats check work
-  heartbeats_timer_ = node_ptr_->create_wall_timer(
-    std::chrono::seconds(2),
-    std::bind(&CyberdogManager::HeartbeatsCheck, this)
-  );
+  heart_beats_ptr_->HeartRun();
+  // heartbeats_timer_ = node_ptr_->create_wall_timer(
+  //   std::chrono::seconds(2),
+  //   std::bind(&CyberdogManager::HeartbeatsCheck, this)
+  // );
   SetState((int8_t)system::ManagerState::kActive);
 
   if (!black_box_ptr_->Init()) {
@@ -148,30 +164,31 @@ void cyberdog::manager::CyberdogManager::HeartbeatsCallback(
   if (iter == heartbeats_map_.end()) {
     return;
   }
-  iter->second.timestamp = msg->timestamp;
-  // iter->second.counter = 0;
+  heart_beats_ptr_->HeartUpdate(iter->first);
+  // iter->second.timestamp = msg->timestamp;
+  // // iter->second.counter = 0;
 }
 
-void cyberdog::manager::CyberdogManager::HeartbeatsCheck()
-{
-  auto current_time = GetMsTime();
-  std::for_each(
-    heartbeats_map_.begin(), heartbeats_map_.end(),
-    [this, &current_time](
-      std::map<std::string, HeartbeatsRecorder>::reference recorder) {
-      if (current_time - recorder.second.timestamp > 500) {
-        if (++recorder.second.counter > 5) {
-          // error msg
-          this->SetState((int8_t)system::ManagerState::kError);
-        } else {
-          // error msg
-        }
-      } else {
-        recorder.second.counter = 0;
-      }
-    }
-  );
-}
+// void cyberdog::manager::CyberdogManager::HeartbeatsCheck()
+// {
+//   auto current_time = GetMsTime();
+//   std::for_each(
+//     heartbeats_map_.begin(), heartbeats_map_.end(),
+//     [this, &current_time](
+//       std::map<std::string, HeartbeatsRecorder>::reference recorder) {
+//       if (current_time - recorder.second.timestamp > 500) {
+//         if (++recorder.second.counter > 5) {
+//           // error msg
+//           this->SetState((int8_t)system::ManagerState::kError);
+//         } else {
+//           // error msg
+//         }
+//       } else {
+//         recorder.second.counter = 0;
+//       }
+//     }
+//   );
+// }
 
 void cyberdog::manager::CyberdogManager::Run()
 {
@@ -202,4 +219,37 @@ void cyberdog::manager::CyberdogManager::OnProtected()
 void cyberdog::manager::CyberdogManager::OnActive()
 {
   ERROR("on active");
+}
+
+void cyberdog::manager::CyberdogManager::NodeStateConfirm(
+  const std::string & name, bool lost)
+{
+  auto iter = heartbeats_map_.find(name);
+  if (iter == heartbeats_map_.end()) {
+    return;
+  }
+  has_error_ = has_error_ | lost;
+  if (has_error_) {
+    ERROR("%s node lost", iter->first.c_str());
+  }
+  iter->second.lost = lost;
+  iter->second.timestamp = GetMsTime();
+}
+
+void cyberdog::manager::CyberdogManager::HeartbeatsStateNotify()
+{
+  Document json_document(kObjectType);
+  for (auto & elem : heartbeats_map_) {
+    Document node_document(kObjectType);
+    CyberdogJson::Add(node_document, "alive", !elem.second.lost);
+    CyberdogJson::Add(json_document, elem.first, node_document);
+  }
+  std::string json_string("{}");
+  if (!CyberdogJson::Document2String(json_document, json_string)) {
+    ERROR("error while encoding to json of heart beats state notify");
+  }
+  has_error_ == true ?
+  this->SetState((int8_t)system::ManagerState::kError, std::move(json_string)) :
+  this->SetState((int8_t)system::ManagerState::kOK, std::move(json_string));
+  has_error_ = false;
 }
