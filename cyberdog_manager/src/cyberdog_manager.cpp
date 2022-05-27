@@ -37,6 +37,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   manager_vec_.emplace_back("sensor");
   manager_vec_.emplace_back("motion");
   manager_vec_.emplace_back("perception");
+  manager_vec_.emplace_back("audio");
 
   black_box_ptr_ = std::make_shared<BlackBox>(node_ptr_);
   heart_beats_ptr_ = std::make_unique<cyberdog::machine::HeartBeats>(500, 5);
