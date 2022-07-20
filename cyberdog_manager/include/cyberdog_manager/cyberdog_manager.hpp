@@ -22,6 +22,7 @@
 #include <string>
 #include "manager_base/manager_base.hpp"
 #include "black_box/black_box.hpp"
+#include "protocol/srv/device_info.hpp"
 #include "cyberdog_machine/cyberdog_heartbeats.hpp"
 
 namespace cyberdog
@@ -61,16 +62,23 @@ public:
 private:
   void NodeStateConfirm(const std::string & name, bool lost);
   void HeartbeatsStateNotify();
+  void QueryDeviceInfo(
+    const protocol::srv::DeviceInfo::Request::SharedPtr request,
+    protocol::srv::DeviceInfo::Response::SharedPtr);
 
 private:
   std::string name_;
   bool has_error_;
+  std::string sn_;
   std::vector<std::string> manager_vec_;
   // std::vector<std::string> heartbeats_vec_;
   std::map<std::string, HeartbeatsRecorder> heartbeats_map_;
   rclcpp::Node::SharedPtr node_ptr_ {nullptr};
+  rclcpp::Node::SharedPtr query_node_ptr_ {nullptr};
+  rclcpp::executors::MultiThreadedExecutor executor_;
   rclcpp::Subscription<ManagerHeartbeatsMsg>::SharedPtr heartbeats_sub_{nullptr};
   // rclcpp::TimerBase::SharedPtr heartbeats_timer_;
+  rclcpp::Service<protocol::srv::DeviceInfo>::SharedPtr device_info_get_srv_;
 
   std::shared_ptr<BlackBox> black_box_ptr_ {nullptr};
   std::unique_ptr<cyberdog::machine::HeartBeats> heart_beats_ptr_ {nullptr};
