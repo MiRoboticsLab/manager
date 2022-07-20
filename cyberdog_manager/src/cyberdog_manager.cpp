@@ -20,6 +20,8 @@
 #include <string>
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/node.hpp"
+#include "std_srvs/srv/trigger.hpp"
+#include "protocol/srv/ota_server_cmd.hpp"
 #include "cyberdog_manager/cyberdog_manager.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 #include "cyberdog_common/cyberdog_json.hpp"
@@ -30,16 +32,25 @@ using rapidjson::kObjectType;
 
 cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
 : ManagerBase(name),
-  name_(name), has_error_(false)
+  name_(name), has_error_(false), sn_("")
 {
   node_ptr_ = rclcpp::Node::make_shared(name_);
-  manager_vec_.emplace_back("device");
-  manager_vec_.emplace_back("sensor");
-  manager_vec_.emplace_back("motion");
-  manager_vec_.emplace_back("perception");
+  query_node_ptr_ = rclcpp::Node::make_shared(name_ + "_query");
+  executor_.add_node(node_ptr_);
+  executor_.add_node(query_node_ptr_);
+  device_info_get_srv_ =
+    query_node_ptr_->create_service<protocol::srv::DeviceInfo>(
+    "query_divice_info",
+    std::bind(
+      &CyberdogManager::QueryDeviceInfo, this, std::placeholders::_1,
+      std::placeholders::_2));
+  // manager_vec_.emplace_back("device");
+  // manager_vec_.emplace_back("sensor");
+  // manager_vec_.emplace_back("motion");
+  // manager_vec_.emplace_back("perception");
   manager_vec_.emplace_back("audio");
 
-  black_box_ptr_ = std::make_shared<BlackBox>(node_ptr_);
+  // black_box_ptr_ = std::make_shared<BlackBox>(node_ptr_);
   heart_beats_ptr_ = std::make_unique<cyberdog::machine::HeartBeats>(500, 5);
 }
 
@@ -58,7 +69,8 @@ bool cyberdog::manager::CyberdogManager::Init()
   if (!RegisterStateHandler(node_ptr_)) {
     return false;
   }
-  if (!SelfCheck() ) {
+  // if (!SelfCheck() ) {
+  if (false) {
     return false;
   } else {
     std::for_each(
@@ -95,7 +107,8 @@ bool cyberdog::manager::CyberdogManager::Init()
   // );
   SetState((int8_t)system::ManagerState::kActive);
 
-  if (!black_box_ptr_->Init()) {
+  // if (!black_box_ptr_->Init()) {
+  if (true) {
     // error msg
     // send msg to app ?
   }
@@ -193,7 +206,7 @@ void cyberdog::manager::CyberdogManager::HeartbeatsCallback(
 
 void cyberdog::manager::CyberdogManager::Run()
 {
-  rclcpp::spin(node_ptr_);
+  executor_.spin();
   rclcpp::shutdown();
 }
 
@@ -253,4 +266,62 @@ void cyberdog::manager::CyberdogManager::HeartbeatsStateNotify()
   this->SetState((int8_t)system::ManagerState::kError, std::move(json_string)) :
   this->SetState((int8_t)system::ManagerState::kOK, std::move(json_string));
   has_error_ = false;
+}
+
+void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
+  const protocol::srv::DeviceInfo::Request::SharedPtr request,
+  protocol::srv::DeviceInfo::Response::SharedPtr response)
+{
+  bool is_sn = request->enables[0];
+  bool is_version = request->enables[1];
+  std::string info;
+  info = "{";
+  if (is_sn) {
+    if (sn_ == "") {
+      rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_sn_ger_srv_;
+      audio_sn_ger_srv_ =
+        node_ptr_->create_client<std_srvs::srv::Trigger>("get_dog_sn");
+      if (!audio_sn_ger_srv_->wait_for_service(std::chrono::seconds(2))) {
+        ERROR("call sn server not avalible");
+      }
+      std::chrono::seconds timeout(3);
+      auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
+      auto future_result = audio_sn_ger_srv_->async_send_request(req);
+      std::future_status status = future_result.wait_for(timeout);
+      if (status == std::future_status::ready) {
+        sn_ = future_result.get()->message;
+      } else {
+        ERROR("call get sn service failed!");
+        sn_ = "unkown";
+      }
+    }
+    info += "\"sn\": ";
+    info += "\"";
+    info += sn_;
+    info += "\"";
+  }
+  if (is_version) {
+    rclcpp::Client<protocol::srv::OtaServerCmd>::SharedPtr ota_ver_get_srv_;
+    ota_ver_get_srv_ =
+      node_ptr_->create_client<protocol::srv::OtaServerCmd>("ota_versions");
+    if (!ota_ver_get_srv_->wait_for_service(std::chrono::seconds(2))) {
+      ERROR("call ota version not avalible");
+    }
+    std::chrono::seconds timeout(3);
+    auto req = std::make_shared<protocol::srv::OtaServerCmd::Request>();
+    req->request.key = "ota_command_version_query";
+    auto future_result = ota_ver_get_srv_->async_send_request(req);
+    std::future_status status = future_result.wait_for(timeout);
+    info += ";";
+    if (status == std::future_status::ready) {
+      std::string version = future_result.get()->response.type;
+      info += "\"version\": ";
+      info += version;
+    } else {
+      ERROR("call ota version failed!");
+      info += "\"version\": \"unkown\"";
+    }
+  }
+  info += "}";
+  response->info = info;
 }
