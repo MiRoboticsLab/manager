@@ -272,9 +272,15 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
   const protocol::srv::DeviceInfo::Request::SharedPtr request,
   protocol::srv::DeviceInfo::Response::SharedPtr response)
 {
+  std::string info;
+  if (request->enables.size() < 2) {
+    info = "{\"error\": \"parmameter count error\"}";
+    response->info = info;
+    return;
+  }
   bool is_sn = request->enables[0];
   bool is_version = request->enables[1];
-  std::string info;
+  bool is_query_delimer;
   info = "{";
   if (is_sn) {
     if (sn_ == "") {
@@ -299,6 +305,11 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     info += "\"";
     info += sn_;
     info += "\"";
+    is_sn = false;
+    is_query_delimer = is_sn | is_version;
+    if (is_query_delimer) {
+      info += ",";
+    }
   }
   if (is_version) {
     rclcpp::Client<protocol::srv::OtaServerCmd>::SharedPtr ota_ver_get_srv_;
@@ -312,9 +323,8 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     req->request.key = "ota_command_version_query";
     auto future_result = ota_ver_get_srv_->async_send_request(req);
     std::future_status status = future_result.wait_for(timeout);
-    info += ";";
     if (status == std::future_status::ready) {
-      std::string version = future_result.get()->response.type;
+      std::string version = future_result.get()->response.value;
       info += "\"version\": ";
       info += version;
     } else {
