@@ -34,13 +34,26 @@ public:
   BoardInfo() = delete;
   static std::string Get_Sn()
   {
-    char buf[256] = {0};
-    std::ifstream infile(INFO_FILE_NAME, std::ifstream::in);
-    if (infile.is_open()) {
-      infile.seekg(10485760, std::ios::beg);
-      infile.get(buf, sizeof(buf));
-    }
-    return buf;
+    // char buf[256] = {0};
+    // std::ifstream infile(INFO_FILE_NAME, std::ifstream::in);
+    // if (infile.is_open()) {
+    //   infile.seekg(10485760, std::ios::beg);
+    //   infile.get(buf, sizeof(buf));
+    // }
+    // return buf;
+	char buf[256] = {0};
+	FILE *stream = popen( "factory-tool -f /usr/share/factory_cmd_config/system.xml  -i \"SN\"", "r" );
+	fread( buf, sizeof(char), sizeof(buf), stream);
+	pclose( stream );
+	for(size_t i=0; i<strlen(buf); ++i)
+	{
+		if(buf[i] == '\n' || buf[i] == '\r' || buf[i] == ' ')
+		{
+		  buf[i] = '\0';
+		  break;
+		}
+	}
+	return buf;
   }
   static bool Get_Iot(std::string & mac, std::string & did, std::string & key)
   {

@@ -23,6 +23,7 @@
 #include "manager_base/manager_base.hpp"
 #include "black_box/black_box.hpp"
 #include "protocol/srv/device_info.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "cyberdog_machine/cyberdog_heartbeats.hpp"
 
 namespace cyberdog
@@ -65,11 +66,14 @@ private:
   void QueryDeviceInfo(
     const protocol::srv::DeviceInfo::Request::SharedPtr request,
     protocol::srv::DeviceInfo::Response::SharedPtr);
+  void UidCallback(const std_msgs::msg::String::SharedPtr msg);
 
 private:
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr uid_sub_;
   std::string name_;
   bool has_error_;
   std::string sn_;
+  std::string uid_;
   std::vector<std::string> manager_vec_;
   // std::vector<std::string> heartbeats_vec_;
   std::map<std::string, HeartbeatsRecorder> heartbeats_map_;

@@ -18,6 +18,7 @@
 #include <memory>
 #include <utility>
 #include <string>
+#include <fstream>
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/node.hpp"
 #include "std_srvs/srv/trigger.hpp"
@@ -25,6 +26,7 @@
 #include "cyberdog_manager/cyberdog_manager.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 #include "cyberdog_common/cyberdog_json.hpp"
+#include "ament_index_cpp/get_package_share_directory.hpp"
 
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
@@ -38,6 +40,19 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   query_node_ptr_ = rclcpp::Node::make_shared(name_ + "_query");
   executor_.add_node(node_ptr_);
   executor_.add_node(query_node_ptr_);
+  auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
+  auto path = local_share_dir + std::string("/toml_config/manager/settings.json");
+  Document json_document(kObjectType);
+  auto result = CyberdogJson::ReadJsonFromFile(path, json_document);
+  if(result)
+  {
+    CyberdogJson::Get(json_document, "uid", uid_);
+    INFO("uid:%s", uid_.c_str());
+  }
+  uid_sub_ =
+    query_node_ptr_->create_subscription<std_msgs::msg::String>(
+    "uid_set", 1,
+    std::bind(&CyberdogManager::UidCallback, this, std::placeholders::_1));
   device_info_get_srv_ =
     query_node_ptr_->create_service<protocol::srv::DeviceInfo>(
     "query_divice_info",
@@ -278,8 +293,18 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     response->info = info;
     return;
   }
-  bool is_sn = request->enables[0];
-  bool is_version = request->enables[1];
+  bool is_sn = false;
+  bool is_version = false;
+  bool is_uid = false;
+  if (request->enables.size() > 0) {
+    is_sn = request->enables[0];
+  }
+  if (request->enables.size() > 1) {
+    is_version = request->enables[1];
+  }
+  if (request->enables.size() > 2) {
+    is_uid = request->enables[2];
+  }
   bool is_query_delimer;
   info = "{";
   if (is_sn) {
@@ -306,7 +331,7 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     info += sn_;
     info += "\"";
     is_sn = false;
-    is_query_delimer = is_sn | is_version;
+    is_query_delimer = is_sn | is_version | is_uid;
     if (is_query_delimer) {
       info += ",";
     }
@@ -331,7 +356,46 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
       ERROR("call ota version failed!");
       info += "\"version\": \"unkown\"";
     }
+    is_version = false;
+    is_query_delimer = is_sn | is_version | is_uid;
+    if (is_query_delimer) {
+      info += ",";
+    }
+  }
+  if (is_uid)
+  {
+    info += "\"uid\": ";
+	info += "\"";
+    info += uid_;
+	info += "\"";
+    is_uid = false;
+    is_query_delimer = is_sn | is_version | is_uid;
+    if (is_query_delimer) {
+      info += ",";
+    }
   }
   info += "}";
   response->info = info;
 }
+
+void cyberdog::manager::CyberdogManager::UidCallback(const std_msgs::msg::String::SharedPtr msg)
+{
+  uid_ = msg->data;
+  INFO("user id:%s", uid_.c_str());
+  std::thread t([this](){
+    auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
+    auto path = local_share_dir + std::string("/toml_config/manager");
+    if(access(path.c_str(), F_OK) != 0)
+    {
+      std::string cmd = "mkdir -p " + path;
+      std::system(cmd.c_str());
+    }
+    auto json_file = path + "/settings.json";
+    Document json_document(kObjectType);
+    CyberdogJson::ReadJsonFromFile(json_file, json_document);
+    CyberdogJson::Add(json_document, "uid", uid_);
+    CyberdogJson::WriteJsonToFile(json_file, json_document);
+  });
+  t.detach();
+}
+
