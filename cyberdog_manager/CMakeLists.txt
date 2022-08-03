@@ -39,7 +39,7 @@ ament_target_dependencies( ${PROJECT_NAME}
   cyberdog_machine
   std_srvs
   protocol
-  ament_index_cpp	)
+  ament_index_cpp )
 
 install(TARGETS ${PROJECT_NAME}
   DESTINATION lib/${PROJECT_NAME})
