@@ -23,6 +23,7 @@ cyberdog::manager::CyberdogPermission::CyberdogPermission()
 : Node(NODE_NAME)
 {
   cyberdog_sn = BoardInfo::Get_Sn();
+  INFO("sn:%s", cyberdog_sn.c_str());
   sn_srv_ =
     this->create_service<std_srvs::srv::Trigger>(
     "get_dog_sn",

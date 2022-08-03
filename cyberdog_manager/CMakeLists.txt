@@ -23,6 +23,7 @@ find_package(black_box REQUIRED)
 find_package(cyberdog_machine REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(protocol REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 
 include_directories(include)
 
@@ -37,7 +38,8 @@ ament_target_dependencies( ${PROJECT_NAME}
   black_box
   cyberdog_machine
   std_srvs
-  protocol )
+  protocol
+  ament_index_cpp )
 
 install(TARGETS ${PROJECT_NAME}
   DESTINATION lib/${PROJECT_NAME})
