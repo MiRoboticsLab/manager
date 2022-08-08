@@ -295,6 +295,12 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
   bool is_sn = false;
   bool is_version = false;
   bool is_uid = false;
+  // bool is_nick_name = false;
+  // bool is_volume = false;
+  // bool is_mic_state = false;
+  // bool is_voice_control = false;
+  // bool is_wifi = false;
+  // bool is_bat_info = false;
   if (request->enables.size() > 0) {
     is_sn = request->enables[0];
   }
@@ -304,6 +310,24 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
   if (request->enables.size() > 2) {
     is_uid = request->enables[2];
   }
+  // if (request->enables.size() > 3) {
+  //   is_nick_name = request->enables[3];
+  // }
+  // if (request->enables.size() > 4) {
+  //   is_volume = request->enables[4];
+  // }
+  // if (request->enables.size() > 5) {
+  //   is_mic_state = request->enables[5];
+  // }
+  // if (request->enables.size() > 6) {
+  //   is_voice_control = request->enables[6];
+  // }
+  // if (request->enables.size() > 7) {
+  //   is_wifi = request->enables[7];
+  // }
+  // if (request->enables.size() > 8) {
+  //   is_bat_info = request->enables[8];
+  // }
   bool is_query_delimer;
   info = "{";
   if (is_sn) {
