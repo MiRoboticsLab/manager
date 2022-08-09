@@ -286,16 +286,21 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
   const protocol::srv::DeviceInfo::Request::SharedPtr request,
   protocol::srv::DeviceInfo::Response::SharedPtr response)
 {
+  Document json_info(kObjectType);
   std::string info;
-  if (request->enables.size() < 2) {
-    info = "{\"error\": \"parmameter count error\"}";
+  if (request->enables.size() < 1) {
+    CyberdogJson::Add(json_info, "error", "parmameter count error");
+    if (!CyberdogJson::Document2String(json_info, info)) {
+      ERROR("error while encoding to json");
+      info = "{\"error\": \"parmameter count error!\"}";
+    }
     response->info = info;
     return;
   }
   bool is_sn = false;
   bool is_version = false;
   bool is_uid = false;
-  // bool is_nick_name = false;
+  bool is_nick_name = false;
   // bool is_volume = false;
   // bool is_mic_state = false;
   // bool is_voice_control = false;
@@ -310,9 +315,9 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
   if (request->enables.size() > 2) {
     is_uid = request->enables[2];
   }
-  // if (request->enables.size() > 3) {
-  //   is_nick_name = request->enables[3];
-  // }
+  if (request->enables.size() > 3) {
+    is_nick_name = request->enables[3];
+  }
   // if (request->enables.size() > 4) {
   //   is_volume = request->enables[4];
   // }
@@ -328,8 +333,6 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
   // if (request->enables.size() > 8) {
   //   is_bat_info = request->enables[8];
   // }
-  bool is_query_delimer;
-  info = "{";
   if (is_sn) {
     if (sn_ == "") {
       rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_sn_ger_srv_;
@@ -349,15 +352,7 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
         sn_ = "unkown";
       }
     }
-    info += "\"sn\": ";
-    info += "\"";
-    info += sn_;
-    info += "\"";
-    is_sn = false;
-    is_query_delimer = is_sn | is_version | is_uid;
-    if (is_query_delimer) {
-      info += ",";
-    }
+    CyberdogJson::Add(json_info, "sn", sn_);
   }
   if (is_version) {
     rclcpp::Client<protocol::srv::OtaServerCmd>::SharedPtr ota_ver_get_srv_;
@@ -373,30 +368,28 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     std::future_status status = future_result.wait_for(timeout);
     if (status == std::future_status::ready) {
       std::string version = future_result.get()->response.value;
-      info += "\"version\": ";
-      info += version;
+      Document version_doc(kObjectType);
+      if (!CyberdogJson::String2Document(version, version_doc)) {
+        ERROR("error while encoding version info to json");
+        CyberdogJson::Add(version_doc, "version", "exception");
+      } else {
+        CyberdogJson::Add(json_info, "version", version_doc);
+      }
     } else {
       ERROR("call ota version failed!");
-      info += "\"version\": \"unkown\"";
-    }
-    is_version = false;
-    is_query_delimer = is_sn | is_version | is_uid;
-    if (is_query_delimer) {
-      info += ",";
+      CyberdogJson::Add(json_info, "version", "unkown");
     }
   }
   if (is_uid) {
-    info += "\"uid\": ";
-    info += "\"";
-    info += uid_;
-    info += "\"";
-    is_uid = false;
-    is_query_delimer = is_sn | is_version | is_uid;
-    if (is_query_delimer) {
-      info += ",";
-    }
+    CyberdogJson::Add(json_info, "uid", uid_);
   }
-  info += "}";
+  if (is_nick_name) {
+    CyberdogJson::Add(json_info, "nick_name", "nick_name");
+  }
+  if (!CyberdogJson::Document2String(json_info, info)) {
+    ERROR("error while encoding to json");
+    info = "{\"error\": \"unkown encoding json error!\"}";
+  }
   response->info = info;
 }
 
@@ -407,10 +400,6 @@ void cyberdog::manager::CyberdogManager::UidCallback(const std_msgs::msg::String
   std::thread t([this]() {
       auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
       auto path = local_share_dir + std::string("/toml_config/manager");
-      if (access(path.c_str(), F_OK) != 0) {
-        std::string cmd = "mkdir -p " + path;
-        std::system(cmd.c_str());
-      }
       auto json_file = path + "/settings.json";
       Document json_document(kObjectType);
       CyberdogJson::ReadJsonFromFile(json_file, json_document);

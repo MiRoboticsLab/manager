@@ -14,6 +14,7 @@
 #include "cyberdog_permission/cyberdog_permission.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 #include "cyberdog_common/cyberdog_json.hpp"
+#include "ament_index_cpp/get_package_share_directory.hpp"
 
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
@@ -24,6 +25,14 @@ cyberdog::manager::CyberdogPermission::CyberdogPermission()
 {
   cyberdog_sn = BoardInfo::Get_Sn();
   INFO("sn:%s", cyberdog_sn.c_str());
+  auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
+  auto path = local_share_dir + std::string("/toml_config/manager");
+  if (access(path.c_str(), F_OK) != 0) {
+    std::string cmd = "mkdir -p " + path;
+    std::system(cmd.c_str());
+    cmd = "chmod 777 " + path;
+    std::system(cmd.c_str());    
+  }  
   sn_srv_ =
     this->create_service<std_srvs::srv::Trigger>(
     "get_dog_sn",

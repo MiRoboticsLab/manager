@@ -18,6 +18,7 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(cyberdog_common REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 
 include_directories(include)
 
@@ -27,7 +28,8 @@ ament_target_dependencies( ${PROJECT_NAME}
   rclcpp
   std_msgs
   std_srvs
-  cyberdog_common)
+  cyberdog_common
+  ament_index_cpp)
 
 install(TARGETS ${PROJECT_NAME}
   DESTINATION lib/${PROJECT_NAME})
