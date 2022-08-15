@@ -361,7 +361,7 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     is_bat_info = request->enables[8];
   }
   if (request->enables.size() > 9) {
-    is_bat_info = request->enables[9];
+    is_motor_temper = request->enables[9];
   }
   if (is_sn) {
     if (sn_ == "") {
@@ -517,6 +517,7 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
       "is_charging", ((bms_status_.batt_st & 2) >> 1) == 1 ? true : false,
       allocator);
     bat_val.AddMember("discharge_time", 120, allocator);
+    CyberdogJson::Add(json_info, "bat_info", bat_val);
   }
   if (is_motor_temper) {
     rapidjson::Value motor_temper_array(rapidjson::kArrayType);
