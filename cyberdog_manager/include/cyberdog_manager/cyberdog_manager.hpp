@@ -99,6 +99,7 @@ private:
   std::map<std::string, HeartbeatsRecorder> heartbeats_map_;
   rclcpp::Node::SharedPtr node_ptr_ {nullptr};
   rclcpp::Node::SharedPtr query_node_ptr_ {nullptr};
+  rclcpp::Node::SharedPtr query_node_feedback_ptr_ {nullptr};
   rclcpp::executors::MultiThreadedExecutor executor_;
   rclcpp::Subscription<ManagerHeartbeatsMsg>::SharedPtr heartbeats_sub_{nullptr};
   rclcpp::Subscription<protocol::msg::ConnectorStatus>::SharedPtr connect_status_sub_;

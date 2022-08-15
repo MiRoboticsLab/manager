@@ -39,8 +39,10 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
 {
   node_ptr_ = rclcpp::Node::make_shared(name_);
   query_node_ptr_ = rclcpp::Node::make_shared(name_ + "_query");
+  query_node_feedback_ptr_ = rclcpp::Node::make_shared(name_ + "_query_feedback");
   executor_.add_node(node_ptr_);
   executor_.add_node(query_node_ptr_);
+  executor_.add_node(query_node_feedback_ptr_);
   auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
   auto path = local_share_dir + std::string("/toml_config/manager/settings.json");
   Document json_document(kObjectType);
@@ -61,11 +63,11 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   }
   wifi_info_ptr_ = std::make_unique<cyberdog::manager::WifiInfo>();
   uid_sub_ =
-    query_node_ptr_->create_subscription<std_msgs::msg::String>(
+    query_node_feedback_ptr_->create_subscription<std_msgs::msg::String>(
     "uid_set", rclcpp::SystemDefaultsQoS(),
     std::bind(&CyberdogManager::UidCallback, this, std::placeholders::_1));
   dog_info_update_sub_ =
-    query_node_ptr_->create_subscription<std_msgs::msg::Bool>(
+    query_node_feedback_ptr_->create_subscription<std_msgs::msg::Bool>(
     "dog_info_update", rclcpp::SystemDefaultsQoS(),
     std::bind(&CyberdogManager::DogInfoUpdate, this, std::placeholders::_1));
   device_info_get_srv_ =
@@ -75,9 +77,9 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
       &CyberdogManager::QueryDeviceInfo, this, std::placeholders::_1,
       std::placeholders::_2));
   audio_volume_get_client_ =
-    query_node_ptr_->create_client<protocol::srv::AudioVolumeGet>("audio_volume_get");
+    query_node_feedback_ptr_->create_client<protocol::srv::AudioVolumeGet>("audio_volume_get");
   audio_execute_client_ =
-    query_node_ptr_->create_client<protocol::srv::AudioExecute>("set_audio_state");
+    query_node_feedback_ptr_->create_client<protocol::srv::AudioExecute>("set_audio_state");
   // manager_vec_.emplace_back("device");
   // manager_vec_.emplace_back("sensor");
   // manager_vec_.emplace_back("motion");
