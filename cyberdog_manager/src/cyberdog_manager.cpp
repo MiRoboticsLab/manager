@@ -573,6 +573,9 @@ void cyberdog::manager::CyberdogManager::DogInfoUpdate(const std_msgs::msg::Bool
       if (dog_val.HasMember("nick_name")) {
         nick_name_ = dog_val["nick_name"].GetString();
       }
+      if (dog_val.HasMember("enable")) {
+        name_switch_ = dog_val["enable"].GetBool();
+      }
       INFO("update nick name:%s", nick_name_.c_str());
     }
   }
