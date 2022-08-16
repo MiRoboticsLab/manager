@@ -79,7 +79,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   audio_volume_get_client_ =
     query_node_feedback_ptr_->create_client<protocol::srv::AudioVolumeGet>("audio_volume_get");
   audio_execute_client_ =
-    query_node_feedback_ptr_->create_client<protocol::srv::AudioExecute>("set_audio_state");
+    query_node_feedback_ptr_->create_client<protocol::srv::AudioExecute>("get_audio_state");
   // manager_vec_.emplace_back("device");
   // manager_vec_.emplace_back("sensor");
   // manager_vec_.emplace_back("motion");
@@ -462,7 +462,7 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     } else {
       std::chrono::seconds timeout(3);
       auto req = std::make_shared<protocol::srv::AudioExecute::Request>();
-      req->client = "app_server";
+      req->client = name_;
       auto future_result = audio_execute_client_->async_send_request(req);
       std::future_status status = future_result.wait_for(timeout);
       if (status == std::future_status::ready) {
@@ -484,7 +484,7 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     } else {
       std::chrono::seconds timeout(3);
       auto req = std::make_shared<protocol::srv::AudioExecute::Request>();
-      req->client = "app_server";
+      req->client = name_;
       auto future_result = audio_execute_client_->async_send_request(req);
       std::future_status status = future_result.wait_for(timeout);
       if (status == std::future_status::ready) {
