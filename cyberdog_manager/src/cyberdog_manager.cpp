@@ -80,6 +80,8 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     query_node_feedback_ptr_->create_client<protocol::srv::AudioVolumeGet>("audio_volume_get");
   audio_execute_client_ =
     query_node_feedback_ptr_->create_client<protocol::srv::AudioExecute>("get_audio_state");
+  motor_temper_client_ =
+    query_node_feedback_ptr_->create_client<protocol::srv::MotorTemp>("motor_temp");
   // manager_vec_.emplace_back("device");
   // manager_vec_.emplace_back("sensor");
   // manager_vec_.emplace_back("motion");
@@ -522,20 +524,78 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     CyberdogJson::Add(json_info, "bat_info", bat_val);
   }
   if (is_motor_temper) {
-    rapidjson::Value motor_temper_array(rapidjson::kArrayType);
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    CyberdogJson::Add(json_info, "motor_temper", motor_temper_array);
+    rapidjson::Value motor_temper_val(rapidjson::kObjectType);
+    if (!motor_temper_client_->wait_for_service()) {
+      INFO(
+        "call mic motor temper server not avalible");
+      CyberdogJson::Add(json_info, "motor_temper", "unavalible");
+    } else {
+      std::chrono::seconds timeout(3);
+      auto req = std::make_shared<protocol::srv::MotorTemp::Request>();
+      auto future_result = motor_temper_client_->async_send_request(req);
+      std::future_status status = future_result.wait_for(timeout);
+      if (status == std::future_status::ready) {
+        INFO(
+          "success to call motor temper services.");
+        rapidjson::Value hip_temper_array(rapidjson::kArrayType);
+        float & hip_left_front = future_result.get()->motor_temp[1];
+        float & hip_right_front = future_result.get()->motor_temp[0];
+        float & hip_left_back = future_result.get()->motor_temp[3];
+        float & hip_right_back = future_result.get()->motor_temp[2];
+        hip_temper_array.PushBack(
+          rapidjson::Value(hip_left_front).Move(),
+          json_info.GetAllocator());
+        hip_temper_array.PushBack(
+          rapidjson::Value(hip_right_front).Move(),
+          json_info.GetAllocator());
+        hip_temper_array.PushBack(rapidjson::Value(hip_left_back).Move(), json_info.GetAllocator());
+        hip_temper_array.PushBack(
+          rapidjson::Value(hip_right_back).Move(),
+          json_info.GetAllocator());
+        motor_temper_val.AddMember("hip", hip_temper_array, json_info.GetAllocator());
+        rapidjson::Value thigh_temper_array(rapidjson::kArrayType);
+        float & thigh_left_front = future_result.get()->motor_temp[5];
+        float & thigh_right_front = future_result.get()->motor_temp[4];
+        float & thigh_left_back = future_result.get()->motor_temp[7];
+        float & thigh_right_back = future_result.get()->motor_temp[6];
+        thigh_temper_array.PushBack(
+          rapidjson::Value(
+            thigh_left_front).Move(), json_info.GetAllocator());
+        thigh_temper_array.PushBack(
+          rapidjson::Value(
+            thigh_right_front).Move(), json_info.GetAllocator());
+        thigh_temper_array.PushBack(
+          rapidjson::Value(thigh_left_back).Move(),
+          json_info.GetAllocator());
+        thigh_temper_array.PushBack(
+          rapidjson::Value(
+            thigh_right_back).Move(), json_info.GetAllocator());
+        motor_temper_val.AddMember("thigh", thigh_temper_array, json_info.GetAllocator());
+        rapidjson::Value crus_temper_array(rapidjson::kArrayType);
+        float & crus_left_front = future_result.get()->motor_temp[9];
+        float & crus_right_front = future_result.get()->motor_temp[8];
+        float & crus_left_back = future_result.get()->motor_temp[11];
+        float & crus_right_back = future_result.get()->motor_temp[10];
+        crus_temper_array.PushBack(
+          rapidjson::Value(crus_left_front).Move(),
+          json_info.GetAllocator());
+        crus_temper_array.PushBack(
+          rapidjson::Value(crus_right_front).Move(),
+          json_info.GetAllocator());
+        crus_temper_array.PushBack(
+          rapidjson::Value(crus_left_back).Move(),
+          json_info.GetAllocator());
+        crus_temper_array.PushBack(
+          rapidjson::Value(crus_right_back).Move(),
+          json_info.GetAllocator());
+        motor_temper_val.AddMember("crus", crus_temper_array, json_info.GetAllocator());
+        CyberdogJson::Add(json_info, "motor_temper", motor_temper_val);
+      } else {
+        INFO(
+          "Failed to call amotor temper services.");
+        CyberdogJson::Add(json_info, "motor_temper", "unkown");
+      }
+    }
   }
   if (!CyberdogJson::Document2String(json_info, info)) {
     ERROR("error while encoding to json");
