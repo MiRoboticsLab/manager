@@ -28,6 +28,7 @@
 #include "protocol/srv/motor_temp.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_srvs/srv/trigger.hpp"
 #include "protocol/msg/connector_status.hpp"
 #include "protocol/msg/bms_status.hpp"
 #include "cyberdog_machine/cyberdog_heartbeats.hpp"
@@ -110,6 +111,7 @@ private:
   rclcpp::Client<protocol::srv::AudioVolumeGet>::SharedPtr audio_volume_get_client_;
   rclcpp::Client<protocol::srv::AudioExecute>::SharedPtr audio_execute_client_;
   rclcpp::Client<protocol::srv::MotorTemp>::SharedPtr motor_temper_client_;
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_active_state_client_;
 
   std::shared_ptr<BlackBox> black_box_ptr_ {nullptr};
   std::unique_ptr<cyberdog::machine::HeartBeats> heart_beats_ptr_ {nullptr};

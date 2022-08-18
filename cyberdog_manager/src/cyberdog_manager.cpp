@@ -82,6 +82,8 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     query_node_feedback_ptr_->create_client<protocol::srv::AudioExecute>("get_audio_state");
   motor_temper_client_ =
     query_node_feedback_ptr_->create_client<protocol::srv::MotorTemp>("motor_temp");
+  audio_active_state_client_ =
+    query_node_feedback_ptr_->create_client<std_srvs::srv::Trigger>("audio_active_state");
   // manager_vec_.emplace_back("device");
   // manager_vec_.emplace_back("sensor");
   // manager_vec_.emplace_back("motion");
@@ -337,6 +339,8 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
   bool is_wifi = false;
   bool is_bat_info = false;
   bool is_motor_temper = false;
+  bool is_audio_state = false;
+  bool is_device_model = false;
   if (request->enables.size() > 0) {
     is_sn = request->enables[0];
   }
@@ -366,6 +370,12 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
   }
   if (request->enables.size() > 9) {
     is_motor_temper = request->enables[9];
+  }
+  if (request->enables.size() > 10) {
+    is_audio_state = request->enables[10];
+  }
+  if (request->enables.size() > 11) {
+    is_device_model = request->enables[11];
   }
   if (is_sn) {
     if (sn_ == "") {
@@ -596,6 +606,30 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
         CyberdogJson::Add(json_info, "motor_temper", "unkown");
       }
     }
+  }
+  if (is_audio_state) {
+    if (!audio_active_state_client_->wait_for_service()) {
+      INFO(
+        "call audio active state server not avalible");
+      CyberdogJson::Add(json_info, "audio_state", false);
+    } else {
+      std::chrono::seconds timeout(3);
+      auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
+      auto future_result = audio_active_state_client_->async_send_request(req);
+      std::future_status status = future_result.wait_for(timeout);
+      if (status == std::future_status::ready) {
+        INFO(
+          "success to call audio active state services.");
+        CyberdogJson::Add(json_info, "audio_state", future_result.get()->success);
+      } else {
+        INFO(
+          "Failed to call audio active state services.");
+        CyberdogJson::Add(json_info, "audio_state", false);
+      }
+    }
+  }
+  if (is_device_model) {
+    CyberdogJson::Add(json_info, "device_model", "MS2241CN");
   }
   if (!CyberdogJson::Document2String(json_info, info)) {
     ERROR("error while encoding to json");
