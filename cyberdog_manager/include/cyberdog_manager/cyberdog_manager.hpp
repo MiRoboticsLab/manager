@@ -110,6 +110,7 @@ private:
   rclcpp::Service<protocol::srv::DeviceInfo>::SharedPtr device_info_get_srv_;
   rclcpp::Client<protocol::srv::AudioVolumeGet>::SharedPtr audio_volume_get_client_;
   rclcpp::Client<protocol::srv::AudioExecute>::SharedPtr audio_execute_client_;
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_action_get_client_;
   rclcpp::Client<protocol::srv::MotorTemp>::SharedPtr motor_temper_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_active_state_client_;
 

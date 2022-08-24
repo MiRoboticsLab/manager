@@ -80,6 +80,8 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     query_node_feedback_ptr_->create_client<protocol::srv::AudioVolumeGet>("audio_volume_get");
   audio_execute_client_ =
     query_node_feedback_ptr_->create_client<protocol::srv::AudioExecute>("get_audio_state");
+  audio_action_get_client_ =
+    query_node_feedback_ptr_->create_client<std_srvs::srv::Trigger>("audio_action_get");
   motor_temper_client_ =
     query_node_feedback_ptr_->create_client<protocol::srv::MotorTemp>("motor_temp");
   audio_active_state_client_ =
@@ -489,23 +491,22 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     }
   }
   if (is_voice_control) {
-    if (!audio_execute_client_->wait_for_service()) {
+    if (!audio_action_get_client_->wait_for_service()) {
       INFO(
-        "call mic state(voice control) server not avalible");
+        "call voice control server not avalible");
       CyberdogJson::Add(json_info, "voice_control", false);
     } else {
       std::chrono::seconds timeout(3);
-      auto req = std::make_shared<protocol::srv::AudioExecute::Request>();
-      req->client = name_;
-      auto future_result = audio_execute_client_->async_send_request(req);
+      auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
+      auto future_result = audio_action_get_client_->async_send_request(req);
       std::future_status status = future_result.wait_for(timeout);
       if (status == std::future_status::ready) {
         INFO(
-          "success to call audio execute(voice control) services.");
-        CyberdogJson::Add(json_info, "voice_control", future_result.get()->result);
+          "success to call voice control services.");
+        CyberdogJson::Add(json_info, "voice_control", future_result.get()->success);
       } else {
         INFO(
-          "Failed to call audio execute(voice control) services.");
+          "Failed to call voice control services.");
         CyberdogJson::Add(json_info, "voice_control", false);
       }
     }
