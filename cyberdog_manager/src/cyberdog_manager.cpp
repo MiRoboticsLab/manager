@@ -80,6 +80,12 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     query_node_feedback_ptr_->create_client<protocol::srv::AudioVolumeGet>("audio_volume_get");
   audio_execute_client_ =
     query_node_feedback_ptr_->create_client<protocol::srv::AudioExecute>("get_audio_state");
+  audio_action_get_client_ =
+    query_node_feedback_ptr_->create_client<std_srvs::srv::Trigger>("audio_action_get");
+  motor_temper_client_ =
+    query_node_feedback_ptr_->create_client<protocol::srv::MotorTemp>("motor_temp");
+  audio_active_state_client_ =
+    query_node_feedback_ptr_->create_client<std_srvs::srv::Trigger>("audio_active_state");
   // manager_vec_.emplace_back("device");
   // manager_vec_.emplace_back("sensor");
   // manager_vec_.emplace_back("motion");
@@ -335,6 +341,8 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
   bool is_wifi = false;
   bool is_bat_info = false;
   bool is_motor_temper = false;
+  bool is_audio_state = false;
+  bool is_device_model = false;
   if (request->enables.size() > 0) {
     is_sn = request->enables[0];
   }
@@ -364,6 +372,12 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
   }
   if (request->enables.size() > 9) {
     is_motor_temper = request->enables[9];
+  }
+  if (request->enables.size() > 10) {
+    is_audio_state = request->enables[10];
+  }
+  if (request->enables.size() > 11) {
+    is_device_model = request->enables[11];
   }
   if (is_sn) {
     if (sn_ == "") {
@@ -477,23 +491,22 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     }
   }
   if (is_voice_control) {
-    if (!audio_execute_client_->wait_for_service()) {
+    if (!audio_action_get_client_->wait_for_service()) {
       INFO(
-        "call mic state(voice control) server not avalible");
+        "call voice control server not avalible");
       CyberdogJson::Add(json_info, "voice_control", false);
     } else {
       std::chrono::seconds timeout(3);
-      auto req = std::make_shared<protocol::srv::AudioExecute::Request>();
-      req->client = name_;
-      auto future_result = audio_execute_client_->async_send_request(req);
+      auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
+      auto future_result = audio_action_get_client_->async_send_request(req);
       std::future_status status = future_result.wait_for(timeout);
       if (status == std::future_status::ready) {
         INFO(
-          "success to call audio execute(voice control) services.");
-        CyberdogJson::Add(json_info, "voice_control", future_result.get()->result);
+          "success to call voice control services.");
+        CyberdogJson::Add(json_info, "voice_control", future_result.get()->success);
       } else {
         INFO(
-          "Failed to call audio execute(voice control) services.");
+          "Failed to call voice control services.");
         CyberdogJson::Add(json_info, "voice_control", false);
       }
     }
@@ -522,20 +535,102 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     CyberdogJson::Add(json_info, "bat_info", bat_val);
   }
   if (is_motor_temper) {
-    rapidjson::Value motor_temper_array(rapidjson::kArrayType);
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    motor_temper_array.PushBack(rapidjson::Value(90).Move(), json_info.GetAllocator());
-    CyberdogJson::Add(json_info, "motor_temper", motor_temper_array);
+    rapidjson::Value motor_temper_val(rapidjson::kObjectType);
+    if (!motor_temper_client_->wait_for_service()) {
+      INFO(
+        "call mic motor temper server not avalible");
+      CyberdogJson::Add(json_info, "motor_temper", "unavalible");
+    } else {
+      std::chrono::seconds timeout(3);
+      auto req = std::make_shared<protocol::srv::MotorTemp::Request>();
+      auto future_result = motor_temper_client_->async_send_request(req);
+      std::future_status status = future_result.wait_for(timeout);
+      if (status == std::future_status::ready) {
+        INFO(
+          "success to call motor temper services.");
+        rapidjson::Value hip_temper_array(rapidjson::kArrayType);
+        float & hip_left_front = future_result.get()->motor_temp[1];
+        float & hip_right_front = future_result.get()->motor_temp[0];
+        float & hip_left_back = future_result.get()->motor_temp[3];
+        float & hip_right_back = future_result.get()->motor_temp[2];
+        hip_temper_array.PushBack(
+          rapidjson::Value(hip_left_front).Move(),
+          json_info.GetAllocator());
+        hip_temper_array.PushBack(
+          rapidjson::Value(hip_right_front).Move(),
+          json_info.GetAllocator());
+        hip_temper_array.PushBack(rapidjson::Value(hip_left_back).Move(), json_info.GetAllocator());
+        hip_temper_array.PushBack(
+          rapidjson::Value(hip_right_back).Move(),
+          json_info.GetAllocator());
+        motor_temper_val.AddMember("hip", hip_temper_array, json_info.GetAllocator());
+        rapidjson::Value thigh_temper_array(rapidjson::kArrayType);
+        float & thigh_left_front = future_result.get()->motor_temp[5];
+        float & thigh_right_front = future_result.get()->motor_temp[4];
+        float & thigh_left_back = future_result.get()->motor_temp[7];
+        float & thigh_right_back = future_result.get()->motor_temp[6];
+        thigh_temper_array.PushBack(
+          rapidjson::Value(
+            thigh_left_front).Move(), json_info.GetAllocator());
+        thigh_temper_array.PushBack(
+          rapidjson::Value(
+            thigh_right_front).Move(), json_info.GetAllocator());
+        thigh_temper_array.PushBack(
+          rapidjson::Value(thigh_left_back).Move(),
+          json_info.GetAllocator());
+        thigh_temper_array.PushBack(
+          rapidjson::Value(
+            thigh_right_back).Move(), json_info.GetAllocator());
+        motor_temper_val.AddMember("thigh", thigh_temper_array, json_info.GetAllocator());
+        rapidjson::Value crus_temper_array(rapidjson::kArrayType);
+        float & crus_left_front = future_result.get()->motor_temp[9];
+        float & crus_right_front = future_result.get()->motor_temp[8];
+        float & crus_left_back = future_result.get()->motor_temp[11];
+        float & crus_right_back = future_result.get()->motor_temp[10];
+        crus_temper_array.PushBack(
+          rapidjson::Value(crus_left_front).Move(),
+          json_info.GetAllocator());
+        crus_temper_array.PushBack(
+          rapidjson::Value(crus_right_front).Move(),
+          json_info.GetAllocator());
+        crus_temper_array.PushBack(
+          rapidjson::Value(crus_left_back).Move(),
+          json_info.GetAllocator());
+        crus_temper_array.PushBack(
+          rapidjson::Value(crus_right_back).Move(),
+          json_info.GetAllocator());
+        motor_temper_val.AddMember("crus", crus_temper_array, json_info.GetAllocator());
+        CyberdogJson::Add(json_info, "motor_temper", motor_temper_val);
+      } else {
+        INFO(
+          "Failed to call amotor temper services.");
+        CyberdogJson::Add(json_info, "motor_temper", "unkown");
+      }
+    }
+  }
+  if (is_audio_state) {
+    if (!audio_active_state_client_->wait_for_service()) {
+      INFO(
+        "call audio active state server not avalible");
+      CyberdogJson::Add(json_info, "audio_state", false);
+    } else {
+      std::chrono::seconds timeout(3);
+      auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
+      auto future_result = audio_active_state_client_->async_send_request(req);
+      std::future_status status = future_result.wait_for(timeout);
+      if (status == std::future_status::ready) {
+        INFO(
+          "success to call audio active state services.");
+        CyberdogJson::Add(json_info, "audio_state", future_result.get()->success);
+      } else {
+        INFO(
+          "Failed to call audio active state services.");
+        CyberdogJson::Add(json_info, "audio_state", false);
+      }
+    }
+  }
+  if (is_device_model) {
+    CyberdogJson::Add(json_info, "device_model", "MS2241CN");
   }
   if (!CyberdogJson::Document2String(json_info, info)) {
     ERROR("error while encoding to json");

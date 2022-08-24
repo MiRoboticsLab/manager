@@ -14,9 +14,11 @@
 #ifndef CYBERDOG_PERMISSION__CYBERDOG_PERMISSION_HPP_
 #define CYBERDOG_PERMISSION__CYBERDOG_PERMISSION_HPP_
 #include <string>
+#include <thread>
 #include "rclcpp/rclcpp.hpp"
 #include "cyberdog_permission/board_info.hpp"
 #include "std_srvs/srv/trigger.hpp"
+#include "std_msgs/msg/string.hpp"
 
 #define NODE_NAME "cyberdog_permission"
 
@@ -36,7 +38,10 @@ private:
 
 private:
   std::string cyberdog_sn;
+  // std::thread sn_thread;
+  rclcpp::CallbackGroup::SharedPtr callback_group_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr sn_srv_;
+  // rclcpp::Publisher<std_msgs::msg::String>::SharedPtr sn_pub_;
 };  // class CyberdogPermission
 }  // namespace manager
 }  // namespace cyberdog
