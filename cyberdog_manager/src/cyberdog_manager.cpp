@@ -448,7 +448,7 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     CyberdogJson::Add(json_info, "nick_name", name_val);
   }
   if (is_volume) {
-    if (!audio_volume_get_client_->wait_for_service()) {
+    if (!audio_volume_get_client_->wait_for_service(std::chrono::seconds(2))) {
       INFO(
         "call VolumeGet server not avalible");
       CyberdogJson::Add(json_info, "volume", -255);
@@ -469,7 +469,7 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     }
   }
   if (is_mic_state) {
-    if (!audio_execute_client_->wait_for_service()) {
+    if (!audio_execute_client_->wait_for_service(std::chrono::seconds(2))) {
       INFO(
         "call mic state server not avalible");
       CyberdogJson::Add(json_info, "mic_state", false);
@@ -491,7 +491,7 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     }
   }
   if (is_voice_control) {
-    if (!audio_action_get_client_->wait_for_service()) {
+    if (!audio_action_get_client_->wait_for_service(std::chrono::seconds(2))) {
       INFO(
         "call voice control server not avalible");
       CyberdogJson::Add(json_info, "voice_control", false);
@@ -536,7 +536,7 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
   }
   if (is_motor_temper) {
     rapidjson::Value motor_temper_val(rapidjson::kObjectType);
-    if (!motor_temper_client_->wait_for_service()) {
+    if (!motor_temper_client_->wait_for_service(std::chrono::seconds(2))) {
       INFO(
         "call mic motor temper server not avalible");
       CyberdogJson::Add(json_info, "motor_temper", "unavalible");
@@ -609,7 +609,7 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     }
   }
   if (is_audio_state) {
-    if (!audio_active_state_client_->wait_for_service()) {
+    if (!audio_active_state_client_->wait_for_service(std::chrono::seconds(2))) {
       INFO(
         "call audio active state server not avalible");
       CyberdogJson::Add(json_info, "audio_state", false);
