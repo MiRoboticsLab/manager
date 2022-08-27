@@ -23,6 +23,7 @@
 #include "rclcpp/node.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "protocol/srv/ota_server_cmd.hpp"
+#include "protocol/msg/motion_id.hpp"
 #include "cyberdog_manager/cyberdog_manager.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 #include "cyberdog_common/cyberdog_json.hpp"
@@ -76,6 +77,10 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     std::bind(
       &CyberdogManager::QueryDeviceInfo, this, std::placeholders::_1,
       std::placeholders::_2));
+  motion_status_sub_ =
+    query_node_feedback_ptr_->create_subscription<protocol::msg::MotionStatus>(
+    "motion_status", rclcpp::SystemDefaultsQoS(),
+    std::bind(&CyberdogManager::MotionStatus, this, std::placeholders::_1));
   audio_volume_get_client_ =
     query_node_feedback_ptr_->create_client<protocol::srv::AudioVolumeGet>("audio_volume_get");
   audio_execute_client_ =
@@ -343,6 +348,7 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
   bool is_motor_temper = false;
   bool is_audio_state = false;
   bool is_device_model = false;
+  bool is_stand_up = false;
   if (request->enables.size() > 0) {
     is_sn = request->enables[0];
   }
@@ -378,6 +384,9 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
   }
   if (request->enables.size() > 11) {
     is_device_model = request->enables[11];
+  }
+  if (request->enables.size() > 12) {
+    is_stand_up = request->enables[12];
   }
   if (is_sn) {
     if (sn_ == "") {
@@ -632,6 +641,9 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
   if (is_device_model) {
     CyberdogJson::Add(json_info, "device_model", "MS2241CN");
   }
+  if (is_stand_up) {
+    CyberdogJson::Add(json_info, "stand", standed_);
+  }
   if (!CyberdogJson::Document2String(json_info, info)) {
     ERROR("error while encoding to json");
     info = "{\"error\": \"unkown encoding json error!\"}";
@@ -695,4 +707,14 @@ void cyberdog::manager::CyberdogManager::ConnectStatus(
 void cyberdog::manager::CyberdogManager::BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
 {
   bms_status_ = *msg;
+}
+
+void cyberdog::manager::CyberdogManager::MotionStatus(
+  const protocol::msg::MotionStatus::SharedPtr msg)
+{
+  if (msg->motion_id == protocol::msg::MotionID::RECOVERYSTAND) {
+    standed_ = true;
+  } else {
+    standed_ = false;
+  }
 }

@@ -31,6 +31,7 @@
 #include "std_srvs/srv/trigger.hpp"
 #include "protocol/msg/connector_status.hpp"
 #include "protocol/msg/bms_status.hpp"
+#include "protocol/msg/motion_status.hpp"
 #include "cyberdog_machine/cyberdog_heartbeats.hpp"
 
 namespace cyberdog
@@ -85,6 +86,7 @@ private:
   void DogInfoUpdate(const std_msgs::msg::Bool::SharedPtr msg);
   void ConnectStatus(const protocol::msg::ConnectorStatus::SharedPtr msg);
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg);
+  void MotionStatus(const protocol::msg::MotionStatus::SharedPtr msg);
 
 private:
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr uid_sub_;
@@ -106,6 +108,7 @@ private:
   rclcpp::Subscription<ManagerHeartbeatsMsg>::SharedPtr heartbeats_sub_{nullptr};
   rclcpp::Subscription<protocol::msg::ConnectorStatus>::SharedPtr connect_status_sub_;
   rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_;
+  rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_;
   // rclcpp::TimerBase::SharedPtr heartbeats_timer_;
   rclcpp::Service<protocol::srv::DeviceInfo>::SharedPtr device_info_get_srv_;
   rclcpp::Client<protocol::srv::AudioVolumeGet>::SharedPtr audio_volume_get_client_;
@@ -118,6 +121,7 @@ private:
   std::unique_ptr<cyberdog::machine::HeartBeats> heart_beats_ptr_ {nullptr};
   std::unique_ptr<cyberdog::manager::WifiInfo> wifi_info_ptr_ {nullptr};
   protocol::msg::BmsStatus bms_status_;
+  bool standed_{false};
 };  // class CyberdogManager
 }  // namespace manager
 }  // namespace cyberdog
