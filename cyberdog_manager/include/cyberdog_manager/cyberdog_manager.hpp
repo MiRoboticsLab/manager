@@ -32,6 +32,7 @@
 #include "protocol/msg/connector_status.hpp"
 #include "protocol/msg/bms_status.hpp"
 #include "protocol/msg/motion_status.hpp"
+#include "protocol/srv/uid_sn.hpp"
 #include "cyberdog_machine/cyberdog_heartbeats.hpp"
 
 namespace cyberdog
@@ -82,6 +83,9 @@ private:
   void QueryDeviceInfo(
     const protocol::srv::DeviceInfo::Request::SharedPtr request,
     protocol::srv::DeviceInfo::Response::SharedPtr);
+  void UidSn(
+    const protocol::srv::UidSn::Request::SharedPtr request,
+    protocol::srv::UidSn::Response::SharedPtr response);
   void UidCallback(const std_msgs::msg::String::SharedPtr msg);
   void DogInfoUpdate(const std_msgs::msg::Bool::SharedPtr msg);
   void ConnectStatus(const protocol::msg::ConnectorStatus::SharedPtr msg);
@@ -111,6 +115,7 @@ private:
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_;
   // rclcpp::TimerBase::SharedPtr heartbeats_timer_;
   rclcpp::Service<protocol::srv::DeviceInfo>::SharedPtr device_info_get_srv_;
+  rclcpp::Service<protocol::srv::UidSn>::SharedPtr uid_sn_srv_;
   rclcpp::Client<protocol::srv::AudioVolumeGet>::SharedPtr audio_volume_get_client_;
   rclcpp::Client<protocol::srv::AudioExecute>::SharedPtr audio_execute_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_action_get_client_;

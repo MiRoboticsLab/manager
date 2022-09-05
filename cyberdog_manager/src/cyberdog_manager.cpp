@@ -77,6 +77,12 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     std::bind(
       &CyberdogManager::QueryDeviceInfo, this, std::placeholders::_1,
       std::placeholders::_2));
+  uid_sn_srv_ =
+    query_node_feedback_ptr_->create_service<protocol::srv::UidSn>(
+    "uid_sn",
+    std::bind(
+      &CyberdogManager::UidSn, this, std::placeholders::_1,
+      std::placeholders::_2));
   motion_status_sub_ =
     query_node_feedback_ptr_->create_subscription<protocol::msg::MotionStatus>(
     "motion_status", rclcpp::SystemDefaultsQoS(),
@@ -717,4 +723,13 @@ void cyberdog::manager::CyberdogManager::MotionStatus(
   } else {
     standed_ = false;
   }
+}
+
+void cyberdog::manager::CyberdogManager::UidSn(
+  const protocol::srv::UidSn::Request::SharedPtr request,
+  protocol::srv::UidSn::Response::SharedPtr response)
+{
+  (void) request;
+  response->sn = sn_;
+  response->uid = uid_;
 }
