@@ -16,8 +16,9 @@
 #define CYBERDOG_INFO_UPLOADER__CYBERDOG_INFO_UPLOADER_HPP_
 
 #include <string>
-#include "cyberdog_info_uploader/cyberdog_log_uploading.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "cyberdog_common/cyberdog_log.hpp"
+#include "cyberdog_info_uploader/cyberdog_log_uploading.hpp"
 
 namespace cyberdog
 {
@@ -31,6 +32,8 @@ public:
 
 private:
   LogUploading log_uploading_;
+
+  LOGGER_MINOR_INSTANCE("InfoUploader");
 };
 }  // namespace manager
 }  // namespace cyberdog
