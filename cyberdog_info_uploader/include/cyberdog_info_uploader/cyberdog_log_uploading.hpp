@@ -38,7 +38,10 @@ private:
   bool uploadLog(const std::string & compressed_file_name, std::string & response);
   rclcpp::Node * ros_node_;
   const std::string log_path_ {"/var/log/"};
+  const std::string upload_url_ {"device/system/log"};
   rclcpp::Client<protocol::srv::BesHttpSendFile>::SharedPtr upload_file_client_;
+
+  LOGGER_MINOR_INSTANCE("LogUploading");
 };
 }  // namespace manager
 }  // namespace cyberdog

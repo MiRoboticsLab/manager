@@ -26,6 +26,7 @@
 #include <iomanip>
 #include <ctime>
 #include <chrono>
+#include "cyberdog_common/cyberdog_log.hpp"
 
 namespace cyberdog
 {
@@ -43,10 +44,16 @@ bool LogUploading::CompressAndUploadLog(std::string & response)
   std::string file_name;
   bool result(false);
   if (compressLogFiles(file_name)) {
+    INFO("System log files have been compressed as %s.", file_name.c_str());
     if (uploadLog(file_name, response)) {
       result = true;
+      INFO("Compressed log file %s has been uploaded.", file_name.c_str());
+    } else {
+      ERROR("Failed to upload log file!");
     }
     remove(file_name.c_str());
+  } else {
+    ERROR("Failed to compress log files!");
   }
   return result;
 }
@@ -57,7 +64,7 @@ std::vector<std::string> LogUploading::getShellEcho(const std::string & cmd) con
   std::vector<std::string> result;
   std::unique_ptr<FILE, decltype(& pclose)> pipe(popen(cmd.c_str(), "r"), pclose);
   if (!pipe) {
-    throw std::runtime_error("popen() failed!");
+    return result;
   }
   while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
     std::string segment_str(buffer.data());
@@ -102,7 +109,7 @@ bool LogUploading::uploadLog(const std::string & compressed_file_name, std::stri
   }
   auto req = std::make_shared<protocol::srv::BesHttpSendFile::Request>();
   req->method = protocol::srv::BesHttpSendFile::Request::HTTP_METHOD_POST;
-  req->url = "";  // undetermined
+  req->url = upload_url_;
   req->file_name = compressed_file_name;
   req->content_type = "application/x-tar";
   req->milsecs = 60000;  // 60s
