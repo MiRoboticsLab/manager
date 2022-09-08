@@ -51,12 +51,14 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   if (result) {
     CyberdogJson::Get(json_document, "uid", uid_);
     rapidjson::Value dog_val;
-    CyberdogJson::Get(json_document, "dog_info", dog_val);
-    if (dog_val.HasMember("nick_name")) {
-      nick_name_ = dog_val["nick_name"].GetString();
-    }
-    if (dog_val.HasMember("enable")) {
-      name_switch_ = dog_val["enable"].GetBool();
+    bool result = CyberdogJson::Get(json_document, "dog_info", dog_val);
+    if (result) {
+      if (dog_val.HasMember("nick_name")) {
+        nick_name_ = dog_val["nick_name"].GetString();
+      }
+      if (dog_val.HasMember("enable")) {
+        name_switch_ = dog_val["enable"].GetBool();
+      }
     }
     INFO(
       "uid:%s, nick name:%s, switch:%s", uid_.c_str(),
