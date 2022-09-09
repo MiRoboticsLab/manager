@@ -27,7 +27,6 @@ namespace manager
 class InfoUploader
 {
 public:
-  explicit InfoUploader(rclcpp::Node * ros_node);
   bool UploadLog(std::string & response);
 
 private:
