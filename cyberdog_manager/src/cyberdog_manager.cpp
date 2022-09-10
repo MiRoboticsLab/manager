@@ -33,6 +33,15 @@ using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
 using rapidjson::kObjectType;
 
+const std::string float_to_string(float & val)
+{
+  std::stringstream ss;
+  ss.setf(std::ios::fixed);
+  ss.precision(2);
+  ss << val;
+  return ss.str();
+}
+
 cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
 : ManagerBase(name),
   name_(name), has_error_(false), sn_(""), uid_(""),
@@ -570,52 +579,67 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
         float & hip_right_front = future_result.get()->motor_temp[0];
         float & hip_left_back = future_result.get()->motor_temp[3];
         float & hip_right_back = future_result.get()->motor_temp[2];
+        rapidjson::Value val;
+        std::string ss = float_to_string(hip_left_front);
+        val.SetString(ss.c_str(), ss.length());
         hip_temper_array.PushBack(
-          rapidjson::Value(hip_left_front).Move(),
-          json_info.GetAllocator());
+          val, json_info.GetAllocator());
+        ss = float_to_string(hip_right_front);
+        val.SetString(ss.c_str(), ss.length());
         hip_temper_array.PushBack(
-          rapidjson::Value(hip_right_front).Move(),
-          json_info.GetAllocator());
-        hip_temper_array.PushBack(rapidjson::Value(hip_left_back).Move(), json_info.GetAllocator());
+          val, json_info.GetAllocator());
+        ss = float_to_string(hip_left_back);
+        val.SetString(ss.c_str(), ss.length());
         hip_temper_array.PushBack(
-          rapidjson::Value(hip_right_back).Move(),
-          json_info.GetAllocator());
+          val, json_info.GetAllocator());
+        ss = float_to_string(hip_right_back);
+        val.SetString(ss.c_str(), ss.length());
+        hip_temper_array.PushBack(
+          val, json_info.GetAllocator());
         motor_temper_val.AddMember("hip", hip_temper_array, json_info.GetAllocator());
         rapidjson::Value thigh_temper_array(rapidjson::kArrayType);
         float & thigh_left_front = future_result.get()->motor_temp[5];
         float & thigh_right_front = future_result.get()->motor_temp[4];
         float & thigh_left_back = future_result.get()->motor_temp[7];
         float & thigh_right_back = future_result.get()->motor_temp[6];
+        ss = float_to_string(thigh_left_front);
+        val.SetString(ss.c_str(), ss.length());
         thigh_temper_array.PushBack(
-          rapidjson::Value(
-            thigh_left_front).Move(), json_info.GetAllocator());
+          val, json_info.GetAllocator());
+        ss = float_to_string(thigh_right_front);
+        val.SetString(ss.c_str(), ss.length());
         thigh_temper_array.PushBack(
-          rapidjson::Value(
-            thigh_right_front).Move(), json_info.GetAllocator());
+          val, json_info.GetAllocator());
+        ss = float_to_string(thigh_left_back);
+        val.SetString(ss.c_str(), ss.length());
         thigh_temper_array.PushBack(
-          rapidjson::Value(thigh_left_back).Move(),
-          json_info.GetAllocator());
+          val, json_info.GetAllocator());
+        ss = float_to_string(thigh_right_back);
+        val.SetString(ss.c_str(), ss.length());
         thigh_temper_array.PushBack(
-          rapidjson::Value(
-            thigh_right_back).Move(), json_info.GetAllocator());
+          val, json_info.GetAllocator());
         motor_temper_val.AddMember("thigh", thigh_temper_array, json_info.GetAllocator());
         rapidjson::Value crus_temper_array(rapidjson::kArrayType);
         float & crus_left_front = future_result.get()->motor_temp[9];
         float & crus_right_front = future_result.get()->motor_temp[8];
         float & crus_left_back = future_result.get()->motor_temp[11];
         float & crus_right_back = future_result.get()->motor_temp[10];
+        ss = float_to_string(crus_left_front);
+        val.SetString(ss.c_str(), ss.length());
         crus_temper_array.PushBack(
-          rapidjson::Value(crus_left_front).Move(),
-          json_info.GetAllocator());
+          val, json_info.GetAllocator());
+        ss = float_to_string(crus_right_front);
+        val.SetString(ss.c_str(), ss.length());
         crus_temper_array.PushBack(
-          rapidjson::Value(crus_right_front).Move(),
-          json_info.GetAllocator());
+          val, json_info.GetAllocator());
+        ss = float_to_string(crus_left_back);
+        val.SetString(ss.c_str(), ss.length());
         crus_temper_array.PushBack(
-          rapidjson::Value(crus_left_back).Move(),
-          json_info.GetAllocator());
+          val, json_info.GetAllocator());
+        ss = float_to_string(crus_right_back);
+        val.SetString(ss.c_str(), ss.length());
         crus_temper_array.PushBack(
-          rapidjson::Value(crus_right_back).Move(),
-          json_info.GetAllocator());
+          val, json_info.GetAllocator());
         motor_temper_val.AddMember("crus", crus_temper_array, json_info.GetAllocator());
         CyberdogJson::Add(json_info, "motor_temper", motor_temper_val);
       } else {
@@ -684,12 +708,14 @@ void cyberdog::manager::CyberdogManager::DogInfoUpdate(const std_msgs::msg::Bool
     auto result = CyberdogJson::ReadJsonFromFile(path, json_document);
     if (result) {
       rapidjson::Value dog_val;
-      CyberdogJson::Get(json_document, "dog_info", dog_val);
-      if (dog_val.HasMember("nick_name")) {
-        nick_name_ = dog_val["nick_name"].GetString();
-      }
-      if (dog_val.HasMember("enable")) {
-        name_switch_ = dog_val["enable"].GetBool();
+      bool result = CyberdogJson::Get(json_document, "dog_info", dog_val);
+      if (result) {
+        if (dog_val.HasMember("nick_name")) {
+          nick_name_ = dog_val["nick_name"].GetString();
+        }
+        if (dog_val.HasMember("enable")) {
+          name_switch_ = dog_val["enable"].GetBool();
+        }
       }
       INFO("update nick name:%s", nick_name_.c_str());
     }
