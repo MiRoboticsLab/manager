@@ -19,10 +19,6 @@ namespace cyberdog
 {
 namespace manager
 {
-InfoUploader::InfoUploader(rclcpp::Node * ros_node)
-: log_uploading_(ros_node)
-{}
-
 bool InfoUploader::UploadLog(std::string & response)
 {
   return log_uploading_.CompressAndUploadLog(response);
