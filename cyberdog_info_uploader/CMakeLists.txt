@@ -31,6 +31,23 @@ install(TARGETS cyberdog_info_uploader
   EXPORT cyberdog_info_uploader
   LIBRARY DESTINATION lib
   INCLUDES DESTINATION include)
+
+if(LOCAL_BUILD_TESTING)
+  add_executable(test_upload_log
+    test/test_upload_log.cpp
+  )
+  target_include_directories(test_upload_log PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>)
+  target_compile_features(test_upload_log PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+  ament_target_dependencies(test_upload_log
+    rclcpp
+  )
+  target_link_libraries(test_upload_log
+    cyberdog_info_uploader
+  )
+endif()
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
+// Copyright (c) 2021 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,28 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CYBERDOG_INFO_UPLOADER__CYBERDOG_INFO_UPLOADER_HPP_
-#define CYBERDOG_INFO_UPLOADER__CYBERDOG_INFO_UPLOADER_HPP_
-
 #include <string>
+#include <memory>
 #include "rclcpp/rclcpp.hpp"
+#include "interface.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
-#include "cyberdog_info_uploader/cyberdog_log_uploading.hpp"
 
-namespace cyberdog
-{
-namespace manager
-{
-class InfoUploader
+class Test_node : public rclcpp::Node
 {
 public:
-  bool UploadLog(std::string & response);
+  explicit Test_node(std::string name)
+  : Node(name)
+  {
+    RCLCPP_INFO(this->get_logger(), "node name is %s.", name.c_str());
+  }
 
 private:
-  LogUploading log_uploading_;
-
-  LOGGER_MINOR_INSTANCE("InfoUploader");
 };
-}  // namespace manager
-}  // namespace cyberdog
-#endif  // CYBERDOG_INFO_UPLOADER__CYBERDOG_INFO_UPLOADER_HPP_
+
+int main(int argc, char ** argv)
+{
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<Test_node>("test_node");
+  rclcpp::spin(node);
+  rclcpp::shutdown();
+  return 0;
+}
