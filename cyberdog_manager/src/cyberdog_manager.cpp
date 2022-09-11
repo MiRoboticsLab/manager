@@ -650,23 +650,28 @@ void cyberdog::manager::CyberdogManager::QueryDeviceInfo(
     }
   }
   if (is_audio_state) {
-    if (!audio_active_state_client_->wait_for_service(std::chrono::seconds(2))) {
-      INFO(
-        "call audio active state server not avalible");
+    if (uid_ == "") {
+      INFO("uid does not exist!");
       CyberdogJson::Add(json_info, "audio_state", false);
     } else {
-      std::chrono::seconds timeout(3);
-      auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
-      auto future_result = audio_active_state_client_->async_send_request(req);
-      std::future_status status = future_result.wait_for(timeout);
-      if (status == std::future_status::ready) {
+      if (!audio_active_state_client_->wait_for_service(std::chrono::seconds(2))) {
         INFO(
-          "success to call audio active state services.");
-        CyberdogJson::Add(json_info, "audio_state", future_result.get()->success);
-      } else {
-        INFO(
-          "Failed to call audio active state services.");
+          "call audio active state server not avalible");
         CyberdogJson::Add(json_info, "audio_state", false);
+      } else {
+        std::chrono::seconds timeout(3);
+        auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
+        auto future_result = audio_active_state_client_->async_send_request(req);
+        std::future_status status = future_result.wait_for(timeout);
+        if (status == std::future_status::ready) {
+          INFO(
+            "success to call audio active state services.");
+          CyberdogJson::Add(json_info, "audio_state", future_result.get()->success);
+        } else {
+          INFO(
+            "Failed to call audio active state services.");
+          CyberdogJson::Add(json_info, "audio_state", false);
+        }
       }
     }
   }
