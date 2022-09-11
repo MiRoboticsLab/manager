@@ -46,7 +46,7 @@ public:
   /**
    * @brief 添加一个新的用户(object)
    *          1. 默认该object包含两个key：FaceState、VoiceState
-   *          2. 默认新建用户的的key值为都0
+   *          2. 默认新建用户的的key值为都0.
    * @param user_name 为新建的用户名，要求为std::string类型
    * @return  是否执行成功,若用户已经存在返回flase
    */
