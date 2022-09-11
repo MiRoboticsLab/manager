@@ -32,6 +32,15 @@ namespace cyberdog
 {
 namespace manager
 {
+LogUploading::LogUploading(rclcpp::Node::SharedPtr node)
+: node_ptr_(node)
+{
+  client_cb_group_ = node_ptr_->create_callback_group(
+    rclcpp::CallbackGroupType::MutuallyExclusive);
+  client_ptr_ = node_ptr_->create_client<protocol::srv::BesHttpSendFile>(
+    "bes_http_send_file_srv", rmw_qos_profile_services_default, client_cb_group_);
+}
+
 bool LogUploading::CompressAndUploadLog(std::string & response)
 {
   std::string file_name;
@@ -97,10 +106,7 @@ bool LogUploading::compressLogFiles(std::string & copressed_file_name) const
 
 bool LogUploading::uploadLog(const std::string & compressed_file_name, std::string & response)
 {
-  auto up_load_node = rclcpp::Node::make_shared("call_log_uploading");
-  auto up_load_client = up_load_node->create_client<protocol::srv::BesHttpSendFile>(
-    "bes_http_send_file_srv");
-  if (!up_load_client->wait_for_service(std::chrono::seconds(3))) {
+  if (!client_ptr_->wait_for_service(std::chrono::seconds(3))) {
     WARN("bes_http_send_file_srv server not avalible!");
     return false;
   }
@@ -110,14 +116,15 @@ bool LogUploading::uploadLog(const std::string & compressed_file_name, std::stri
   req->file_name = compressed_file_name;
   req->content_type = "application/x-tar";
   req->milsecs = 60000;  // 60s
-  auto future_result = up_load_client->async_send_request(req);
-  if (rclcpp::spin_until_future_complete(up_load_node, future_result, std::chrono::seconds(60)) !=
-    rclcpp::FutureReturnCode::SUCCESS)
-  {
+  auto future_result = client_ptr_->async_send_request(req);
+  std::future_status status = future_result.wait_for(std::chrono::seconds(63));
+  if (status == std::future_status::ready) {
+    response = future_result.get()->data;
+    INFO("upload log respon: %s", response.c_str());
+  } else {
     WARN("calling bes_http_send_file_srv service timeout!");
     return false;
   }
-  response = future_result.get()->data;
   return true;
 }
 }  // namespace manager
