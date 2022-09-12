@@ -83,7 +83,7 @@ std::string LogUploading::getTimeStamp() const
 {
   std::time_t tt = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
   std::stringstream time_ss;
-  time_ss << std::put_time(std::localtime(&tt), "%C%m%d%H%M%S");
+  time_ss << std::put_time(std::localtime(&tt), "%Y%m%d%H%M%S");
   return time_ss.str();
 }
 
