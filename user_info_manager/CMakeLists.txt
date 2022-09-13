@@ -31,12 +31,14 @@ add_executable(test_node src/test_inteface_node.cpp)
 ament_target_dependencies(test_node rclcpp rapidjson cyberdog_common)
 
 target_link_libraries(test_node ${cyberdog_log_LIBRARIES})
-
-install(TARGETS
-  test_node
-  DESTINATION lib/${PROJECT_NAME}
+install(
+  TARGETS test_node
+  DESTINATION lib/${PROJECT_NAME}  
 )
-
+install(
+  DIRECTORY include/
+  DESTINATION include/
+)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_dependencies(${dependencies})
 ament_package()
