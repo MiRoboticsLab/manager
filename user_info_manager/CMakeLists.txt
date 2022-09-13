@@ -33,7 +33,7 @@ ament_target_dependencies(test_node rclcpp rapidjson cyberdog_common)
 target_link_libraries(test_node ${cyberdog_log_LIBRARIES})
 install(
   TARGETS test_node
-  DESTINATION lib/${PROJECT_NAME}  
+  DESTINATION lib/${PROJECT_NAME}
 )
 install(
   DIRECTORY include/
