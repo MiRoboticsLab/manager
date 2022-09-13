@@ -27,9 +27,11 @@ namespace manager
 class InfoUploader
 {
 public:
+  explicit InfoUploader(rclcpp::Node::SharedPtr node);
   bool UploadLog(std::string & response);
 
 private:
+  rclcpp::Node::SharedPtr node_ptr_;
   LogUploading log_uploading_;
 
   LOGGER_MINOR_INSTANCE("InfoUploader");

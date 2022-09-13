@@ -19,6 +19,9 @@ namespace cyberdog
 {
 namespace manager
 {
+InfoUploader::InfoUploader(rclcpp::Node::SharedPtr node)
+: node_ptr_(node), log_uploading_(node)
+{}
 bool InfoUploader::UploadLog(std::string & response)
 {
   return log_uploading_.CompressAndUploadLog(response);

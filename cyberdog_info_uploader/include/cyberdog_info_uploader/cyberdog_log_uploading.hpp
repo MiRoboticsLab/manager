@@ -28,6 +28,7 @@ namespace manager
 class LogUploading
 {
 public:
+  explicit LogUploading(rclcpp::Node::SharedPtr node);
   bool CompressAndUploadLog(std::string & response);
 
 private:
@@ -35,7 +36,9 @@ private:
   std::string getTimeStamp() const;
   bool compressLogFiles(std::string & copressed_file_name) const;
   bool uploadLog(const std::string & compressed_file_name, std::string & response);
-  rclcpp::Node::SharedPtr ros_node_;
+  rclcpp::Node::SharedPtr node_ptr_;
+  rclcpp::CallbackGroup::SharedPtr client_cb_group_;
+  rclcpp::Client<protocol::srv::BesHttpSendFile>::SharedPtr client_ptr_;
   const std::string log_path_ {"/var/log/"};
   const std::string upload_url_ {"device/system/log"};
 
