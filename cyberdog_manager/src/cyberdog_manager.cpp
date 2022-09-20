@@ -836,8 +836,9 @@ void cyberdog::manager::CyberdogManager::QueryAccountSearch(
     obj.SearchUser(account_name, result);
     int face_state = result[0];
     int voice_state = result[1];
-    INFO("account name:%s \n voice_state: %d \n face_stare: %d",
-             account_name.c_str(), result[0], result[1]);
+    INFO(
+      "account name:%s \n voice_state: %d \n face_stare: %d",
+      account_name.c_str(), result[0], result[1]);
     rapidjson::Value value(account_name.c_str(), json_info.GetAllocator());
     js_obj.AddMember("name", value, json_info.GetAllocator());
     js_obj.AddMember("face_state", face_state, json_info.GetAllocator());
