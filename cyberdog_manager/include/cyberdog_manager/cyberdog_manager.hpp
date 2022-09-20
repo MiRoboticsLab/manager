@@ -26,6 +26,8 @@
 #include "protocol/srv/audio_volume_get.hpp"
 #include "protocol/srv/audio_execute.hpp"
 #include "protocol/srv/motor_temp.hpp"
+#include "protocol/srv/account_add.hpp"
+#include "protocol/srv/account_search.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_srvs/srv/trigger.hpp"
@@ -93,6 +95,15 @@ private:
   void MotionStatus(const protocol::msg::MotionStatus::SharedPtr msg);
 
 private:
+  void QueryAccountAdd(
+    const protocol::srv::AccountAdd::Request::SharedPtr request,
+    protocol::srv::AccountAdd::Response::SharedPtr);
+
+  void QueryAccountSearch(
+    const protocol::srv::AccountSearch::Request::SharedPtr request,
+    protocol::srv::AccountSearch::Response::SharedPtr);
+
+private:
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr uid_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr dog_info_update_sub_;
   std::string name_;
@@ -108,6 +119,7 @@ private:
   rclcpp::Node::SharedPtr node_ptr_ {nullptr};
   rclcpp::Node::SharedPtr query_node_ptr_ {nullptr};
   rclcpp::Node::SharedPtr query_node_feedback_ptr_ {nullptr};
+  rclcpp::Node::SharedPtr query_account_add_ptr_ {nullptr};
   rclcpp::executors::MultiThreadedExecutor executor_;
   rclcpp::Subscription<ManagerHeartbeatsMsg>::SharedPtr heartbeats_sub_{nullptr};
   rclcpp::Subscription<protocol::msg::ConnectorStatus>::SharedPtr connect_status_sub_;
@@ -121,6 +133,8 @@ private:
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_action_get_client_;
   rclcpp::Client<protocol::srv::MotorTemp>::SharedPtr motor_temper_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_active_state_client_;
+  rclcpp::Service<protocol::srv::AccountAdd>::SharedPtr account_add_srv_;
+  rclcpp::Service<protocol::srv::AccountSearch>::SharedPtr account_search_srv_;
 
   std::shared_ptr<BlackBox> black_box_ptr_ {nullptr};
   std::unique_ptr<cyberdog::machine::HeartBeats> heart_beats_ptr_ {nullptr};

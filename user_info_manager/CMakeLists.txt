@@ -26,13 +26,15 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(include)
 
 add_executable(test_node src/test_inteface_node.cpp)
+add_executable(test_node2 test/test.cpp)
 
 #target_compile_definitions(test_node PRIVATE BenchmarkPath="${CMAKE_INSTALL_PREFIX}/lib/cyberdog_common")
 ament_target_dependencies(test_node rclcpp rapidjson cyberdog_common)
+ament_target_dependencies(test_node2 rclcpp rapidjson cyberdog_common)
 
 target_link_libraries(test_node ${cyberdog_log_LIBRARIES})
 install(
-  TARGETS test_node
+  TARGETS test_node test_node2
   DESTINATION lib/${PROJECT_NAME}
 )
 install(

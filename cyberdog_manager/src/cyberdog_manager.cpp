@@ -28,6 +28,7 @@
 #include "cyberdog_common/cyberdog_log.hpp"
 #include "cyberdog_common/cyberdog_json.hpp"
 #include "ament_index_cpp/get_package_share_directory.hpp"
+#include "user_info_manager/UserAccountManager.hpp"
 
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
@@ -50,9 +51,11 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   node_ptr_ = rclcpp::Node::make_shared(name_);
   query_node_ptr_ = rclcpp::Node::make_shared(name_ + "_query");
   query_node_feedback_ptr_ = rclcpp::Node::make_shared(name_ + "_query_feedback");
+  query_account_add_ptr_ = rclcpp::Node::make_shared(name_ + "_query_account_add");
   executor_.add_node(node_ptr_);
   executor_.add_node(query_node_ptr_);
   executor_.add_node(query_node_feedback_ptr_);
+  executor_.add_node(query_account_add_ptr_);
   auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
   auto path = local_share_dir + std::string("/toml_config/manager/settings.json");
   Document json_document(kObjectType);
@@ -116,6 +119,20 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
 
   // black_box_ptr_ = std::make_shared<BlackBox>(node_ptr_);
   heart_beats_ptr_ = std::make_unique<cyberdog::machine::HeartBeats>(500, 5);
+
+  account_add_srv_ =
+    query_account_add_ptr_->create_service<protocol::srv::AccountAdd>(
+    "account_add",
+    std::bind(
+      &CyberdogManager::QueryAccountAdd, this, std::placeholders::_1,
+      std::placeholders::_2));
+
+  account_search_srv_ =
+    query_account_add_ptr_->create_service<protocol::srv::AccountSearch>(
+    "account_search",
+    std::bind(
+      &CyberdogManager::QueryAccountSearch, this, std::placeholders::_1,
+      std::placeholders::_2));
 }
 
 cyberdog::manager::CyberdogManager::~CyberdogManager()
@@ -765,4 +782,75 @@ void cyberdog::manager::CyberdogManager::UidSn(
   (void) request;
   response->sn = sn_;
   response->uid = uid_;
+}
+
+void cyberdog::manager::CyberdogManager::QueryAccountAdd(
+  const protocol::srv::AccountAdd::Request::SharedPtr request,
+  protocol::srv::AccountAdd::Response::SharedPtr response)
+{
+  std::string name = request->member;
+  INFO("add_account_name is: %s", name.c_str());
+  cyberdog::common::CyberdogAccountManager obj;
+  if (obj.AddMember(name)) {
+    response->status = true;
+    INFO("add_account_success");
+  } else {
+    response->status = false;
+    INFO("add_account_fail");
+  }
+}
+
+void cyberdog::manager::CyberdogManager::QueryAccountSearch(
+  const protocol::srv::AccountSearch::Request::SharedPtr request,
+  protocol::srv::AccountSearch::Response::SharedPtr response)
+{
+  std::string account_name = request->member;
+  INFO("search user_name: %s", account_name.c_str());
+  Document json_info(rapidjson::kObjectType);
+  rapidjson::Value arr(rapidjson::kArrayType);
+  std::string data;
+  cyberdog::common::CyberdogAccountManager obj;
+  if (request->member == "") {
+    INFO("search_all_user");
+    std::vector<cyberdog::common::CyberdogAccountManager::UserInformation> member_data;
+    if (obj.SearAllUser(member_data)) {
+      for (unsigned int i = 0; i < member_data.size(); ++i) {
+        rapidjson::Value js_obj(rapidjson::kObjectType);
+        rapidjson::Value value(member_data[i].username.c_str(), json_info.GetAllocator());
+        js_obj.AddMember("name", value, json_info.GetAllocator());
+        js_obj.AddMember("face_state", member_data[i].faceStatus, json_info.GetAllocator());
+        js_obj.AddMember("voice_state", member_data[i].voiceStatus, json_info.GetAllocator());
+        arr.PushBack(js_obj, json_info.GetAllocator());
+      }
+      json_info.AddMember("accounts", arr, json_info.GetAllocator());
+      response->status = true;
+    } else {
+      INFO("Search ALL Account faile!");
+      response->status = false;
+      response->data = "{\"error\":\"search failed!\"}";
+    }
+  } else {
+    INFO("search_one_user");
+    int result[2];
+    rapidjson::Value js_obj(rapidjson::kObjectType);
+    obj.SearchUser(account_name, result);
+    int face_state = result[0];
+    int voice_state = result[1];
+    INFO("account name:%s \n voice_state: %d \n face_stare: %d",
+             account_name.c_str(), result[0], result[1]);
+    rapidjson::Value value(account_name.c_str(), json_info.GetAllocator());
+    js_obj.AddMember("name", value, json_info.GetAllocator());
+    js_obj.AddMember("face_state", face_state, json_info.GetAllocator());
+    js_obj.AddMember("voice_state", voice_state, json_info.GetAllocator());
+    arr.PushBack(js_obj, json_info.GetAllocator());
+    json_info.AddMember("accounts", arr, json_info.GetAllocator());
+    response->status = true;
+  }
+
+  if (!CyberdogJson::Document2String(json_info, data)) {
+    ERROR("error while encoding to json");
+    data = "{\"error\": \"unkown encoding json error!\"}";
+  }
+  response->data = data;
+  INFO("Search result is :%s", data.c_str());
 }
