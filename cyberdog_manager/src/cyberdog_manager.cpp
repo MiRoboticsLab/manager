@@ -133,6 +133,13 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     std::bind(
       &CyberdogManager::QueryAccountSearch, this, std::placeholders::_1,
       std::placeholders::_2));
+
+  account_delete_srv_ =
+    query_account_add_ptr_->create_service<protocol::srv::AccountDelete>(
+    "account_delete",
+    std::bind(
+      &CyberdogManager::QueryAccountDelete, this, std::placeholders::_1,
+      std::placeholders::_2));
 }
 
 cyberdog::manager::CyberdogManager::~CyberdogManager()
@@ -854,4 +861,79 @@ void cyberdog::manager::CyberdogManager::QueryAccountSearch(
   }
   response->data = data;
   INFO("Search result is :%s", data.c_str());
+}
+
+void cyberdog::manager::CyberdogManager::QueryAccountDelete(
+  const protocol::srv::AccountDelete::Request::SharedPtr request,
+  protocol::srv::AccountDelete::Response::SharedPtr response)
+{
+  INFO("enter delete account callback");
+  // voice delete
+  rclcpp::Client<protocol::srv::AudioVoiceprintEntry>::SharedPtr voice_delete_client_;
+  voice_delete_client_ =
+    node_ptr_->create_client<protocol::srv::AudioVoiceprintEntry>("audio_voiceprint_entry");
+  if (!voice_delete_client_->wait_for_service(std::chrono::seconds(2))) {
+    ERROR("call voice service server not avalible");
+    return;
+  }
+  auto request_voice = std::make_shared<protocol::srv::AudioVoiceprintEntry::Request>();
+  request_voice->command = 4;
+  request_voice->username = request->member;
+  std::chrono::seconds timeout(3);
+  auto future_result_voice = voice_delete_client_->async_send_request(request_voice);
+  std::future_status status_face = future_result_voice.wait_for(timeout);
+  if (status_face == std::future_status::ready) {
+    INFO(
+      "success to call vocie delete response services.");
+  } else {
+    INFO(
+      "Failed to call vocie delete response services.");
+    return;
+  }
+
+  // face delete
+  rclcpp::Client<protocol::srv::FaceEntry>::SharedPtr face_delete_client_;
+  face_delete_client_ =
+    node_ptr_->create_client<protocol::srv::FaceEntry>("/cyberdog_face_entry_srv");
+
+  if (!face_delete_client_->wait_for_service(std::chrono::seconds(2))) {
+    ERROR("call face service server not avalible");
+    return;
+  }
+  auto request_face = std::make_shared<protocol::srv::FaceEntry::Request>();
+  request_face->command = 4;
+  request_face->username = request->member;
+
+  auto future_result_face = face_delete_client_->async_send_request(request_face);
+  std::future_status status_voice = future_result_voice.wait_for(timeout);
+  if (status_voice == std::future_status::ready) {
+    INFO(
+      "success to call face delete response services.");
+  } else {
+    INFO(
+      "Failed to call face delete response services.");
+    return;
+  }
+
+  // delete account
+  std::string name = request->member;
+  INFO("delete_account_name is: %s", name.c_str());
+  if (future_result_voice.get()->success) {
+    if (future_result_face.get()->result == 0) {
+      cyberdog::common::CyberdogAccountManager obj;
+      if (obj.DeleteUserInformation(name)) {
+        INFO("delete_account_success");
+        response->status = true;
+      } else {
+        INFO("delete_account_fail");
+        response->status = false;
+      }
+    } else {
+      INFO("delete face faile");
+      response->status = false;
+    }
+  } else {
+    INFO("delete voice faile");
+    response->status = false;
+  }
 }

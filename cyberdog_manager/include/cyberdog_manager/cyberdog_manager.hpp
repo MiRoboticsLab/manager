@@ -28,6 +28,7 @@
 #include "protocol/srv/motor_temp.hpp"
 #include "protocol/srv/account_add.hpp"
 #include "protocol/srv/account_search.hpp"
+#include "protocol/srv/account_delete.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_srvs/srv/trigger.hpp"
@@ -36,6 +37,8 @@
 #include "protocol/msg/motion_status.hpp"
 #include "protocol/srv/uid_sn.hpp"
 #include "cyberdog_machine/cyberdog_heartbeats.hpp"
+#include "protocol/srv/audio_voiceprint_entry.hpp"
+#include "protocol/srv/face_entry.hpp"
 
 namespace cyberdog
 {
@@ -103,6 +106,10 @@ private:
     const protocol::srv::AccountSearch::Request::SharedPtr request,
     protocol::srv::AccountSearch::Response::SharedPtr);
 
+  void QueryAccountDelete(
+    const protocol::srv::AccountDelete::Request::SharedPtr request,
+    protocol::srv::AccountDelete::Response::SharedPtr);
+
 private:
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr uid_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr dog_info_update_sub_;
@@ -135,6 +142,7 @@ private:
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_active_state_client_;
   rclcpp::Service<protocol::srv::AccountAdd>::SharedPtr account_add_srv_;
   rclcpp::Service<protocol::srv::AccountSearch>::SharedPtr account_search_srv_;
+  rclcpp::Service<protocol::srv::AccountDelete>::SharedPtr account_delete_srv_;
 
   std::shared_ptr<BlackBox> black_box_ptr_ {nullptr};
   std::unique_ptr<cyberdog::machine::HeartBeats> heart_beats_ptr_ {nullptr};
