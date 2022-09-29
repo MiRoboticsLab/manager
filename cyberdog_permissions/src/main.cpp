@@ -18,8 +18,8 @@
 
 int main(int argc, char ** argv)
 {
-  rclcpp::init(argc, argv);
   LOGGER_MAIN_INSTANCE(NODE_NAME);
+  rclcpp::init(argc, argv);
   auto permission_node =
     std::make_shared<cyberdog::manager::CyberdogPermission>();
   rclcpp::spin(permission_node);
