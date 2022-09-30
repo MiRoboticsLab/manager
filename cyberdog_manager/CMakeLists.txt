@@ -23,11 +23,17 @@ find_package(black_box REQUIRED)
 find_package(cyberdog_machine REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(protocol REQUIRED)
+find_package(low_power_consumption REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 
 include_directories(include)
 
 add_executable(${PROJECT_NAME} src/cyberdog_manager.cpp src/main.cpp)
+target_link_libraries(${PROJECT_NAME}
+${CMAKE_INSTALL_PREFIX}/lib/libpm_client.so
+)
+
+# MESSAGE('--------------${CMAKE_INSTALL_PREFIX}------------------')
 
 ament_target_dependencies( ${PROJECT_NAME}
   rclcpp
@@ -39,6 +45,7 @@ ament_target_dependencies( ${PROJECT_NAME}
   cyberdog_machine
   std_srvs
   protocol
+  low_power_consumption
   ament_index_cpp )
 
 install(TARGETS ${PROJECT_NAME}

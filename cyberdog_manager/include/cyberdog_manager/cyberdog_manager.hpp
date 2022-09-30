@@ -32,6 +32,7 @@
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_srvs/srv/trigger.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 #include "protocol/msg/connector_status.hpp"
 #include "protocol/msg/bms_status.hpp"
 #include "protocol/msg/motion_status.hpp"
@@ -96,6 +97,9 @@ private:
   void ConnectStatus(const protocol::msg::ConnectorStatus::SharedPtr msg);
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg);
   void MotionStatus(const protocol::msg::MotionStatus::SharedPtr msg);
+  void EnterLowPower(
+    const std_srvs::srv::SetBool::Request::SharedPtr request,
+    std_srvs::srv::SetBool::Response::SharedPtr response);
 
 private:
   void QueryAccountAdd(
@@ -127,6 +131,7 @@ private:
   rclcpp::Node::SharedPtr query_node_ptr_ {nullptr};
   rclcpp::Node::SharedPtr query_node_feedback_ptr_ {nullptr};
   rclcpp::Node::SharedPtr query_account_add_ptr_ {nullptr};
+  rclcpp::Node::SharedPtr low_power_consumption_ptr_ {nullptr};
   rclcpp::executors::MultiThreadedExecutor executor_;
   rclcpp::Subscription<ManagerHeartbeatsMsg>::SharedPtr heartbeats_sub_{nullptr};
   rclcpp::Subscription<protocol::msg::ConnectorStatus>::SharedPtr connect_status_sub_;
@@ -135,6 +140,7 @@ private:
   // rclcpp::TimerBase::SharedPtr heartbeats_timer_;
   rclcpp::Service<protocol::srv::DeviceInfo>::SharedPtr device_info_get_srv_;
   rclcpp::Service<protocol::srv::UidSn>::SharedPtr uid_sn_srv_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_consumption_srv_;
   rclcpp::Client<protocol::srv::AudioVolumeGet>::SharedPtr audio_volume_get_client_;
   rclcpp::Client<protocol::srv::AudioExecute>::SharedPtr audio_execute_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_action_get_client_;

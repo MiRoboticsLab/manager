@@ -29,6 +29,7 @@
 #include "cyberdog_common/cyberdog_json.hpp"
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "user_info_manager/UserAccountManager.hpp"
+#include "low_power_consumption/pm_if.h"
 
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
@@ -52,10 +53,12 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   query_node_ptr_ = rclcpp::Node::make_shared(name_ + "_query");
   query_node_feedback_ptr_ = rclcpp::Node::make_shared(name_ + "_query_feedback");
   query_account_add_ptr_ = rclcpp::Node::make_shared(name_ + "_query_account_add");
+  low_power_consumption_ptr_ = rclcpp::Node::make_shared(name_ + "_low_power_consumption");
   executor_.add_node(node_ptr_);
   executor_.add_node(query_node_ptr_);
   executor_.add_node(query_node_feedback_ptr_);
   executor_.add_node(query_account_add_ptr_);
+  executor_.add_node(low_power_consumption_ptr_);
   auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
   auto path = local_share_dir + std::string("/toml_config/manager/settings.json");
   Document json_document(kObjectType);
@@ -139,6 +142,13 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     "account_delete",
     std::bind(
       &CyberdogManager::QueryAccountDelete, this, std::placeholders::_1,
+      std::placeholders::_2));
+
+  low_power_consumption_srv_ =
+    low_power_consumption_ptr_->create_service<std_srvs::srv::SetBool>(
+    "low_power_consumption",
+    std::bind(
+      &CyberdogManager::EnterLowPower, this, std::placeholders::_1,
       std::placeholders::_2));
 }
 
@@ -780,6 +790,23 @@ void cyberdog::manager::CyberdogManager::MotionStatus(
   } else {
     standed_ = false;
   }
+}
+
+void cyberdog::manager::CyberdogManager::EnterLowPower(
+  const std_srvs::srv::SetBool::Request::SharedPtr request,
+  std_srvs::srv::SetBool::Response::SharedPtr response)
+{
+  INFO("EnterLowPower %s:start", (request->data ? "true" : "false"));
+  PM_DEV pd = PM_CAM_ALL;
+  unsigned int err;
+  int code = -1;
+  if (request->data) {
+    code = PmRelease(pd, &err);
+  } else {
+    code = PmRequest(pd, &err);
+  }
+  response->success = (code == 0 ? true : false);
+  INFO("EnterLowPower %s:stop", (request->data ? "true" : "false"));
 }
 
 void cyberdog::manager::CyberdogManager::UidSn(
