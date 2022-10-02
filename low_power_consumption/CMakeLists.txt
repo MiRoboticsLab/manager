@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(cyberdog_manager)
+project(low_power_consumption)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -13,40 +13,20 @@ if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
 endif()
 
+# find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(manager_base REQUIRED)
-find_package(protocol REQUIRED)
-find_package(cyberdog_system REQUIRED)
-find_package(cyberdog_common REQUIRED)
-find_package(black_box REQUIRED)
-find_package(cyberdog_machine REQUIRED)
-find_package(std_srvs REQUIRED)
-find_package(protocol REQUIRED)
-find_package(low_power_consumption REQUIRED)
-find_package(ament_index_cpp REQUIRED)
 
 include_directories(include)
 
-add_executable(${PROJECT_NAME} src/cyberdog_manager.cpp src/main.cpp)
+install(
+  DIRECTORY include/
+  DESTINATION include/
+)
 
-# MESSAGE('--------------${CMAKE_INSTALL_PREFIX}------------------')
-
-ament_target_dependencies( ${PROJECT_NAME}
-  rclcpp
-  protocol
-  manager_base
-  cyberdog_system
-  cyberdog_common
-  black_box
-  cyberdog_machine
-  std_srvs
-  protocol
-  low_power_consumption
-  ament_index_cpp )
-
-install(TARGETS ${PROJECT_NAME}
-  DESTINATION lib/${PROJECT_NAME})
+# install(
+#   DIRECTORY lib/
+#   DESTINATION lib/
+# )
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
