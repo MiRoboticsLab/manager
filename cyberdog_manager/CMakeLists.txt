@@ -29,9 +29,6 @@ find_package(ament_index_cpp REQUIRED)
 include_directories(include)
 
 add_executable(${PROJECT_NAME} src/cyberdog_manager.cpp src/main.cpp)
-target_link_libraries(${PROJECT_NAME}
-${CMAKE_INSTALL_PREFIX}/lib/libpm_client.so
-)
 
 # MESSAGE('--------------${CMAKE_INSTALL_PREFIX}------------------')
 

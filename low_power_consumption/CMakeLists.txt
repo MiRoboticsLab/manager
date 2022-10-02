@@ -23,10 +23,10 @@ install(
   DESTINATION include/
 )
 
-install(
-  DIRECTORY lib/
-  DESTINATION lib/
-)
+# install(
+#   DIRECTORY lib/
+#   DESTINATION lib/
+# )
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
