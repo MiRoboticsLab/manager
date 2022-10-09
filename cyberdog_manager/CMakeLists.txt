@@ -25,6 +25,7 @@ find_package(std_srvs REQUIRED)
 find_package(protocol REQUIRED)
 find_package(low_power_consumption REQUIRED)
 find_package(ament_index_cpp REQUIRED)
+find_package(user_info_manager REQUIRED)
 
 include_directories(include)
 
@@ -43,6 +44,7 @@ ament_target_dependencies( ${PROJECT_NAME}
   std_srvs
   protocol
   low_power_consumption
+  user_info_manager
   ament_index_cpp )
 
 install(TARGETS ${PROJECT_NAME}

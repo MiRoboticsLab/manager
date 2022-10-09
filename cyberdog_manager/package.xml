@@ -13,6 +13,7 @@
   <depend>manager_base</depend>
   <depend>black_box</depend>
   <depend>cyberdog_common</depend>
+  <depend>user_info_manager</depend>
   <depend>cyberdog_machine</depend>
   <depend>std_srvs</depend>
   <depend>protocol</depend>
