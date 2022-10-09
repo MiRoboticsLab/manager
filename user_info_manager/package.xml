@@ -10,6 +10,7 @@
   <depend>rclcpp</depend>
   <depend>rapidjson</depend>
   <depend>cyberdog_common</depend>
+  <depend>black_box</depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
   <export>
