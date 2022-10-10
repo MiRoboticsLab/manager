@@ -80,7 +80,7 @@
 //   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr account_search_one_subscribe_;
 //   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr account_delete_subscribe_;
 //   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr account_modify_voice_or_face_subscribe_;
-//   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr account_modify_voice_and_face_subscribe_;
+// rclcpp::Subscription<std_msgs::msg::String>::SharedPtr account_modify_voice_and_face_subscribe_;
 //   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr account_modify_voice_to0_subscribe_;
 //   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr account_modify_face_to0_subscribe_;
 
@@ -134,7 +134,7 @@
 //     auto result = obj.SearchUser(name, state);
 //     INFO("SearchUser() return is %d", result);
 
-//     INFO("account name:%s \n voice_state: %d \n face_stare: %d", name.c_str(), state[0], state[1]);
+// INFO("account name:%s,voice_state:%d,face_stare:%d", name.c_str(), state[0], state[1]);
 //   }
 
 //   // 回调函数，删除用户
