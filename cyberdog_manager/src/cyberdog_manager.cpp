@@ -574,8 +574,8 @@ void cyberdog::manager::CyberdogManager::QueryAccountSearch(
     int result[2];
     rapidjson::Value js_obj(rapidjson::kObjectType);
     obj.SearchUser(account_name, result);
-    int face_state = result[0];
-    int voice_state = result[1];
+    int voice_state = result[0];
+    int face_state = result[1];
     INFO(
       "account name:%s \n voice_state: %d \n face_stare: %d",
       account_name.c_str(), result[0], result[1]);
@@ -614,20 +614,20 @@ void cyberdog::manager::CyberdogManager::QueryAccountDelete(
   request_voice->username = request->member;
   std::chrono::seconds timeout(3);
   auto future_result_voice = voice_delete_client_->async_send_request(request_voice);
-  std::future_status status_face = future_result_voice.wait_for(timeout);
-  if (status_face == std::future_status::ready) {
+  std::future_status status_voice = future_result_voice.wait_for(timeout);
+  if (status_voice == std::future_status::ready) {
     INFO(
-      "success to call vocie delete response services.");
+      "success to call voice delete response services.");
   } else {
     INFO(
-      "Failed to call vocie delete response services.");
+      "Failed to call voice delete response services.");
     return;
   }
 
   // face delete
   rclcpp::Client<protocol::srv::FaceEntry>::SharedPtr face_delete_client_;
   face_delete_client_ =
-    node_ptr_->create_client<protocol::srv::FaceEntry>("/cyberdog_face_entry_srv");
+    node_ptr_->create_client<protocol::srv::FaceEntry>("cyberdog_face_entry_srv");
 
   if (!face_delete_client_->wait_for_service(std::chrono::seconds(2))) {
     ERROR("call face service server not avalible");
@@ -638,8 +638,8 @@ void cyberdog::manager::CyberdogManager::QueryAccountDelete(
   request_face->username = request->member;
 
   auto future_result_face = face_delete_client_->async_send_request(request_face);
-  std::future_status status_voice = future_result_voice.wait_for(timeout);
-  if (status_voice == std::future_status::ready) {
+  std::future_status status_face = future_result_face.wait_for(timeout);
+  if (status_face == std::future_status::ready) {
     INFO(
       "success to call face delete response services.");
   } else {
