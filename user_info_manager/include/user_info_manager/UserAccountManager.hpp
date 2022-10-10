@@ -51,6 +51,8 @@ public:
   } userinformation;
   std::vector<cyberdog::common::CyberdogAccountManager::UserInformation> vectorUser;
   int result[2];
+ 
+public:
   // const std::string base_account_dir = "/opt/ros2/cyberdog/share/params/toml_config/manager";
   bool AddMember(std::string username)
   {
@@ -69,9 +71,8 @@ public:
       INFO("enter serachAllUser [if]");
       for (int i = 0; i < vectorUser.size(); i++) {
         INFO("enter serachAllUser [for] cycle");
-        INFO(
-          "%s:%d %d",
-          vectorUser_[i].name.c_str(), vectorUser_[i].voiceStatus, vectorUser_[i].faceStatus);
+        INFO("%s:%d %d",vectorUser_[i].name.c_str(),
+              vectorUser_[i].voiceStatus, vectorUser_[i].faceStatus);
         vectorUser[i].username = vectorUser_[i].name;
         vectorUser[i].voiceStatus = vectorUser_[i].voiceStatus;
         vectorUser[i].faceStatus = vectorUser_[i].faceStatus;
