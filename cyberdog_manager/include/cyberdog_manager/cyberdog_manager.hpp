@@ -42,6 +42,7 @@
 #include "protocol/srv/face_entry.hpp"
 #include "low_power_consumption/low_power_consumption.hpp"
 #include "cyberdog_manager/query_info.hpp"
+#include "cyberdog_manager/state_context.hpp"
 
 namespace cyberdog
 {
@@ -142,6 +143,7 @@ private:
   std::shared_ptr<BlackBox> black_box_ptr_ {nullptr};
   std::unique_ptr<cyberdog::machine::HeartBeats> heart_beats_ptr_ {nullptr};
   std::unique_ptr<cyberdog::manager::LowPowerConsumption> lpc_ptr_ {nullptr};
+  std::unique_ptr<cyberdog::manager::StateContext> machine_state_ptr_ {nullptr};
 };  // class CyberdogManager
 }  // namespace manager
 }  // namespace cyberdog

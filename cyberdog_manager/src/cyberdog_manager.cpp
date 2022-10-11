@@ -97,6 +97,12 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     query_node_feedback_ptr_->create_subscription<protocol::msg::MotionStatus>(
     "motion_status", rclcpp::SystemDefaultsQoS(),
     std::bind(&CyberdogManager::MotionStatus, this, std::placeholders::_1));
+
+  machine_state_ptr_ = std::make_unique<cyberdog::manager::StateContext>(name_ + "_machine");
+  if (!machine_state_ptr_->Init()) {
+    ERROR("machine state init error!");
+  }
+
   // manager_vec_.emplace_back("device");
   // manager_vec_.emplace_back("sensor");
   // manager_vec_.emplace_back("motion");
