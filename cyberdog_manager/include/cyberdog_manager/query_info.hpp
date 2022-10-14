@@ -577,7 +577,11 @@ public:
       "cyberdog/base_info/submit",
       rclcpp::SystemDefaultsQoS()
     );
-    std::thread back_to_end_thread = std::thread(
+  }
+
+  void Init()
+  {
+    std::thread(
       [this]() {
         while (rclcpp::ok()) {
           std::this_thread::sleep_for(std::chrono::milliseconds(30000));
@@ -616,8 +620,7 @@ public:
           back_to_end_pub_->publish(msg);
           INFO("[stop:back to end upload device info-------------------]");
         }
-      });
-    back_to_end_thread.detach();
+      }).detach();
   }
 
 private:
