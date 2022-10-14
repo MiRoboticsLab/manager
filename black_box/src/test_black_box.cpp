@@ -30,5 +30,7 @@ int main(int argc, char * argv[])
   exec.add_node(node);
   exec.spin();
   rclcpp::shutdown();
+  cyberdog::manager::BlackBox black_box;
+  black_box.AddUser("ding");
   return 0;
 }

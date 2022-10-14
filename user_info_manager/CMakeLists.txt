@@ -10,11 +10,13 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rapidjson REQUIRED)
 find_package(cyberdog_common REQUIRED)
+find_package(black_box REQUIRED)
 
 set(dependencies
   cyberdog_common
   rapidjson
   rclcpp
+  black_box
 )
 
 if(BUILD_TESTING)
@@ -29,8 +31,8 @@ add_executable(test_node src/test_inteface_node.cpp)
 add_executable(test_node2 test/test.cpp)
 
 #target_compile_definitions(test_node PRIVATE BenchmarkPath="${CMAKE_INSTALL_PREFIX}/lib/cyberdog_common")
-ament_target_dependencies(test_node rclcpp rapidjson cyberdog_common)
-ament_target_dependencies(test_node2 rclcpp rapidjson cyberdog_common)
+ament_target_dependencies(test_node rclcpp rapidjson cyberdog_common black_box)
+ament_target_dependencies(test_node2 rclcpp rapidjson cyberdog_common black_box)
 
 target_link_libraries(test_node ${cyberdog_log_LIBRARIES})
 install(

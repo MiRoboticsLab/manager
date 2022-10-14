@@ -39,12 +39,20 @@ struct Table
   std::vector<std::vector<std::string>> fields;
 };
 
+struct MemberInformaion
+{
+  std::string name;
+  int voiceStatus;
+  int faceStatus;
+};
+
 class BlackBox final
 {
   using TouchStatusMsg = protocol::msg::TouchStatus;
 
 public:
   explicit BlackBox(rclcpp::Node::SharedPtr node_ptr);
+  BlackBox() {}
   BlackBox(const BlackBox &) = delete;
   BlackBox & operator=(const BlackBox &) = delete;
   ~BlackBox() {}
@@ -75,6 +83,17 @@ private:
   bool InsertTouchStatus(const TouchStatusMsg & msg, const std::string & topic_name);
   void RollOverDB();
   std::string GetTime();
+
+public:
+  // new function
+  bool write(const std::string & name);
+  bool AddUser(const std::string & name);
+  bool DeleteUser(const std::string & name);
+  bool SearchUser(std::vector<cyberdog::manager::MemberInformaion> & UserVector);
+  bool SearchSingleUser(const std::string & name, int * result);
+  bool ModifyUser(const std::string & name, int status, int newStatus);
+  bool HasUser(const std::string & name);
+  bool DataBaseExit(const std::string DB_path);
 };  // class BlackBox
 }  // namespace manager
 }  // namespace cyberdog
