@@ -31,7 +31,7 @@ include_directories(include)
 add_library(black_box SHARED src/black_box.cpp)
 target_link_libraries(black_box ${SQLite3_LIBRARIES} ${Boost_FILESYSTEM_LIBRARY})
 ament_target_dependencies(black_box rclcpp protocol cyberdog_common params)
-
+ament_target_dependencies(black_box rclcpp cyberdog_common params)
 # target_include_directories(black_box
 #                            PUBLIC
 #                            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

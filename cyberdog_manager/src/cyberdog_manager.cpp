@@ -577,7 +577,7 @@ void cyberdog::manager::CyberdogManager::QueryAccountSearch(
     }
   } else {
     INFO("search_one_user");
-    int result[2];
+    int result[2] = {8888, 8888};
     rapidjson::Value js_obj(rapidjson::kObjectType);
     obj.SearchUser(account_name, result);
     int voice_state = result[0];
