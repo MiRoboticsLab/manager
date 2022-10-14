@@ -71,8 +71,7 @@ public:
       INFO("enter serachAllUser [if]");
       for (int i = 0; i < vectorUser.size(); i++) {
         INFO("enter serachAllUser [for] cycle");
-        INFO(
-          "%s:%d %d", vectorUser_[i].name.c_str(),
+        INFO("%s:%d %d", vectorUser_[i].name.c_str(),
           vectorUser_[i].voiceStatus, vectorUser_[i].faceStatus);
         vectorUser[i].username = vectorUser_[i].name;
         vectorUser[i].voiceStatus = vectorUser_[i].voiceStatus;
