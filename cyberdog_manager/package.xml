@@ -13,12 +13,12 @@
   <depend>manager_base</depend>
   <depend>black_box</depend>
   <depend>cyberdog_common</depend>
+  <depend>user_info_manager</depend>
   <depend>cyberdog_machine</depend>
   <depend>std_srvs</depend>
   <depend>protocol</depend>
   <depend>low_power_consumption</depend>
   <depend>ament_index_cpp</depend>
-  <depend>user_info_manager</depend>
   
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
