@@ -99,7 +99,9 @@ public:
     cyberdog::manager::BlackBox black_box;
     if (black_box.SearchSingleUser(username, result) ) {
       INFO("[UserAccountManager]: enter SearchUser [if]");
-      INFO("[UserAccountManager]: search singleuser's information is : %d, %d", result[0], result[1]);
+      INFO(
+        "[UserAccountManager]: search singleuser's information is : %d, %d", result[0],
+        result[1]);
       return true;
     } else {
       INFO("[UserAccountManager]: search single user failed");
@@ -108,7 +110,7 @@ public:
   }
 /**
  * @brief  search a user information by username
- * param： username (the user's name), 
+ * param： username (the user's name),
  * param:  flag (flag=0 return the user's voice status; flag=1 return the user's face status)
  * return: the status of user's voice or face
 */
@@ -134,7 +136,9 @@ public:
     cyberdog::manager::BlackBox black_box;
     if (black_box.ModifyUser(username, flag, status)) {
       INFO("[UserAccountManager]: enter Modify user [if]");
-      INFO("[UserAccountManager]: modify username:%s, flag:%d, status:%d", username.c_str(), flag, status);
+      INFO(
+        "[UserAccountManager]: modify username:%s, flag:%d, status:%d",
+        username.c_str(), flag, status);
       return true;
     } else {
       INFO("[UserAccountManager]: modify user information failed");

@@ -84,6 +84,7 @@ private:
   void RollOverDB();
   std::string GetTime();
   std::string filename_ = "/opt/ros2/cyberdog/share/params/toml_config/manager";
+
 public:
   // new function
   bool write(const std::string & name);
