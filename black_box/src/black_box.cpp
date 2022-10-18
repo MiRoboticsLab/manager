@@ -218,7 +218,8 @@ void cyberdog::manager::BlackBox::GeneralMsgCallback(
 bool cyberdog::manager::BlackBox::write(const std::string & name)
 {
   std::string sql;
-  std::string filename = "/opt/ros2/cyberdog/share/params/toml_config/manager/userInformation.db";
+  //std::string filename = "/opt/ros2/cyberdog/share/params/toml_config/manager/userInformation.db";
+  std::string filename = filename_ + "/userInformation.db";
   sqlite3 * db;
   char * zErrMsg = 0;
   INFO("enter writer!!!!!!!!!");
@@ -248,12 +249,12 @@ bool cyberdog::manager::BlackBox::write(const std::string & name)
  */
 bool cyberdog::manager::BlackBox::AddUser(const std::string & name)
 {
-  std::string filename = "/opt/ros2/cyberdog/share/params/toml_config/manager/userInformation.db";
+  //std::string filename = "/opt/ros2/cyberdog/share/params/toml_config/manager/userInformation.db";
+  std::string filename = filename_ + "/userInformation.db";
   sqlite3 * db;
   char * sql;
   char * zErrMsg = 0;
   INFO("[black_box]: add %s", name.c_str());
-
   if (!boost::filesystem::exists(filename)) {
     int rc = sqlite3_open(filename.c_str(), &db);
     INFO("[black_box]: ADDUser sqlite_open = %d", rc);
@@ -282,6 +283,14 @@ bool cyberdog::manager::BlackBox::AddUser(const std::string & name)
   } else {
     INFO("[black_box]:  the file exists");
     INFO("[black_box]: add %s", name.c_str());
+    if(HasUser(name))
+    {
+      INFO("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+      INFO("%s",name.c_str());
+      INFO("[black_box] : the %s has exist!",name.c_str());
+      return true;
+    }
+    INFO("$$$$$$$$$$$$$$$$$$$$$$$");
     if (write(name)) {
       return true;
     } else {
@@ -300,15 +309,16 @@ bool cyberdog::manager::BlackBox::AddUser(const std::string & name)
  */
 bool cyberdog::manager::BlackBox::DeleteUser(const std::string & name)
 {
-  std::string filename = "/opt/ros2/cyberdog/share/params/toml_config/manager/userInformation.db";
+  //std::string filename = "/opt/ros2/cyberdog/share/params/toml_config/manager/userInformation.db";
+  std::string filename = filename_ + "/userInformation.db";
   sqlite3 * db;
   char * zErrMsg = 0;
-  INFO("delete %s!!!!!!!", name.c_str());
+  INFO("[black_box]: will delete %s!!!!!!!", name.c_str());
   std::string query = std::string("DELETE FROM USER WHERE NAME = ") + std::string("\'") + name +
     "\'" + ";";
-  INFO("%s", query.c_str());
+  INFO("[black_box]: %s", query.c_str());
   if (!DataBaseExit(filename)) {
-    INFO("[manager:black_box]: the %s not exit", filename.c_str());
+   // INFO("[manager:black_box]: the %s not exit", filename.c_str());
     return false;
   }
   int rc;
@@ -319,12 +329,12 @@ bool cyberdog::manager::BlackBox::DeleteUser(const std::string & name)
     }
     int flag = sqlite3_exec(db, query.c_str(), 0, 0, &zErrMsg);
     if (flag == SQLITE_OK) {
-      INFO("sqlite_exec(delete) return :%d", flag);
-      INFO("[manager:black_box]: delete %s success", name.c_str());
+     // INFO("sqlite_exec(delete) return code:%d", flag);
+      INFO("[black_box]: delete %s success", name.c_str());
       return true;
     } else {
-      INFO("sqlite_exec(delete) return :%d", flag);
-      INFO("[manager:black_box]: delete %s failed!!!", name.c_str());
+      INFO("[black_box]: delete  sqlite_exec() return code :%d", flag);
+      INFO("[black_box]: delete %s failed!!!", name.c_str());
       return false;
     }
   }
@@ -347,14 +357,15 @@ bool cyberdog::manager::BlackBox::SearchUser(
   int nRow;
   int nColumn;
   cyberdog::manager::MemberInformaion memberInformation_;
-  std::string filename = "/opt/ros2/cyberdog/share/params/toml_config/manager/userInformation.db";
+  //std::string filename = "/opt/ros2/cyberdog/share/params/toml_config/manager/userInformation.db";
+  std::string filename = filename_ + "/userInformation.db";
   if (!DataBaseExit(filename)) {
-    INFO("[manager:black_box]: the %s not exit", filename.c_str());
+    //INFO("[manager:black_box]: the %s not exit", filename.c_str());
     return false;
   }
   int rc = sqlite3_open(filename.c_str(), &db);
   if (rc) {
-    INFO("[manager:black_box:] %s", sqlite3_errmsg(db));
+    INFO("[black_box:] %s", sqlite3_errmsg(db));
     return false;
   }
 
@@ -368,15 +379,17 @@ bool cyberdog::manager::BlackBox::SearchUser(
       memberInformation_.faceStatus = std::atoi(dbResult[i * nColumn + 2]);
       UserVector.push_back(memberInformation_);
       INFO(
-        "Search all:%s:%d %d", memberInformation_.name.c_str(),
+        "[black_box]: Search all:%s:%d %d", memberInformation_.name.c_str(),
         memberInformation_.voiceStatus, memberInformation_.faceStatus);
     }
     sqlite3_free_table(dbResult);
-    INFO("search all close :%d", sqlite3_close(db));
+    sqlite3_close(db);
+    //INFO("search all close :%d", sqlite3_close(db));
     return true;
   } else {
     INFO("[black_box:] get datebase table failed!!!");
-    INFO("search all close :%d", sqlite3_close(db));
+    //INFO("search all close :%d", sqlite3_close(db));
+    sqlite3_close(db);
     return false;
   }
 }
@@ -388,14 +401,15 @@ bool cyberdog::manager::BlackBox::HasUser(const std::string & name)
   char ** dbResult;
   int nRow;
   int nColumn;
-  std::string filename = "/opt/ros2/cyberdog/share/params/toml_config/manager/userInformation.db";
+  //std::string filename = "/opt/ros2/cyberdog/share/params/toml_config/manager/userInformation.db";
+  std::string filename = filename_ + "/userInformation.db";
   if (!DataBaseExit(filename)) {
-    INFO("[manager:black_box]: the %s not exit", filename.c_str());
+   // INFO("[manager:black_box]: the %s not exit", filename.c_str());
     return false;
   }
   int rc = sqlite3_open(filename.c_str(), &db);
   if (rc) {
-    INFO("[manager:black_box:] %s", sqlite3_errmsg(db));
+    INFO("[black_box:] %s", sqlite3_errmsg(db));
     return false;
   }
   sql = std::string("SELECT * FROM USER") + std::string(" WHERE NAME =") + "\'" + name + "\'";
@@ -426,14 +440,15 @@ bool cyberdog::manager::BlackBox::SearchSingleUser(const std::string & name, int
   int nRow;
   int nColumn;
   cyberdog::manager::MemberInformaion memberInformation_;
-  std::string filename = "/opt/ros2/cyberdog/share/params/toml_config/manager/userInformation.db";
+  //std::string filename = "/opt/ros2/cyberdog/share/params/toml_config/manager/userInformation.db";
+  std::string filename = filename_ + "/userInformation.db";
   if (!DataBaseExit(filename)) {
-    INFO("[manager:black_box]: the %s not exit", filename.c_str());
+   // INFO("[manager:black_box]: the %s not exit", filename.c_str());
     return false;
   }
   int rc = sqlite3_open(filename.c_str(), &db);
   if (rc) {
-    INFO("[manager:black_box:] %s", sqlite3_errmsg(db));
+    INFO("[black_box:] %s", sqlite3_errmsg(db));
     return false;
   }
   sql = std::string("SELECT * FROM USER") + std::string(" WHERE NAME =") + "\'" + name + "\'";
@@ -443,9 +458,9 @@ bool cyberdog::manager::BlackBox::SearchSingleUser(const std::string & name, int
     result[0] = std::atoi(dbResult[nColumn + 1]);
     result[1] = std::atoi(dbResult[nColumn + 2]);
     sqlite3_free_table(dbResult);
+    sqlite3_close(db);
     INFO(
-      "[black_box]: search single user close :%d,voice:%d,face:%d", sqlite3_close(
-        db), result[0], result[1]);
+      "[black_box]: search single user :voice:%d,face:%d", result[0], result[1]);
     return true;
   } else {
     INFO("[black_box]: search failed");
@@ -465,40 +480,43 @@ bool cyberdog::manager::BlackBox::SearchSingleUser(const std::string & name, int
  */
 bool cyberdog::manager::BlackBox::ModifyUser(const std::string & name, int status, int newStatus)
 {
-  std::string filename = "/opt/ros2/cyberdog/share/params/toml_config/manager/userInformation.db";
+  //std::string filename = "/opt/ros2/cyberdog/share/params/toml_config/manager/userInformation.db";
+  std::string filename = filename_ + "/userInformation.db";
   if (!DataBaseExit(filename)) {
-    INFO("[manager:black_box]: the %s not exit", filename.c_str());
+    //INFO("[black_box]: the %s not exit", filename.c_str());
     return false;
   }
-  INFO("enter modify !!!!!!!!!!");
+  INFO("[black_box]: enter modify !!!!!!!!!!");
   std::string query_update;
   sqlite3 * db;
   char * zErrMsg = 0;
   if (status == 0) {
-    std::cout << "enter 0" << std::endl;
+    //std::cout << "will modify voice status" << std::endl;
     query_update = std::string("UPDATE USER SET VOICE = ") + std::to_string(newStatus) +
       std::string(" WHERE NAME =") + "\'" + name + "\'";
-    std::cout << query_update << std::endl;
+   // std::cout << query_update << std::endl;
   } else if (status == 1) {
-    std::cout << "enter 1" << std::endl;
+   // std::cout << "will modify face status" << std::endl;
     query_update = std::string("UPDATE USER SET FACE = ") + std::to_string(newStatus) +
       std::string(" WHERE NAME =") + "\'" + name + "\'";
-    std::cout << query_update << std::endl;
+    //std::cout << query_update << std::endl;
   }
-  std::cout << query_update << std::endl;
+  //std::cout << query_update << std::endl;
+  INFO("[black_box]: %s",query_update.c_str());
   int rc = sqlite3_open(filename.c_str(), &db);
   // INFO("SQL :%s",query_update.str().c_str());
-  INFO("%s", query_update.c_str());
-  INFO("modify sqlite_open is :%d ", rc);
+  //INFO("%s", query_update.c_str());
+  INFO("[black_box]: modify sqlite_open() return Code is :%d ", rc);
   if (rc == SQLITE_OK) {
     if (!HasUser(name)) {
       return false;
     }
     int hc = sqlite3_exec(db, query_update.c_str(), 0, 0, &zErrMsg);
-    INFO("modify sqlite exec is : %d", hc);
+    INFO("[black_box]: modify sqlite_exec() return Code is : %d", hc);
     if (hc == SQLITE_OK) {
-      INFO("[manager:black_box]: modify success!!!");
-      INFO("modify close :%d", sqlite3_close(db));
+      INFO("[black_box]: modify success!!!");
+      //INFO("[black_box]: modify sqlite3_close() return Code is :%d", sqlite3_close(db));
+      sqlite3_close(db);
       return true;
     }
   }
@@ -517,7 +535,7 @@ bool cyberdog::manager::BlackBox::DataBaseExit(const std::string DB_path)
   if (boost::filesystem::exists(DB_path)) {
     return true;
   } else {
-    INFO("[manager:black_box]:the %s not exit", DB_path.c_str());
+    INFO("[black_box]:the %s not exit", DB_path.c_str());
     return false;
   }
 }

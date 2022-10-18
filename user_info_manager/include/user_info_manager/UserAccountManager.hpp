@@ -54,25 +54,30 @@ public:
 
 public:
   // const std::string base_account_dir = "/opt/ros2/cyberdog/share/params/toml_config/manager";
+/**
+ * @brief  add a user to database
+*/
   bool AddMember(std::string username)
   {
-    INFO("enter ADDMember");
+    INFO("[UserAccountManager]: enter ADDMember()");
     cyberdog::manager::BlackBox black_box_;
     return black_box_.AddUser(username);
   }
-
+/**
+ * @brief  search all user form database
+*/
   bool SearAllUser(
     std::vector<cyberdog::common::CyberdogAccountManager::UserInformation> & vectorUser)
   {
-    INFO("enter serachAllUser");
+    INFO("[UserAccountManager]: enter serachAllUser()");
     cyberdog::manager::BlackBox black_box;
     std::vector<cyberdog::manager::MemberInformaion> vectorUser_;
     if (black_box.SearchUser(vectorUser_) ) {
-      INFO("enter serachAllUser [if]");
+      INFO("[UserAccountManager]: enter serachAllUser [if]");
       for (int i = 0; i < vectorUser.size(); i++) {
-        INFO("enter serachAllUser [for] cycle");
+        INFO("[UserAccountManager]: enter serachAllUser [for] cycle");
         INFO(
-          "%s:%d %d", vectorUser_[i].name.c_str(),
+          "[UserAccountManager]: %s:%d %d", vectorUser_[i].name.c_str(),
           vectorUser_[i].voiceStatus, vectorUser_[i].faceStatus);
         vectorUser[i].username = vectorUser_[i].name;
         vectorUser[i].voiceStatus = vectorUser_[i].voiceStatus;
@@ -80,73 +85,87 @@ public:
       }
       return true;
     } else {
-      INFO("search all user failed");
+      INFO("[UserAccountManager]: search all user failed");
       return false;
     }
   }
-
+/**
+ * @brief  search a user information by username
+ * param： username (the user's name), result (the array of user's information)
+*/
   bool SearchUser(const std::string username, int * result)
   {
-    INFO("enter SearchUser");
+    INFO("[UserAccountManager]: enter SearchUser");
     cyberdog::manager::BlackBox black_box;
     if (black_box.SearchSingleUser(username, result) ) {
-      INFO("enter SearchUser [if]");
-      INFO("search singleuser's information is : %d, %d", result[0], result[1]);
+      INFO("[UserAccountManager]: enter SearchUser [if]");
+      INFO("[UserAccountManager]: search singleuser's information is : %d, %d", result[0], result[1]);
       return true;
     } else {
-      INFO("search single user failed");
+      INFO("[UserAccountManager]: search single user failed");
       return false;
     }
   }
-
+/**
+ * @brief  search a user information by username
+ * param： username (the user's name), 
+ * param:  flag (flag=0 return the user's voice status; flag=1 return the user's face status)
+ * return: the status of user's voice or face
+*/
   int SearchOneUser(std::string username, int flag)
   {
     int result[2] = {0};
     if (SearchUser(username, result)) {
-      INFO("[%s:] search success", CYBETDOGMANAGER);
+      INFO("[UserAccountManager]: search success");
       return result[flag];
     } else {
-      INFO("[%s:] the %s not exit", CYBETDOGMANAGER, username.c_str());
+      INFO("[UserAccountManager]: the %s not exit", username.c_str());
       return -1;
     }
   }
-
-  bool ModifyInformation(std::string username, int NewVoiceStatus, int NewFaceStatus)
-  {
-  }
-
+/**
+ * @brief  modify the indoformation of user
+ * param: status. the new status(voice | face) of user
+ * param: flag. flag =0 ,status = voice; flag =1 , status = face;
+*/
   bool ModifyUserInformation(std::string username, int status, int flag)
   {
-    INFO("enter ModifyUserInformation");
+    INFO("[UserAccountManager]: enter ModifyUserInformation");
     cyberdog::manager::BlackBox black_box;
     if (black_box.ModifyUser(username, flag, status)) {
-      INFO("enter Modify user [if]");
-      INFO("modify username:%s, flag:%d, status:%d", username.c_str(), flag, status);
+      INFO("[UserAccountManager]: enter Modify user [if]");
+      INFO("[UserAccountManager]: modify username:%s, flag:%d, status:%d", username.c_str(), flag, status);
       return true;
     } else {
-      INFO("modify user information failed");
+      INFO("[UserAccountManager]: modify user information failed");
       return false;
     }
   }
+/**
+ *@brief  delete the information of user
+*/
   bool DeleteUserInformation(std::string username)
   {
-    INFO("enter DeleteUserInformation");
+    INFO("[UserAccountManager]: enter DeleteUserInformation");
     cyberdog::manager::BlackBox black_box;
     if (black_box.DeleteUser(username)) {
-      INFO("delete user success");
+      INFO("[UserAccountManager]: delete user success");
       return true;
     } else {
-      INFO("delete user failed!!!!");
+      INFO("[UserAccountManager]: delete user failed!!!!");
       return false;
     }
   }
+/**
+ * @brief  delete the voice status of user
+*/
   bool DeleteVoice(std::string username)
   {
     if (ModifyUserInformation(username, 0, 0)) {
-      INFO("[%s:] delete %s's voice status success", CYBETDOGMANAGER, username.c_str());
+      INFO("[UserAccountManager]: delete %s's voice status success", username.c_str());
       return true;
     } else {
-      INFO("[%s:] delete %s's voice status failed", CYBETDOGMANAGER, username.c_str());
+      INFO("[UserAccountManager]: delete %s's voice status failed", username.c_str());
       return false;
     }
   }
@@ -157,10 +176,10 @@ public:
   bool DeleteFace(std::string username)
   {
     if (ModifyUserInformation(username, 0, 1)) {
-      INFO("[%s:] delete %s's voice status success", CYBETDOGMANAGER, username.c_str());
+      INFO("[UserAccountManager]: delete %s's voice status success", username.c_str());
       return true;
     } else {
-      INFO("[%s:] delete %s's voice status failed", CYBETDOGMANAGER, username.c_str());
+      INFO("[UserAccountManager]: delete %s's voice status failed", username.c_str());
       return false;
     }
   }
