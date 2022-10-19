@@ -92,20 +92,21 @@ void PowerConsumptionManager::sub_mostion_status_callback(
   static int lay_count = 0;
 
   static bool times_flag = true;
+  static int count = 0;
 
   // 启动(或急停)后不进行任何操作，60s后进入低功耗
   if (times_flag == true && msg.motion_id == 0) {
-    ++lay_count;
-    INFO("lay_count %d", lay_count);
-    if (lay_count == 600) {
-      lay_count = 0;
+    ++count;
+    INFO("lay_count %d", count);
+    if (count == 600) {
+      count = 0;
       convert_motion_flage = false;
       times_flag = false;
       INFO("call low power consumption");
       send_power_manager_request(true);
     }
   } else {
-    lay_count = 0;
+    count = 0;
   }
 
   // 运动状态转换至趴下，30s后启动低功耗
