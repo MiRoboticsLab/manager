@@ -88,52 +88,54 @@ private:
   {
     // INFO("sub motion_id messages*********");
     // motion_id: 趴下(101)、站立(111)
-    static bool motion_status_change_flage = 1;
+    static bool convert_motion_flage = true;
     static int lay_count = 0;
-    static bool flage = 1;
+    static bool times_flag = true;
     static int count = 0;
-    PM_DEV pd = PM_CAM_ALL;
+    PM_DEV pd = PM_ALL;
     unsigned int err;
     int code = -1;
 
     // 启动后不进行任何操作，60s后进入低功耗
-    if (motion_status_change_flage == 1 && flage == 1 && msg.motion_id == 101) {
+    if (times_flag == true && msg.motion_id == 0) {
       ++count;
-      INFO("count = %d", count);
-      if (count == 600) {
+      if (count == 100) {
         count = 0;
-        flage = 0;
+        convert_motion_flage = false;
+        times_flag = false;
         INFO("call low power consumption");
         // code = lpc_ptr_->LpcRelease(pd, &err);
         // if(code == 0)
         release_handler();
       }
+    } else {
+      count = 0;
     }
-    // 状态切换到站立，启动正常功耗
-    if (motion_status_change_flage == true && msg.motion_id == 111) {
-      flage = 0;
-      INFO("call nomal power consumption");
-      // code = lpc_ptr_->LpcRequest(pd, &err);
-      //   if(code == 0)
-      request_handler();
-      motion_status_change_flage = 0;
-    }
-
-    // 状态切换到趴下，30s后启动低功耗
-    if (motion_status_change_flage == false && msg.motion_id == 101) {
+    // 运动状态转换至趴下，30s后启动低功耗
+    if (convert_motion_flage == true && msg.motion_id == 101) {
       // motion_status的发布频率为10Hz，延时30s，lay_count == 300
       ++lay_count;
-      INFO("lay_count = %d", lay_count);
       if (lay_count == 300) {
         INFO("call low power consumption");
+        INFO("call low power");
         // code = lpc_ptr_->LpcRelease(pd, &err);
         // if(code == 0)
         release_handler();
-        motion_status_change_flage = 1;
+        convert_motion_flage = false;
         lay_count = 0;
       }
     } else {
       lay_count = 0;
+    }
+
+    // 状态切换到站立，启动正常功耗
+    if (convert_motion_flage == false && msg.motion_id == 111) {
+      INFO("call nomal power consumption");
+      // code = lpc_ptr_->LpcRelease(pd, &err);
+      // if(code == 0)
+      request_handler();
+      convert_motion_flage = true;
+      times_flag = true;
     }
   }
 

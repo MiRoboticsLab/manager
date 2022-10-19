@@ -66,7 +66,7 @@ bool cyberdog::manager::CyberdogManager::Init()
   if (!machine_state_ptr_->Init()) {
     ERROR("machine state init error!");
   }
-  Config();
+  // Config();
   if (!RegisterStateHandler(node_ptr_)) {
     return false;
   }
@@ -84,7 +84,7 @@ bool cyberdog::manager::CyberdogManager::Init()
 
   query_node_ptr_->Init();
 
-  OnActive();
+  // OnActive();
 
   return true;
 }
