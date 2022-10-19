@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #ifndef LOW_POWER_CONSUMPTION__PM_IF_H_
-        #define LOW_POWER_CONSUMPTION__PM_IF_H_
+#define LOW_POWER_CONSUMPTION__PM_IF_H_
 
 
 #ifdef __cplusplus
@@ -35,6 +35,7 @@ enum PM_DEV
   PM_LIDAR        = 1 << 13,  // 激光雷达组件,
   PM_TOF          = 1 << 14,  // TOF 组件
   PM_ULTRA        = 1 << 15,  // 超声波组件
+  PM_ALL          = 0xffffffff,
 };
 
 int PmRequest(unsigned int devs, unsigned int * err);

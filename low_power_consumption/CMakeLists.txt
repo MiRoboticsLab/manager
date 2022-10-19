@@ -15,6 +15,10 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(protocol REQUIRED)
+find_package(std_srvs REQUIRED)
+find_package(cyberdog_common REQUIRED)
 
 include_directories(include)
 
@@ -27,6 +31,15 @@ install(
 #   DIRECTORY lib/
 #   DESTINATION lib/
 # )
+add_executable(${PROJECT_NAME} src/power_consumption_manager.cpp src/main.cpp)
+ament_target_dependencies( ${PROJECT_NAME}
+  rclcpp
+  protocol
+  cyberdog_common
+  std_srvs)
+
+install(TARGETS ${PROJECT_NAME}
+  DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
