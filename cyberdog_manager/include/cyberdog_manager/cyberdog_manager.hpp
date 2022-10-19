@@ -58,6 +58,7 @@ public:
   void OnSuspend() override;
   void OnProtected() override;
   void OnActive() override;
+  void OnDeactive();
 
 private:
   std::string name_;
