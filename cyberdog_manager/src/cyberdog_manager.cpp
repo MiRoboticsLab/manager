@@ -57,6 +57,8 @@ cyberdog::manager::CyberdogManager::~CyberdogManager()
 void cyberdog::manager::CyberdogManager::Config()
 {
   INFO("config");
+  power_consumption_node_ptr->SetActive(std::bind(&CyberdogManager::OnActive, this));
+  power_consumption_node_ptr->SetDeactive(std::bind(&CyberdogManager::OnDeactive, this));
 }
 
 bool cyberdog::manager::CyberdogManager::Init()
@@ -64,6 +66,7 @@ bool cyberdog::manager::CyberdogManager::Init()
   if (!machine_state_ptr_->Init()) {
     ERROR("machine state init error!");
   }
+  Config();
   if (!RegisterStateHandler(node_ptr_)) {
     return false;
   }
@@ -80,6 +83,8 @@ bool cyberdog::manager::CyberdogManager::Init()
   }
 
   query_node_ptr_->Init();
+
+  OnActive();
 
   return true;
 }
@@ -174,7 +179,8 @@ void cyberdog::manager::CyberdogManager::OnError()
 
 void cyberdog::manager::CyberdogManager::OnLowPower()
 {
-  ERROR("on lowpower");
+  INFO("on lowpower");
+  machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_LowPower);
 }
 
 void cyberdog::manager::CyberdogManager::OnSuspend()
@@ -189,5 +195,12 @@ void cyberdog::manager::CyberdogManager::OnProtected()
 
 void cyberdog::manager::CyberdogManager::OnActive()
 {
-  ERROR("on active");
+  INFO("on active");
+  machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
+}
+
+void cyberdog::manager::CyberdogManager::OnDeactive()
+{
+  INFO("on deactive");
+  machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_DeActive);
 }
