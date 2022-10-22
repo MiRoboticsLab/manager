@@ -585,6 +585,9 @@ public:
       [this]() {
         while (rclcpp::ok()) {
           std::this_thread::sleep_for(std::chrono::milliseconds(30000));
+          if (!is_reporting_) {
+            continue;
+          }
           INFO("[start:back to end upload device info-------------------]");
           bool is_sn = false;
           bool is_version = true;
@@ -621,6 +624,11 @@ public:
           INFO("[stop:back to end upload device info-------------------]");
         }
       }).detach();
+  }
+
+  void Report(bool report)
+  {
+    is_reporting_ = report;
   }
 
 private:
@@ -733,6 +741,7 @@ private:
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_;
   rclcpp::Subscription<protocol::msg::ConnectorStatus>::SharedPtr connect_status_sub_;
   rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_;
+  bool is_reporting_ {false};
 };
 
 }  // namespace manager

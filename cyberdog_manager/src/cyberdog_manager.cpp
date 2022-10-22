@@ -45,6 +45,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   heart_beat_ptr_ = std::make_unique<cyberdog::manager::HeartContext>(
     node_ptr_,
     std::bind(&CyberdogManager::SetState, this, std::placeholders::_1, std::placeholders::_2));
+  error_context_ptr_ = std::make_unique<cyberdog::manager::ErrorContext>(name_ + "_error");
   executor_.add_node(node_ptr_);
   // black_box_ptr_ = std::make_shared<BlackBox>(node_ptr_);
 }
@@ -63,14 +64,17 @@ void cyberdog::manager::CyberdogManager::Config()
 
 bool cyberdog::manager::CyberdogManager::Init()
 {
+  error_context_ptr_->Init();
   if (!machine_state_ptr_->Init()) {
     ERROR("machine state init error!");
   }
+  error_context_ptr_->ClearError();
   // Config();
   if (!RegisterStateHandler(node_ptr_)) {
     return false;
   }
-  if (!SelfCheck() ) {
+  // if (!SelfCheck() ) {
+  if (false) {
     return false;
   } else {
     heart_beat_ptr_->Init();
@@ -85,6 +89,7 @@ bool cyberdog::manager::CyberdogManager::Init()
   query_node_ptr_->Init();
 
   // OnActive();
+  query_node_ptr_->Report(true);
 
   return true;
 }
@@ -92,57 +97,6 @@ bool cyberdog::manager::CyberdogManager::Init()
 bool cyberdog::manager::CyberdogManager::SelfCheck()
 {
   return machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_SelfCheck);
-  // std::vector<std::string> manager_vec_;
-
-  // std::vector<rclcpp::Client<protocol::srv::ManagerInit>::SharedPtr> manager_client;
-  // auto wait_result = std::all_of(
-  //   manager_vec_.cbegin(), manager_vec_.cend(),
-  //   [this, &manager_client](const std::string & manager_name) {
-  //     std::string server_name = std::string("manager_init_") + manager_name;
-  //     auto client = this->node_ptr_->create_client<protocol::srv::ManagerInit>(server_name);
-  //     if (!client->wait_for_service(std::chrono::nanoseconds(1000 * 1000 * 1000)) ) {
-  //       // error msg or other executing
-  //       return false;
-  //     } else {
-  //       manager_client.emplace_back(client);
-  //     }
-  //     return true;
-  //   }
-  // );
-
-  // if (!wait_result) {
-  //   // error msg
-  //   manager_client.clear();
-  //   return false;
-  // }
-
-  // auto check_result = std::all_of(
-  //   manager_client.cbegin(), manager_client.cend(),
-  //   [this](const rclcpp::Client<protocol::srv::ManagerInit>::SharedPtr client_ptr) {
-  //     auto request_ptr = std::make_shared<protocol::srv::ManagerInit::Request>();
-  //     auto result = client_ptr->async_send_request(request_ptr);
-  //     if (rclcpp::spin_until_future_complete(
-  //       this->node_ptr_,
-  //       result) == rclcpp::FutureReturnCode::SUCCESS)
-  //     {
-  //       if (result.get()->res_code != (int32_t)system::KeyCode::kOK) {
-  //         // error msg or other executing
-  //         return false;
-  //       }
-  //     } else {
-  //       // error msg or other executing
-  //       return false;
-  //     }
-  //     return true;
-  //   }
-  // );
-
-  // if (!check_result) {
-  //   // error msg
-  //   return false;
-  // }
-
-  // return true;
 }
 
 // void cyberdog::manager::CyberdogManager::HeartbeatsCheck()
@@ -197,10 +151,12 @@ void cyberdog::manager::CyberdogManager::OnActive()
 {
   INFO("on active");
   machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
+  query_node_ptr_->Report(true);
 }
 
 void cyberdog::manager::CyberdogManager::OnDeactive()
 {
   INFO("on deactive");
   machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_DeActive);
+  query_node_ptr_->Report(false);
 }
