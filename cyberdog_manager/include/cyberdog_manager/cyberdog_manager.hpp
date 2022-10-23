@@ -34,6 +34,7 @@
 #include "cyberdog_manager/power_consumption_info.hpp"
 #include "cyberdog_manager/state_context.hpp"
 #include "cyberdog_manager/heart_context.hpp"
+#include "cyberdog_manager/error_context.hpp"
 
 namespace cyberdog
 {
@@ -69,6 +70,7 @@ private:
   std::unique_ptr<PowerConsumptionInfoNode> power_consumption_node_ptr {nullptr};
   std::unique_ptr<cyberdog::manager::StateContext> machine_state_ptr_ {nullptr};
   std::unique_ptr<cyberdog::manager::HeartContext> heart_beat_ptr_ {nullptr};
+  std::unique_ptr<cyberdog::manager::ErrorContext> error_context_ptr_ {nullptr};
   std::shared_ptr<BlackBox> black_box_ptr_ {nullptr};
 };  // class CyberdogManager
 }  // namespace manager
