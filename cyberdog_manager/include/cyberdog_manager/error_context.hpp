@@ -73,7 +73,7 @@ public:
     std::thread(
       [this]() {
         rclcpp::spin(error_report_node_);
-      }).detach();
+    }).detach();
   }
   ~ErrorContext()
   {
@@ -88,7 +88,7 @@ public:
   }
   void Init()
   {
-    INFO("Error context thread started.");
+    INFO("error context thread started.");
     thread_ = std::thread(
       [this]() {
         while (rclcpp::ok() && !exit_) {

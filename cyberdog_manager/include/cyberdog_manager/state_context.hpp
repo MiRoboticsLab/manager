@@ -37,7 +37,7 @@ public:
     std::thread(
       [this]() {
         rclcpp::spin(node_ptr_);
-      }).detach();
+    }).detach();
   }
 
   ~StateContext() {}

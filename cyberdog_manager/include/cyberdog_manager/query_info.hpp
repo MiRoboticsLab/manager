@@ -364,21 +364,21 @@ public:
           float & hip_right_front = future_result.get()->motor_temp[0];
           float & hip_left_back = future_result.get()->motor_temp[3];
           float & hip_right_back = future_result.get()->motor_temp[2];
-          rapidjson::Value val;
+          rapidjson::Value val(rapidjson::kStringType);
           std::string ss = float_to_string(hip_left_front);
-          val.SetString(ss.c_str(), ss.length());
+          val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
           hip_temper_array.PushBack(
             val, json_info.GetAllocator());
           ss = float_to_string(hip_right_front);
-          val.SetString(ss.c_str(), ss.length());
+          val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
           hip_temper_array.PushBack(
             val, json_info.GetAllocator());
           ss = float_to_string(hip_left_back);
-          val.SetString(ss.c_str(), ss.length());
+          val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
           hip_temper_array.PushBack(
             val, json_info.GetAllocator());
           ss = float_to_string(hip_right_back);
-          val.SetString(ss.c_str(), ss.length());
+          val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
           hip_temper_array.PushBack(
             val, json_info.GetAllocator());
           motor_temper_val.AddMember("hip", hip_temper_array, json_info.GetAllocator());
@@ -388,19 +388,19 @@ public:
           float & thigh_left_back = future_result.get()->motor_temp[7];
           float & thigh_right_back = future_result.get()->motor_temp[6];
           ss = float_to_string(thigh_left_front);
-          val.SetString(ss.c_str(), ss.length());
+          val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
           thigh_temper_array.PushBack(
             val, json_info.GetAllocator());
           ss = float_to_string(thigh_right_front);
-          val.SetString(ss.c_str(), ss.length());
+          val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
           thigh_temper_array.PushBack(
             val, json_info.GetAllocator());
           ss = float_to_string(thigh_left_back);
-          val.SetString(ss.c_str(), ss.length());
+          val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
           thigh_temper_array.PushBack(
             val, json_info.GetAllocator());
           ss = float_to_string(thigh_right_back);
-          val.SetString(ss.c_str(), ss.length());
+          val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
           thigh_temper_array.PushBack(
             val, json_info.GetAllocator());
           motor_temper_val.AddMember("thigh", thigh_temper_array, json_info.GetAllocator());
@@ -410,19 +410,19 @@ public:
           float & crus_left_back = future_result.get()->motor_temp[11];
           float & crus_right_back = future_result.get()->motor_temp[10];
           ss = float_to_string(crus_left_front);
-          val.SetString(ss.c_str(), ss.length());
+          val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
           crus_temper_array.PushBack(
             val, json_info.GetAllocator());
           ss = float_to_string(crus_right_front);
-          val.SetString(ss.c_str(), ss.length());
+          val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
           crus_temper_array.PushBack(
             val, json_info.GetAllocator());
           ss = float_to_string(crus_left_back);
-          val.SetString(ss.c_str(), ss.length());
+          val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
           crus_temper_array.PushBack(
             val, json_info.GetAllocator());
           ss = float_to_string(crus_right_back);
-          val.SetString(ss.c_str(), ss.length());
+          val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
           crus_temper_array.PushBack(
             val, json_info.GetAllocator());
           motor_temper_val.AddMember("crus", crus_temper_array, json_info.GetAllocator());
@@ -470,6 +470,7 @@ public:
       ERROR("error while encoding to json");
       info = "{\"error\": \"unkown encoding json error!\"}";
     }
+    // INFO("info:%s", info.c_str());
     return info;
   }
 
