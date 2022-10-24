@@ -73,7 +73,7 @@ public:
     std::thread(
       [this]() {
         rclcpp::spin(error_report_node_);
-    }).detach();
+      }).detach();
   }
   ~ErrorContext()
   {

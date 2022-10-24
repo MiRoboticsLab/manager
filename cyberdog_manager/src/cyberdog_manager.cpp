@@ -74,7 +74,7 @@ bool cyberdog::manager::CyberdogManager::Init()
     return false;
   }
   if (!SelfCheck() ) {
-  // if (false) {
+    // if (false) {
     return false;
   } else {
     heart_beat_ptr_->Init();
