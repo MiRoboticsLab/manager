@@ -71,7 +71,8 @@ private:
   {
     static int r_count = 0;
     INFO("[%d]EnterLowPower %s:start", (r_count + 1), (request->data ? "true" : "false"));
-    PM_DEV pd = PM_CAM_ALL;
+    // PM_DEV pd = PM_CAM_ALL;
+    PM_DEV pd = PM_ALL_NO_MOTION;
     unsigned int err;
     int code = -1;
     if (request->data) {
@@ -99,7 +100,7 @@ private:
     // 启动后不进行任何操作，60s后进入低功耗
     if (times_flag == true && msg.motion_id == 0) {
       ++count;
-      if (count == 100) {
+      if (count == 300) {
         count = 0;
         convert_motion_flage = false;
         times_flag = false;
@@ -117,7 +118,6 @@ private:
       ++lay_count;
       if (lay_count == 300) {
         INFO("call low power consumption");
-        INFO("call low power");
         // code = lpc_ptr_->LpcRelease(pd, &err);
         // if(code == 0)
         release_handler();
