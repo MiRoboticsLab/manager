@@ -88,7 +88,7 @@ public:
   }
   void Init()
   {
-    INFO("Error context thread started.");
+    INFO("error context thread started.");
     thread_ = std::thread(
       [this]() {
         while (rclcpp::ok() && !exit_) {

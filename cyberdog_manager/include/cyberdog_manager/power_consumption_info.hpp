@@ -105,9 +105,12 @@ private:
         convert_motion_flage = false;
         times_flag = false;
         INFO("call low power consumption");
+        // release_handler();
         // code = lpc_ptr_->LpcRelease(pd, &err);
         // if(code == 0)
-        release_handler();
+        // {
+        //   INFO("low power consumption enter success.");
+        // }
       }
     } else {
       count = 0;
@@ -118,9 +121,12 @@ private:
       ++lay_count;
       if (lay_count == 300) {
         INFO("call low power consumption");
+        // release_handler();
         // code = lpc_ptr_->LpcRelease(pd, &err);
         // if(code == 0)
-        release_handler();
+        // {
+        //   INFO("low power consumption enter success.");
+        // }
         convert_motion_flage = false;
         lay_count = 0;
       }
@@ -133,7 +139,11 @@ private:
       INFO("call nomal power consumption");
       // code = lpc_ptr_->LpcRelease(pd, &err);
       // if(code == 0)
-      request_handler();
+      // {
+      //   request_handler();
+      //   INFO("nomal power consumption enter success.");
+      // }
+      // request_handler();
       convert_motion_flage = true;
       times_flag = true;
     }
