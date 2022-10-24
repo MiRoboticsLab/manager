@@ -74,9 +74,9 @@ bool PowerConsumptionManager::send_power_manager_request(const bool msg)
   std::future_status status = result_future.wait_for(timeout);
 
   if (status == std::future_status::ready) {
-    INFO("success to call the low_power_comsumption server.");
+    INFO("success to call the power_comsumption server.");
   } else {
-    INFO("Failed to call the low_power_comsumption server.");
+    INFO("Failed to call the power_comsumption server.");
     return false;
   }
   // INFO("result is: %ld", result_future.get()->success);
@@ -116,7 +116,6 @@ void PowerConsumptionManager::sub_mostion_status_callback(
     INFO("lay_count = %d", lay_count);
     if (lay_count == 300) {
       INFO("call low power consumption");
-      INFO("call low power");
       send_power_manager_request(true);
       convert_motion_flage = false;
       lay_count = 0;
@@ -140,7 +139,7 @@ void PowerConsumptionManager::EnterLowPower(
 {
   static int r_count = 0;
   INFO("[%d]EnterLowPower %s:start", (r_count + 1), (request->data ? "true" : "false"));
-  PM_DEV pd = PM_ALL;
+  PM_DEV pd = PM_ALL_NO_MOTION;
   unsigned int err;
   int code = -1;
   if (request->data) {
