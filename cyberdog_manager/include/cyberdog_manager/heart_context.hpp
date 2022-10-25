@@ -56,7 +56,8 @@ public:
     // manager_vec_.emplace_back("sensor");
     // manager_vec_.emplace_back("motion");
     // manager_vec_.emplace_back("perception");
-    manager_vec_.emplace_back("audio");
+    // manager_vec_.emplace_back("audio");
+    HeartbeatsNodeInit();
     heart_beats_ptr_ = std::make_unique<cyberdog::machine::HeartBeats>(500, 5);
   }
   ~HeartContext() = default;
@@ -136,6 +137,28 @@ private:
     heart_beats_ptr_->HeartUpdate(iter->first);
     // iter->second.timestamp = msg->timestamp;
     // // iter->second.counter = 0;
+  }
+
+  bool HeartbeatsNodeInit()
+  {
+    auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
+    auto path = local_share_dir + std::string("/toml_config/manager/heart_beat_config.toml");
+    toml::value config;
+    if (!common::CyberdogToml::ParseFile(path, config)) {
+      ERROR("Parse Heart Beat config file failed, toml file is invalid!");
+      return false;
+    }
+    toml::value heartbeat;
+    if (!common::CyberdogToml::Get(config, "heartbeat", heartbeat)) {
+      ERROR("Heart Beat init failed, parse heartbeat config failed!");
+      return false;
+    }
+    // toml::array actuator_array;
+    if (!common::CyberdogToml::Get(heartbeat, "node", manager_vec_)) {
+      ERROR("Heart Beat init failed, parse node array failed!");
+      return false;
+    }
+    return true;
   }
 
 private:
