@@ -88,7 +88,7 @@ public:
   }
   void Init()
   {
-    INFO("error context thread started.");
+    INFO("arror context thread started.");
     thread_ = std::thread(
       [this]() {
         while (rclcpp::ok() && !exit_) {
@@ -112,7 +112,7 @@ public:
           CyberdogJson::Add(json_info, "code", er.code);
           std::string info;
           if (!CyberdogJson::Document2String(json_info, info)) {
-            ERROR("error context error while encoding to json");
+            ERROR("arror context error while encoding to json");
             continue;
           }
           std_msgs::msg::String msg;
