@@ -26,7 +26,7 @@ namespace manager
 class StateContext final
 {
 public:
-  explicit StateContext(std::string node_name)
+  explicit StateContext(const std::string & node_name)
   : name_(node_name)
   {
     node_ptr_ = rclcpp::Node::make_shared(name_);
