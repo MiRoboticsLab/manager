@@ -25,6 +25,7 @@
 #include "protocol/srv/audio_voiceprint_entry.hpp"
 #include "protocol/srv/face_entry.hpp"
 #include "user_info_manager/UserAccountManager.hpp"
+#include "protocol/srv/all_user_search.hpp"
 
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
@@ -64,9 +65,36 @@ public:
         &AccountInfoNode::QueryAccountDelete, this, std::placeholders::_1,
         std::placeholders::_2),
       rmw_qos_profile_services_default, account_callback_group_);
+
+    all_user_serach_srv_ =
+      account_info_node_->create_service<protocol::srv::AllUserSearch>(
+      "all_user_search",
+      std::bind(
+        &AccountInfoNode::AllUserSearch, this, std::placeholders::_1,
+        std::placeholders::_2),
+      rmw_qos_profile_services_default, account_callback_group_);
   }
 
 private:
+  void AllUserSearch(
+    const protocol::srv::AllUserSearch::Request::SharedPtr request,
+    protocol::srv::AllUserSearch::Response::SharedPtr response)
+  {
+    INFO("enter search all user service  callback");
+    cyberdog::common::CyberdogAccountManager obj;
+    if (obj.SearAllUser(obj.vectorUser)) {
+      response->success = true;
+    } else {
+      response->success = false;
+    }
+    int len = obj.vectorUser.size();
+    for (int i = 0; i < len; i++) {
+      response->result[i].username = obj.vectorUser[i].username;
+      response->result[i].voicestatus = obj.vectorUser[i].voiceStatus;
+      response->result[i].facestatus = obj.vectorUser[i].faceStatus;
+    }
+  }
+
   void QueryAccountAdd(
     const protocol::srv::AccountAdd::Request::SharedPtr request,
     protocol::srv::AccountAdd::Response::SharedPtr response)
@@ -82,6 +110,7 @@ private:
       INFO("add_account_fail");
     }
   }
+
   void QueryAccountSearch(
     const protocol::srv::AccountSearch::Request::SharedPtr request,
     protocol::srv::AccountSearch::Response::SharedPtr response)
@@ -165,6 +194,7 @@ private:
         "Failed to call voice delete response services.");
       return;
     }
+
     // face delete
     rclcpp::Client<protocol::srv::FaceEntry>::SharedPtr face_delete_client_;
     face_delete_client_ =
@@ -210,11 +240,13 @@ private:
   }
 
 private:
-  rclcpp::Node::SharedPtr account_info_node_ {nullptr};
+  rclcpp::Node::SharedPtr account_info_node_{nullptr};
   rclcpp::CallbackGroup::SharedPtr account_callback_group_;
   rclcpp::Service<protocol::srv::AccountAdd>::SharedPtr account_add_srv_;
   rclcpp::Service<protocol::srv::AccountSearch>::SharedPtr account_search_srv_;
   rclcpp::Service<protocol::srv::AccountDelete>::SharedPtr account_delete_srv_;
+
+  rclcpp::Service<protocol::srv::AllUserSearch>::SharedPtr all_user_serach_srv_;
 };
 
 }  // namespace manager
