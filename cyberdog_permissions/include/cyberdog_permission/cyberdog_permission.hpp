@@ -41,7 +41,7 @@ private:
   // std::thread sn_thread;
   rclcpp::CallbackGroup::SharedPtr callback_group_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr sn_srv_;
-  // rclcpp::Publisher<std_msgs::msg::String>::SharedPtr sn_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr sn_pub_;
 };  // class CyberdogPermission
 }  // namespace manager
 }  // namespace cyberdog
