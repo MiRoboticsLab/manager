@@ -26,6 +26,10 @@ cyberdog::manager::CyberdogPermission::CyberdogPermission()
 {
   cyberdog_sn = BoardInfo::Get_Sn();
   INFO("sn:%s", cyberdog_sn.c_str());
+  sn_pub_ =
+    this->create_publisher<std_msgs::msg::String>(
+    "dog_sn",
+    rclcpp::SystemDefaultsQoS());
   std::thread t([this]() {
       try {
         auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
@@ -35,6 +39,14 @@ cyberdog::manager::CyberdogPermission::CyberdogPermission()
           std::system(cmd.c_str());
           cmd = "chmod 777 " + path;
           std::system(cmd.c_str());
+        }
+        uint16_t pub_cnt = 0;
+        while (rclcpp::ok() && (++pub_cnt < 3000)) {
+          std_msgs::msg::String msg;
+          msg.data = cyberdog_sn;
+          sn_pub_->publish(msg);
+          INFO_MILLSECONDS(3000, "publish sn:%s", cyberdog_sn.c_str());
+          std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
       } catch (...) {
         ERROR("mkdir manager directory error.");
@@ -49,21 +61,6 @@ cyberdog::manager::CyberdogPermission::CyberdogPermission()
     std::bind(&CyberdogPermission::SnCallback, this, std::placeholders::_1, std::placeholders::_2),
     rmw_qos_profile_services_default,
     callback_group_);
-  // sn_pub_ =
-  //   this->create_publisher<std_msgs::msg::String>(
-  //   "dog_sn",
-  //   rclcpp::SystemDefaultsQoS());
-  // sn_thread = std::thread([this](){
-  //   uint16_t pub_cnt = 0;
-  //   while (++pub_cnt < 600)
-  //   {
-  //     /* code */
-  //     std_msgs::msg::String msg;
-  //     msg.data = cyberdog_sn;
-  //     sn_pub_->publish(msg);
-  //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  //   }
-  // });
 }
 
 void cyberdog::manager::CyberdogPermission::SnCallback(
