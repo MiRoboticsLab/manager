@@ -82,16 +82,40 @@ private:
   {
     INFO("enter search all user service  callback");
     cyberdog::common::CyberdogAccountManager obj;
-    if (obj.SearAllUser(obj.vectorUser)) {
-      response->success = true;
+    int result[2];
+    if (request->command == "") {
+      INFO("service---search all user");
+      if (obj.SearAllUser(obj.vectorUser)) {
+        response->success = true;
+      } else {
+        response->success = false;
+      }
+      int len = obj.vectorUser.size();
+      for (int i = 0; i < len; i++) {
+        response->result[i].username = obj.vectorUser[i].username;
+        response->result[i].voicestatus = obj.vectorUser[i].voiceStatus;
+        response->result[i].facestatus = obj.vectorUser[i].faceStatus;
+      }
     } else {
-      response->success = false;
-    }
-    int len = obj.vectorUser.size();
-    for (int i = 0; i < len; i++) {
-      response->result[i].username = obj.vectorUser[i].username;
-      response->result[i].voicestatus = obj.vectorUser[i].voiceStatus;
-      response->result[i].facestatus = obj.vectorUser[i].faceStatus;
+      INFO("service---search single user");
+      std::string username = request->command;
+      if (obj.SearchUser(username, result)) {
+        response->success = true;
+      } else {
+        response->success = false;
+      }
+      //int len = obj.vectorUser.size();
+      INFO(
+        "search all service (serach single user : name:%s, %d, %d)",
+        username.c_str(), result[0], result[1]);
+      response->result[0].username = username;
+      response->result[0].voicestatus = result[0];
+      response->result[0].facestatus = result[1];
+      // for (int i = 0; i < len; i++){
+      //   response->result[i].username = username;
+      //   response->result[i].voicestatus = result[0];
+      //   response->result[i].facestatus = result[1];
+      // }
     }
   }
 
@@ -171,6 +195,7 @@ private:
     protocol::srv::AccountDelete::Response::SharedPtr response)
   {
     INFO("enter delete account callback");
+    std::chrono::seconds timeout(3);
     // voice delete
     rclcpp::Client<protocol::srv::AudioVoiceprintEntry>::SharedPtr voice_delete_client_;
     voice_delete_client_ =
@@ -183,7 +208,6 @@ private:
     auto request_voice = std::make_shared<protocol::srv::AudioVoiceprintEntry::Request>();
     request_voice->command = 4;
     request_voice->username = request->member;
-    std::chrono::seconds timeout(3);
     auto future_result_voice = voice_delete_client_->async_send_request(request_voice);
     std::future_status status_voice = future_result_voice.wait_for(timeout);
     if (status_voice == std::future_status::ready) {
