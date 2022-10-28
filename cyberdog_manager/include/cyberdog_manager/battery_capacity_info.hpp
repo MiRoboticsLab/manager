@@ -122,35 +122,37 @@ private:
         // audio_play_extend_pub->publish(msg);
       }
     }
-    if (!is_reported_charging && (bms_status_.batt_soc < 20)) {
-      is_reported_charging = true;
-      protocol::msg::AudioPlayExtend msg;
-      msg.is_online = true;
-      msg.module_name = battery_capacity_info_node_->get_name();
-      msg.text = "电量低于20%，部分功能受限";
-      audio_play_extend_pub->publish(msg);
-    } else if (bms_status_.batt_soc < 30) {
-      if (!is_reported_charging) {
+    if (!is_protected) {
+      if (!is_reported_charging && (bms_status_.batt_soc < 20)) {
         is_reported_charging = true;
         protocol::msg::AudioPlayExtend msg;
         msg.is_online = true;
         msg.module_name = battery_capacity_info_node_->get_name();
-        msg.text = "电量低于30%，请尽快充电";
+        msg.text = "电量低于20%，部分功能受限";
         audio_play_extend_pub->publish(msg);
-      }
-      if (bms_status_.batt_soc < 20) {
-        if (!is_set_count && is_reported_charging) {
-          is_set_count = true;
+      } else if (bms_status_.batt_soc < 30) {
+        if (!is_reported_charging) {
+          is_reported_charging = true;
           protocol::msg::AudioPlayExtend msg;
           msg.is_online = true;
           msg.module_name = battery_capacity_info_node_->get_name();
-          msg.text = "电量低于20%，部分功能受限";
+          msg.text = "电量低于30%，请尽快充电";
           audio_play_extend_pub->publish(msg);
         }
+        if (bms_status_.batt_soc < 20) {
+          if (!is_set_count && is_reported_charging) {
+            is_set_count = true;
+            protocol::msg::AudioPlayExtend msg;
+            msg.is_online = true;
+            msg.module_name = battery_capacity_info_node_->get_name();
+            msg.text = "电量低于20%，部分功能受限";
+            audio_play_extend_pub->publish(msg);
+          }
+        }
+      } else if (bms_status_.batt_soc > 35) {
+        is_reported_charging = false;
+        is_set_count = false;
       }
-    } else if (bms_status_.batt_soc > 35) {
-      is_reported_charging = false;
-      is_set_count = false;
     }
   }
 
