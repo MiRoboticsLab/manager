@@ -104,18 +104,12 @@ private:
       } else {
         response->success = false;
       }
-      //int len = obj.vectorUser.size();
       INFO(
         "search all service (serach single user : name:%s, %d, %d)",
         username.c_str(), result[0], result[1]);
       response->result[0].username = username;
       response->result[0].voicestatus = result[0];
       response->result[0].facestatus = result[1];
-      // for (int i = 0; i < len; i++){
-      //   response->result[i].username = username;
-      //   response->result[i].voicestatus = result[0];
-      //   response->result[i].facestatus = result[1];
-      // }
     }
   }
 
