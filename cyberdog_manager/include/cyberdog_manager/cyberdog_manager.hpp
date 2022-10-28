@@ -33,6 +33,7 @@
 #include "cyberdog_manager/account_info.hpp"
 #include "cyberdog_manager/power_consumption_info.hpp"
 #include "cyberdog_manager/ready_info.hpp"
+#include "cyberdog_manager/battery_capacity_info.hpp"
 #include "cyberdog_manager/state_context.hpp"
 #include "cyberdog_manager/heart_context.hpp"
 #include "cyberdog_manager/error_context.hpp"
@@ -61,6 +62,7 @@ public:
   void OnProtected() override;
   void OnActive() override;
   void OnDeactive();
+  void OnTearDown();
 
 private:
   std::string name_;
@@ -70,6 +72,7 @@ private:
   std::unique_ptr<AccountInfoNode> account_node_ptr_ {nullptr};
   std::unique_ptr<PowerConsumptionInfoNode> power_consumption_node_ptr {nullptr};
   std::unique_ptr<ReadyNotifyNode> ready_node_ptr {nullptr};
+  std::unique_ptr<BatteryCapacityInfoNode> bcin_node_ptr {nullptr};
   std::unique_ptr<cyberdog::manager::StateContext> machine_state_ptr_ {nullptr};
   std::unique_ptr<cyberdog::manager::HeartContext> heart_beat_ptr_ {nullptr};
   std::unique_ptr<cyberdog::manager::ErrorContext> error_context_ptr_ {nullptr};
