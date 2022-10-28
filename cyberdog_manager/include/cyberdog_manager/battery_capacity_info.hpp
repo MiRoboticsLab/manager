@@ -41,7 +41,8 @@ public:
   void Init()
   {
     bc_callback_group_ =
-      battery_capacity_info_node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+      battery_capacity_info_node_->create_callback_group(
+      rclcpp::CallbackGroupType::MutuallyExclusive);
     rclcpp::SubscriptionOptions sub_options;
     sub_options.callback_group = bc_callback_group_;
     bms_status_sub_ = battery_capacity_info_node_->create_subscription<protocol::msg::BmsStatus>(
@@ -74,6 +75,11 @@ private:
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
   {
     static bool is_set_count = false;
+    if (((bms_status_.batt_st & 0x02) >> 1) == 1) {
+      is_set_count = false;
+      is_reported_charging = false;
+      return;
+    }
     bms_status_ = *msg;
     INFO_MILLSECONDS(
       30000, "Battery Capacity Info:%d",
