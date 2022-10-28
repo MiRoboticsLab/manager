@@ -523,18 +523,18 @@ public:
       rmw_qos_profile_services_default, query_srv_callback_group_);
     query_feedback_callback_group_ =
       query_info_node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-    rclcpp::SubscriptionOptions options;
-    options.callback_group = query_feedback_callback_group_;
+    rclcpp::SubscriptionOptions sub_options;
+    sub_options.callback_group = query_feedback_callback_group_;
     uid_sub_ =
       query_info_node_->create_subscription<std_msgs::msg::String>(
       "uid_set", rclcpp::SystemDefaultsQoS(),
       std::bind(&QueryInfoNode::UidCallback, this, std::placeholders::_1),
-      options);
+      sub_options);
     dog_info_update_sub_ =
       query_info_node_->create_subscription<std_msgs::msg::Bool>(
       "dog_info_update", rclcpp::SystemDefaultsQoS(),
       std::bind(&QueryInfoNode::DogInfoUpdate, this, std::placeholders::_1),
-      options);
+      sub_options);
     uid_sn_srv_ =
       query_info_node_->create_service<protocol::srv::UidSn>(
       "uid_sn",
@@ -545,13 +545,15 @@ public:
       query_info_node_->create_subscription<protocol::msg::MotionStatus>(
       "motion_status", rclcpp::SystemDefaultsQoS(),
       std::bind(&QueryInfoNode::MotionStatus, this, std::placeholders::_1),
-      options);
+      sub_options);
     connect_status_sub_ = query_info_node_->create_subscription<protocol::msg::ConnectorStatus>(
       "connector_state", rclcpp::SystemDefaultsQoS(),
-      std::bind(&QueryInfoNode::ConnectStatus, this, std::placeholders::_1));
+      std::bind(&QueryInfoNode::ConnectStatus, this, std::placeholders::_1),
+      sub_options);
     bms_status_sub_ = query_info_node_->create_subscription<protocol::msg::BmsStatus>(
       "bms_status", rclcpp::SystemDefaultsQoS(),
-      std::bind(&QueryInfoNode::BmsStatus, this, std::placeholders::_1));
+      std::bind(&QueryInfoNode::BmsStatus, this, std::placeholders::_1),
+      sub_options);
     query_node_ptr_ = std::make_unique<QueryInfo>(query_info_node_);
     auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
     auto path = local_share_dir + std::string("/toml_config/manager/settings.json");
@@ -574,9 +576,12 @@ public:
         "uid:%s, nick name:%s, switch:%s", uid_.c_str(),
         query_node_ptr_->GetNick().c_str(), query_node_ptr_->GetSwitch() == true ? "on" : "off");
     }
+    rclcpp::PublisherOptions pub_options;
+    pub_options.callback_group = query_feedback_callback_group_;
     back_to_end_pub_ = query_info_node_->create_publisher<std_msgs::msg::String>(
       "cyberdog/base_info/submit",
-      rclcpp::SystemDefaultsQoS()
+      rclcpp::SystemDefaultsQoS(),
+      pub_options
     );
   }
 
