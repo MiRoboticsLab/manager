@@ -67,21 +67,18 @@ public:
  * @brief  search all user form database
 */
   bool SearAllUser(
-    std::vector<cyberdog::common::CyberdogAccountManager::UserInformation> & vectorUser)
+    std::vector<cyberdog::manager::MemberInformaion> & vectorUser_)
   {
     INFO("[UserAccountManager]: enter serachAllUser()");
-    cyberdog::manager::BlackBox black_box;
-    std::vector<cyberdog::manager::MemberInformaion> vectorUser_;
+    cyberdog::manager::BlackBox black_box; 
     if (black_box.SearchUser(vectorUser_) ) {
-      INFO("[UserAccountManager]: enter serachAllUser [if]");
-      for (int i = 0; i < vectorUser.size(); i++) {
+      INFO("[UserAccountManager]: enter serachAllUser [if], verctor size is %d",vectorUser_.size());
+      INFO("vectorUser size is :%d",vectorUser.size());
+      for (int i = 0; i < vectorUser_.size(); i++) {
         INFO("[UserAccountManager]: enter serachAllUser [for] cycle");
         INFO(
           "[UserAccountManager]: %s:%d %d", vectorUser_[i].name.c_str(),
           vectorUser_[i].voiceStatus, vectorUser_[i].faceStatus);
-        vectorUser[i].username = vectorUser_[i].name;
-        vectorUser[i].voiceStatus = vectorUser_[i].voiceStatus;
-        vectorUser[i].faceStatus = vectorUser_[i].faceStatus;
       }
       return true;
     } else {
@@ -89,6 +86,29 @@ public:
       return false;
     }
   }
+  // bool SearAllUser(
+  //   std::vector<cyberdog::common::CyberdogAccountManager::UserInformation> & vectorUser)
+  // {
+  //   INFO("[UserAccountManager]: enter serachAllUser()");
+  //   cyberdog::manager::BlackBox black_box;
+  //   std::vector<cyberdog::manager::MemberInformaion> vectorUser_;
+  //   if (black_box.SearchUser(vectorUser_) ) {
+  //     INFO("[UserAccountManager]: enter serachAllUser [if]");
+  //     for (int i = 0; i < vectorUser.size(); i++) {
+  //       INFO("[UserAccountManager]: enter serachAllUser [for] cycle");
+  //       INFO(
+  //         "[UserAccountManager]: %s:%d %d", vectorUser_[i].name.c_str(),
+  //         vectorUser_[i].voiceStatus, vectorUser_[i].faceStatus);
+  //       vectorUser[i].username = vectorUser_[i].name;
+  //       vectorUser[i].voiceStatus = vectorUser_[i].voiceStatus;
+  //       vectorUser[i].faceStatus = vectorUser_[i].faceStatus;
+  //     }
+  //     return true;
+  //   } else {
+  //     INFO("[UserAccountManager]: search all user failed");
+  //     return false;
+  //   }
+  // }
 /**
  * @brief  search a user information by username
  * param： username (the user's name), result (the array of user's information)

@@ -66,6 +66,10 @@ public:
         std::placeholders::_2),
       rmw_qos_profile_services_default, account_callback_group_);
 
+<<<<<<< HEAD
+=======
+    // 查找服务
+>>>>>>> [Modify] fix conflict
     all_user_serach_srv_ =
       account_info_node_->create_service<protocol::srv::AllUserSearch>(
       "all_user_search",
@@ -82,34 +86,43 @@ private:
   {
     INFO("enter search all user service  callback");
     cyberdog::common::CyberdogAccountManager obj;
+    std::vector<cyberdog::manager::MemberInformaion> member_data;
     int result[2];
     if (request->command == "") {
       INFO("service---search all user");
-      if (obj.SearAllUser(obj.vectorUser)) {
+      if (obj.SearAllUser(member_data)) {
+
         response->success = true;
       } else {
         response->success = false;
       }
-      int len = obj.vectorUser.size();
+      int len = member_data.size();
+      INFO("%d", len);
+      response->result.resize(len);
       for (int i = 0; i < len; i++) {
-        response->result[i].username = obj.vectorUser[i].username;
-        response->result[i].voicestatus = obj.vectorUser[i].voiceStatus;
-        response->result[i].facestatus = obj.vectorUser[i].faceStatus;
+        INFO("enter for");
+        response->result[i].username = member_data[i].name;
+        response->result[i].voicestatus = member_data[i].voiceStatus;
+        response->result[i].facestatus = member_data[i].faceStatus;
       }
+      INFO("response->result length is %d", response->result.size());
     } else {
       INFO("service---search single user");
       std::string username = request->command;
+      response->result.resize(1);
       if (obj.SearchUser(username, result)) {
+        INFO(
+          "search all service (serach single user : name:%s, %d, %d)",
+          username.c_str(), result[0], result[1]);
+
+        response->result[0].username = username;
+        response->result[0].voicestatus = result[0];
+        response->result[0].facestatus = result[1];
         response->success = true;
       } else {
         response->success = false;
+        return;
       }
-      INFO(
-        "search all service (serach single user : name:%s, %d, %d)",
-        username.c_str(), result[0], result[1]);
-      response->result[0].username = username;
-      response->result[0].voicestatus = result[0];
-      response->result[0].facestatus = result[1];
     }
   }
 
@@ -141,11 +154,12 @@ private:
     cyberdog::common::CyberdogAccountManager obj;
     if (request->member == "") {
       INFO("search_all_user");
-      std::vector<cyberdog::common::CyberdogAccountManager::UserInformation> member_data;
+      // std::vector<cyberdog::common::CyberdogAccountManager::UserInformation> member_data;
+      std::vector<cyberdog::manager::MemberInformaion> member_data;
       if (obj.SearAllUser(member_data)) {
         for (unsigned int i = 0; i < member_data.size(); ++i) {
           rapidjson::Value js_obj(rapidjson::kObjectType);
-          rapidjson::Value value(member_data[i].username.c_str(), json_info.GetAllocator());
+          rapidjson::Value value(member_data[i].name.c_str(), json_info.GetAllocator());
           js_obj.AddMember("name", value, json_info.GetAllocator());
           js_obj.AddMember("face_state", member_data[i].faceStatus, json_info.GetAllocator());
           js_obj.AddMember("voice_state", member_data[i].voiceStatus, json_info.GetAllocator());
@@ -263,7 +277,10 @@ private:
   rclcpp::Service<protocol::srv::AccountAdd>::SharedPtr account_add_srv_;
   rclcpp::Service<protocol::srv::AccountSearch>::SharedPtr account_search_srv_;
   rclcpp::Service<protocol::srv::AccountDelete>::SharedPtr account_delete_srv_;
+<<<<<<< HEAD
 
+=======
+>>>>>>> [Modify] fix conflict
   rclcpp::Service<protocol::srv::AllUserSearch>::SharedPtr all_user_serach_srv_;
 };
 
