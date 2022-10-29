@@ -70,10 +70,10 @@ public:
     std::vector<cyberdog::manager::MemberInformaion> & vectorUser_)
   {
     INFO("[UserAccountManager]: enter serachAllUser()");
-    cyberdog::manager::BlackBox black_box; 
+    cyberdog::manager::BlackBox black_box;
     if (black_box.SearchUser(vectorUser_) ) {
-      INFO("[UserAccountManager]: enter serachAllUser [if], verctor size is %d",vectorUser_.size());
-      INFO("vectorUser size is :%d",vectorUser.size());
+      INFO("[UserAccountManager]: enter serachAllUser [if]", vectorUser_.size());
+      INFO("vectorUser size is :%d", vectorUser_.size());
       for (int i = 0; i < vectorUser_.size(); i++) {
         INFO("[UserAccountManager]: enter serachAllUser [for] cycle");
         INFO(
