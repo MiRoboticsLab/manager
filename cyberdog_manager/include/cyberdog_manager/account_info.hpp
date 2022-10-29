@@ -66,10 +66,7 @@ public:
         std::placeholders::_2),
       rmw_qos_profile_services_default, account_callback_group_);
 
-<<<<<<< HEAD
-=======
     // 查找服务
->>>>>>> [Modify] fix conflict
     all_user_serach_srv_ =
       account_info_node_->create_service<protocol::srv::AllUserSearch>(
       "all_user_search",
@@ -277,10 +274,7 @@ private:
   rclcpp::Service<protocol::srv::AccountAdd>::SharedPtr account_add_srv_;
   rclcpp::Service<protocol::srv::AccountSearch>::SharedPtr account_search_srv_;
   rclcpp::Service<protocol::srv::AccountDelete>::SharedPtr account_delete_srv_;
-<<<<<<< HEAD
 
-=======
->>>>>>> [Modify] fix conflict
   rclcpp::Service<protocol::srv::AllUserSearch>::SharedPtr all_user_serach_srv_;
 };
 
