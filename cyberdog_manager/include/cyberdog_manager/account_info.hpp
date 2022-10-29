@@ -88,7 +88,6 @@ private:
     if (request->command == "") {
       INFO("service---search all user");
       if (obj.SearAllUser(member_data)) {
-
         response->success = true;
       } else {
         response->success = false;
