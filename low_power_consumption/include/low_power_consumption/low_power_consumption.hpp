@@ -53,7 +53,7 @@ public:
   }
   int LpcSysRequest(PM_SYS op)
   {
-    return PmSysRequest(op);
+    return Pm_SysRequest(op);
   }
 
 private:

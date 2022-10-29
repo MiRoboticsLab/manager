@@ -17,6 +17,7 @@
 #include <memory>
 #include "rclcpp/rclcpp.hpp"
 #include "std_srvs/srv/set_bool.hpp"
+#include "std_srvs/srv/trigger.hpp"
 #include "protocol/msg/motion_status.hpp"
 #include "low_power_consumption/low_power_consumption.hpp"
 
@@ -43,6 +44,15 @@ public:
         &PowerConsumptionInfoNode::EnterLowPower, this, std::placeholders::_1,
         std::placeholders::_2),
       rmw_qos_profile_services_default, power_consumption_callback_group_);
+
+    power_off_srv_ =
+      power_consumption_info_node_->create_service<std_srvs::srv::Trigger>(
+      "poweroff",
+      std::bind(
+        &PowerConsumptionInfoNode::ShutdownCallback, this,
+        std::placeholders::_1, std::placeholders::_2),
+      rmw_qos_profile_services_default, power_consumption_callback_group_);
+
     // sub motion init
     rclcpp::SubscriptionOptions options;
     options.callback_group = power_consumption_callback_group_;
@@ -97,24 +107,25 @@ private:
     unsigned int err;
     int code = -1;
 
-    // 启动后不进行任何操作，60s后进入低功耗
-    if (times_flag == true && msg.motion_id == 0) {
-      ++count;
-      if (count == 300) {
-        count = 0;
-        convert_motion_flage = false;
-        times_flag = false;
-        INFO("call low power consumption");
-        // release_handler();
-        // code = lpc_ptr_->LpcRelease(pd, &err);
-        // if(code == 0)
-        // {
-        //   INFO("low power consumption enter success.");
-        // }
-      }
-    } else {
-      count = 0;
-    }
+    // // 启动后不进行任何操作，60s后进入低功耗
+    // if (times_flag == true && msg.motion_id == 0) {
+    //   ++count;
+    //   if (count == 300) {
+    //     count = 0;
+    //     convert_motion_flage = false;
+    //     times_flag = false;
+    //     INFO("call low power consumption");
+    //     // release_handler();
+    //     // code = lpc_ptr_->LpcRelease(pd, &err);
+    //     // if(code == 0)
+    //     // {
+    //     //   INFO("low power consumption enter success.");
+    //     // }
+    //   }
+    // } else {
+    //   count = 0;
+    // }
+
     // 运动状态转换至趴下，30s后启动低功耗
     if (convert_motion_flage == true && msg.motion_id == 101) {
       // motion_status的发布频率为10Hz，延时30s，lay_count == 300
@@ -149,10 +160,28 @@ private:
     }
   }
 
+  void ShutdownCallback(
+    std_srvs::srv::Trigger::Request::SharedPtr request,
+    std_srvs::srv::Trigger::Response::SharedPtr response)
+  {
+    INFO("poweroff......");
+    request;
+    PM_SYS pd = PM_SYS_SHUTDOWN;
+    int code = -1;
+    code = lpc_ptr_->LpcSysRequest(pd);
+    if (code != 0) {
+      INFO("Shutdown failedpw, function LpcRequest call faild");
+    } else {
+      INFO("Shut down successfully");
+    }
+    response->success = (code == 0 ? true : false);
+  }
+
 private:
   rclcpp::Node::SharedPtr power_consumption_info_node_ {nullptr};
   rclcpp::CallbackGroup::SharedPtr power_consumption_callback_group_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_consumption_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr power_off_srv_ {nullptr};
   std::unique_ptr<cyberdog::manager::LowPowerConsumption> lpc_ptr_ {nullptr};
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
   PCIN_CALLBACK request_handler;
