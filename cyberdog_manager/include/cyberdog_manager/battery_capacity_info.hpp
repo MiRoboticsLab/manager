@@ -74,6 +74,7 @@ public:
 private:
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
   {
+    static bool is_battary_zero = false;
     static bool is_set_count = false;
     if (((bms_status_.batt_st & 0x02) >> 1) == 1) {
       is_set_count = false;
@@ -84,7 +85,8 @@ private:
     INFO_MILLSECONDS(
       30000, "Battery Capacity Info:%d",
       bms_status_.batt_soc);
-    if (bms_status_.batt_soc <= 0) {
+    if (!is_battary_zero && bms_status_.batt_soc <= 0) {
+      is_battary_zero = true;
       protocol::msg::AudioPlayExtend msg;
       msg.is_online = true;
       msg.module_name = battery_capacity_info_node_->get_name();
