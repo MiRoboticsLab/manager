@@ -170,9 +170,14 @@ private:
       }
     } else {
       INFO("search_one_user");
-      int result[2];
+      int result[2]{-1, -1};
       rapidjson::Value js_obj(rapidjson::kObjectType);
-      obj.SearchUser(account_name, result);
+      if (!obj.SearchUser(account_name, result)) {
+        INFO("search %s faild, SearchUser() return 0", account_name.c_str());
+        response->status = false;
+        response->data = "{\"error\":\"this account does not exist!\"}";
+        return;
+      }
       int voice_state = result[0];
       int face_state = result[1];
       INFO(
