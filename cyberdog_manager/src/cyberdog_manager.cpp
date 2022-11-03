@@ -48,6 +48,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     std::bind(&CyberdogManager::SetState, this, std::placeholders::_1, std::placeholders::_2));
   error_context_ptr_ = std::make_unique<cyberdog::manager::ErrorContext>(name_ + "_error");
   bcin_node_ptr = std::make_unique<BatteryCapacityInfoNode>(node_ptr_);
+  touch_node_ptr = std::make_unique<TouchInfoNode>(node_ptr_);
   executor_.add_node(node_ptr_);
   // black_box_ptr_ = std::make_shared<BlackBox>(node_ptr_);
 }
