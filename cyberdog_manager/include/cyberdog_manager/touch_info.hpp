@@ -34,31 +34,29 @@ public:
     touch_callback_group_ =
       touch_info_node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
     rclcpp::SubscriptionOptions sub_options;
-    
+
     sub_options.callback_group = touch_callback_group_;
     touch_status_sub_ = touch_info_node_->create_subscription<protocol::msg::TouchStatus>(
       "touch_status", rclcpp::SystemDefaultsQoS(),
       std::bind(&TouchInfoNode::ReportPower, this, std::placeholders::_1), sub_options);
-    
+
     bms_status_sub_ = touch_info_node_->create_subscription<protocol::msg::BmsStatus>(
       "bms_status", rclcpp::SystemDefaultsQoS(),
       std::bind(&TouchInfoNode::BmsStatus, this, std::placeholders::_1),
       sub_options);
-    
+
     rclcpp::PublisherOptions pub_options;
     pub_options.callback_group = touch_callback_group_;
     audio_play_extend_pub =
       touch_info_node_->create_publisher<protocol::msg::AudioPlayExtend>(
-      "speech_play_extend", rclcpp::SystemDefaultsQoS(), pub_options); 
+      "speech_play_extend", rclcpp::SystemDefaultsQoS(), pub_options);
   }
 
 private:
   void ReportPower(const protocol::msg::TouchStatus::SharedPtr msg)
   {
-   // INFO("[cyberdog_manager:] touch_info-->> Enter TouchStatus callback!!");
     INFO_MILLSECONDS(30000, "[cyberdog_manager:] touch_info-->> Enter TouchStatus callback!!");
-    if(msg->touch_state == 3)
-    {
+    if (msg->touch_state == 3) {
       INFO("[cyberdog_manager:] touch_info-->> the batt_soc is %d", battery_percent);
       protocol::msg::AudioPlayExtend msg;
       msg.is_online = true;
@@ -71,10 +69,13 @@ private:
 
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
   {
-   // INFO("[cyberdog_manager:] touch_info-->> Enter BMS callback. the batt_soc is %d.", msg->batt_soc);
     battery_percent = msg->batt_soc;
-    INFO_MILLSECONDS(30000, "[cyberdog_manager:] touch_info-->> Enter BMS callback.the batt_soc is %d.", battery_percent);
+    INFO_MILLSECONDS(
+      30000,
+      "[cyberdog_manager:] touch_info-->> Enter BMS callback.the batt_soc is %d.",
+      battery_percent);
   }
+
 private:
   rclcpp::Node::SharedPtr touch_info_node_{nullptr};
   rclcpp::CallbackGroup::SharedPtr touch_callback_group_;
