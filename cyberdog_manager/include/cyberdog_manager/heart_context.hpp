@@ -121,7 +121,7 @@ private:
       return;
     }
     has_error_ = has_error_ | lost;
-    if (has_error_) {
+    if (has_error_ && lost) {
       ERROR("%s node lost", iter->first.c_str());
     }
     iter->second.lost = lost;
