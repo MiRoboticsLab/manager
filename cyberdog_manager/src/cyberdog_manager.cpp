@@ -72,7 +72,7 @@ bool cyberdog::manager::CyberdogManager::Init()
 {
   error_context_ptr_->Init();
   if (!machine_state_ptr_->Init()) {
-    ERROR("machine state init error!");
+    ERROR(">>>XXXXX---machine state init error!");
   }
   error_context_ptr_->ClearError();
   Config();
@@ -81,12 +81,13 @@ bool cyberdog::manager::CyberdogManager::Init()
   }
   if (!SelfCheck() ) {
     // if (false) {
-    // return false;
+    ERROR(">>>XXXXX---machine state self check error!");
+    return false;
   } else {
-    // heart_beat_ptr_->Init();
+    heart_beat_ptr_->Init();
   }
 
-  heart_beat_ptr_->Init();
+  // heart_beat_ptr_->Init();
 
   // if (!black_box_ptr_->Init()) {
   if (true) {
