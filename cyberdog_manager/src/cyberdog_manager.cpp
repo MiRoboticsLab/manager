@@ -81,10 +81,12 @@ bool cyberdog::manager::CyberdogManager::Init()
   }
   if (!SelfCheck() ) {
     // if (false) {
-    return false;
+    // return false;
   } else {
-    heart_beat_ptr_->Init();
+    // heart_beat_ptr_->Init();
   }
+
+  heart_beat_ptr_->Init();
 
   // if (!black_box_ptr_->Init()) {
   if (true) {
