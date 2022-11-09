@@ -14,6 +14,8 @@
 #ifndef CYBERDOG_MANAGER__TOUCH_INFO_HPP_
 #define CYBERDOG_MANAGER__TOUCH_INFO_HPP_
 
+#include <chrono>
+#include <cmath>
 #include "rclcpp/rclcpp.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -56,7 +58,18 @@ private:
   void ReportPower(const protocol::msg::TouchStatus::SharedPtr msg)
   {
     INFO_MILLSECONDS(30000, "[cyberdog_manager:] touch_info-->> Enter TouchStatus callback!!");
-    if (msg->touch_state == 3) {
+    std::chrono::milliseconds report_previous_time =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::system_clock::now().time_since_epoch());
+    INFO("report_previous_time is %d", report_previous_time.count());
+    if (msg->touch_state == 3 &&
+      abs(reporting_time.count() - report_previous_time.count()) >= 3000)
+    {
+      INFO(
+        "reporting_time - report_previous_time is %d",
+        abs(reporting_time.count() - report_previous_time.count()));
+      reporting_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch());
       INFO("[cyberdog_manager:] touch_info-->> the batt_soc is %d", battery_percent);
       protocol::msg::AudioPlayExtend msg;
       msg.is_online = true;
@@ -83,6 +96,8 @@ private:
   rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_;
   rclcpp::Publisher<protocol::msg::AudioPlayExtend>::SharedPtr audio_play_extend_pub;
   int battery_percent;
+  std::chrono::milliseconds reporting_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::system_clock::now().time_since_epoch());
 };
 }  // namespace manager
 }  // namespace cyberdog
