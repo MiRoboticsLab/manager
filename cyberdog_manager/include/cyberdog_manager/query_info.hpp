@@ -33,6 +33,7 @@
 #include "protocol/msg/bms_status.hpp"
 #include "protocol/msg/motion_status.hpp"
 #include "protocol/srv/uid_sn.hpp"
+#include "protocol/srv/audio_nick_name.hpp"
 
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
@@ -213,7 +214,8 @@ public:
     if (is_version) {
       if (!ota_ver_get_srv_->wait_for_service(std::chrono::seconds(2))) {
         ERROR("call ota version not avalible");
-        CyberdogJson::Add(json_info, "version", "unaviable");
+        Document version_doc(kObjectType);
+        CyberdogJson::Add(json_info, "version", version_doc);
       } else {
         std::chrono::seconds timeout(3);
         auto req = std::make_shared<protocol::srv::OtaServerCmd::Request>();
@@ -225,13 +227,14 @@ public:
           Document version_doc(kObjectType);
           if (!CyberdogJson::String2Document(version, version_doc)) {
             ERROR("error while encoding version info to json");
-            CyberdogJson::Add(version_doc, "version", "exception");
+            CyberdogJson::Add(version_doc, "version", version_doc);
           } else {
             CyberdogJson::Add(json_info, "version", version_doc);
           }
         } else {
+          Document version_doc(kObjectType);
           ERROR("call ota version failed!");
-          CyberdogJson::Add(json_info, "version", "unkown");
+          CyberdogJson::Add(json_info, "version", version_doc);
         }
       }
     }
@@ -583,6 +586,10 @@ public:
       rclcpp::SystemDefaultsQoS(),
       pub_options
     );
+    dev_name_set_client_ =
+      query_info_node_->create_client<protocol::srv::AudioNickName>(
+      "set_nick_name",
+      rmw_qos_profile_services_default, query_feedback_callback_group_);
   }
 
   void Init()
@@ -657,6 +664,26 @@ private:
   }
   void UidCallback(const std_msgs::msg::String::SharedPtr msg)
   {
+    bool dog_info_notify = false;
+    if (true) {
+      auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
+      auto path = local_share_dir + std::string("/toml_config/manager/settings.json");
+      Document json_document(kObjectType);
+      auto result = CyberdogJson::ReadJsonFromFile(path, json_document);
+      rapidjson::Value dog_val(rapidjson::kObjectType);
+      if (!result) {
+        dog_info_notify = true;
+      } else {
+        result = CyberdogJson::Get(json_document, "dog_info", dog_val);
+        if (!result) {
+          dog_info_notify = true;
+        } else {
+          if (!dog_val.HasMember("activate_date")) {
+            dog_info_notify = true;
+          }
+        }
+      }
+    }
     uid_ = msg->data;
     query_node_ptr_->SetUid(uid_);
     INFO("user id:%s", uid_.c_str());
@@ -669,7 +696,28 @@ private:
         CyberdogJson::Add(json_document, "uid", uid_);
         CyberdogJson::WriteJsonToFile(json_file, json_document);
       });
-    t.detach();
+    t.join();
+    if (dog_info_notify) {
+      if (!dev_name_set_client_->wait_for_service(std::chrono::seconds(3))) {
+        INFO(
+          "call setnickname server not avaiable"
+        );
+        return;
+      }
+      std::chrono::seconds timeout(3);
+      auto req = std::make_shared<protocol::srv::AudioNickName::Request>();
+      req->nick_name = "铁蛋";
+      req->wake_name = "铁蛋铁蛋";
+      auto future_result = dev_name_set_client_->async_send_request(req);
+      std::future_status status = future_result.wait_for(timeout);
+      if (status == std::future_status::ready) {
+        INFO(
+          "success to call setnickname request services.");
+      } else {
+        INFO(
+          "Failed to call setnickname request  services.");
+      }
+    }
   }
   void DogInfoUpdate(const std_msgs::msg::Bool::SharedPtr msg)
   {
@@ -747,6 +795,7 @@ private:
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_;
   rclcpp::Subscription<protocol::msg::ConnectorStatus>::SharedPtr connect_status_sub_;
   rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_;
+  rclcpp::Client<protocol::srv::AudioNickName>::SharedPtr dev_name_set_client_;
   bool is_reporting_ {false};
 };
 

@@ -49,6 +49,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   error_context_ptr_ = std::make_unique<cyberdog::manager::ErrorContext>(name_ + "_error");
   bcin_node_ptr = std::make_unique<BatteryCapacityInfoNode>(node_ptr_);
   touch_node_ptr = std::make_unique<TouchInfoNode>(node_ptr_);
+  audio_node_ptr = std::make_unique<AudioInfoNode>(node_ptr_);
   executor_.add_node(node_ptr_);
   // black_box_ptr_ = std::make_shared<BlackBox>(node_ptr_);
 }
@@ -160,7 +161,11 @@ void cyberdog::manager::CyberdogManager::OnProtected()
 void cyberdog::manager::CyberdogManager::OnActive()
 {
   INFO("trigger state:on active");
-  machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
+  bool result = machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
+  if (result) {
+    INFO("!!! All node in detectedc machine state is acitve ok !!!");
+    audio_node_ptr->Init();
+  }
   query_node_ptr_->Report(true);
   ready_node_ptr->Ready(true);
 }
