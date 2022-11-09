@@ -214,7 +214,8 @@ public:
     if (is_version) {
       if (!ota_ver_get_srv_->wait_for_service(std::chrono::seconds(2))) {
         ERROR("call ota version not avalible");
-        CyberdogJson::Add(json_info, "version", "unaviable");
+        Document version_doc(kObjectType);
+        CyberdogJson::Add(json_info, "version", version_doc);
       } else {
         std::chrono::seconds timeout(3);
         auto req = std::make_shared<protocol::srv::OtaServerCmd::Request>();
@@ -226,13 +227,14 @@ public:
           Document version_doc(kObjectType);
           if (!CyberdogJson::String2Document(version, version_doc)) {
             ERROR("error while encoding version info to json");
-            CyberdogJson::Add(version_doc, "version", "exception");
+            CyberdogJson::Add(version_doc, "version", version_doc);
           } else {
             CyberdogJson::Add(json_info, "version", version_doc);
           }
         } else {
+          Document version_doc(kObjectType);
           ERROR("call ota version failed!");
-          CyberdogJson::Add(json_info, "version", "unkown");
+          CyberdogJson::Add(json_info, "version", version_doc);
         }
       }
     }
