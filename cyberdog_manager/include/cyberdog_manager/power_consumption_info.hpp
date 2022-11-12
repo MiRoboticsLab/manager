@@ -25,13 +25,21 @@ namespace cyberdog
 {
 namespace manager
 {
+// enum class PowerMachineState : uint8_t
+// {
+//   PMS_NORMAL    = 0,    // 正常
+//   PMS_PROTECT   = 1,    // 保护
+//   PMS_LOWPOWER  = 2,    // 低功耗
+//   PMS_UNKOWN    = 255,  // 未知
+// };
+
 class PowerConsumptionInfoNode final
 {
   using PCIN_CALLBACK = std::function<void ()>;
 
 public:
   explicit PowerConsumptionInfoNode(rclcpp::Node::SharedPtr node_ptr)
-  : request_handler([](void) {}), release_handler([](void) {})
+  // : request_handler([](void) {}), release_handler([](void) {})
   {
     power_consumption_info_node_ = node_ptr;
     lpc_ptr_ = std::make_unique<cyberdog::manager::LowPowerConsumption>();
@@ -65,14 +73,33 @@ public:
   }
 
 public:
-  void SetActive(PCIN_CALLBACK callback)
-  {
-    request_handler = callback;
-  }
-  void SetDeactive(PCIN_CALLBACK callback)
-  {
-    release_handler = callback;
-  }
+  // void SetActive(PCIN_CALLBACK callback)
+  // {
+  //   request_handler = callback;
+  // }
+  // void SetDeactive(PCIN_CALLBACK callback)
+  // {
+  //   release_handler = callback;
+  // }
+  // void SetPms(PowerMachineState p)
+  // {
+  //   pms = p;
+  // }
+  // void NotifyState(uint8_t state)
+  // {
+  //   switch (state)
+  //   {
+  //   case 0:
+  //     break;
+  //   case 1:
+  //     break;
+  //   case 2:
+  //     break;
+
+  //   default:
+  //     break;
+  //   }
+  // }
 
 private:
   void EnterLowPower(
@@ -161,7 +188,7 @@ private:
   }
 
   void ShutdownCallback(
-    std_srvs::srv::Trigger::Request::SharedPtr request,
+    const std_srvs::srv::Trigger::Request::SharedPtr request,
     std_srvs::srv::Trigger::Response::SharedPtr response)
   {
     INFO("poweroff......");
@@ -184,8 +211,9 @@ private:
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr power_off_srv_ {nullptr};
   std::unique_ptr<cyberdog::manager::LowPowerConsumption> lpc_ptr_ {nullptr};
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
-  PCIN_CALLBACK request_handler;
-  PCIN_CALLBACK release_handler;
+  // PCIN_CALLBACK request_handler;
+  // PCIN_CALLBACK release_handler;
+  // PowerMachineState pms {PowerMachineState::PMS_UNKOWN};
 };
 }  // namespace manager
 }  // namespace cyberdog

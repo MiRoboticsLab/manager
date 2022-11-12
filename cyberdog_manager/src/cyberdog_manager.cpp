@@ -47,9 +47,16 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     node_ptr_,
     std::bind(&CyberdogManager::SetState, this, std::placeholders::_1, std::placeholders::_2));
   error_context_ptr_ = std::make_unique<cyberdog::manager::ErrorContext>(name_ + "_error");
-  bcin_node_ptr = std::make_unique<BatteryCapacityInfoNode>(node_ptr_);
+  mssc_context_ptr_ = std::make_shared<cyberdog::manager::MachineStateSwitchContext>(node_ptr_);
+  bcin_node_ptr = std::make_unique<BatteryCapacityInfoNode>(
+    node_ptr_,
+    std::bind(
+      &MachineStateSwitchContext::BatteryChargeUpdate, mssc_context_ptr_,
+      std::placeholders::_1));
   touch_node_ptr = std::make_unique<TouchInfoNode>(node_ptr_);
-  audio_node_ptr = std::make_unique<AudioInfoNode>(node_ptr_);
+  audio_node_ptr = std::make_unique<AudioInfoNode>(
+    node_ptr_,
+    std::bind(&MachineStateSwitchContext::AudioWakeUp, mssc_context_ptr_));
   executor_.add_node(node_ptr_);
   // black_box_ptr_ = std::make_shared<BlackBox>(node_ptr_);
 }
@@ -62,11 +69,16 @@ cyberdog::manager::CyberdogManager::~CyberdogManager()
 void cyberdog::manager::CyberdogManager::Config()
 {
   INFO("config state handler");
-  power_consumption_node_ptr->SetActive(std::bind(&CyberdogManager::OnActive, this));
-  power_consumption_node_ptr->SetDeactive(std::bind(&CyberdogManager::OnDeactive, this));
-  bcin_node_ptr->SetProtect(std::bind(&CyberdogManager::OnProtected, this));
-  bcin_node_ptr->SetActive(std::bind(&CyberdogManager::OnActive, this));
-  bcin_node_ptr->SetShutdown(std::bind(&CyberdogManager::OnTearDown, this));
+  // power_consumption_node_ptr->SetActive(std::bind(&CyberdogManager::OnActive, this));
+  // power_consumption_node_ptr->SetDeactive(std::bind(&CyberdogManager::OnDeactive, this));
+  // bcin_node_ptr->SetProtect(std::bind(&CyberdogManager::OnProtected, this));
+  // bcin_node_ptr->SetLowpower(std::bind(&CyberdogManager::OnLowPower, this));
+  // bcin_node_ptr->SetActive(std::bind(&CyberdogManager::OnActive, this));
+  // bcin_node_ptr->SetShutdown(std::bind(&CyberdogManager::OnTearDown, this));
+  mssc_context_ptr_->SetActive(std::bind(&CyberdogManager::OnActive, this));
+  mssc_context_ptr_->SetProtect(std::bind(&CyberdogManager::OnProtected, this));
+  mssc_context_ptr_->SetLowpower(std::bind(&CyberdogManager::OnLowPower, this));
+  mssc_context_ptr_->SetShutdown(std::bind(&CyberdogManager::OnTearDown, this));
 }
 
 bool cyberdog::manager::CyberdogManager::Init()
@@ -98,6 +110,7 @@ bool cyberdog::manager::CyberdogManager::Init()
 
   query_node_ptr_->Init();
   bcin_node_ptr->Init();
+  mssc_context_ptr_->Init();
 
   OnActive();
 
@@ -144,6 +157,7 @@ void cyberdog::manager::CyberdogManager::OnError()
 void cyberdog::manager::CyberdogManager::OnLowPower()
 {
   INFO("on lowpower");
+  // bcin_node_ptr->SetBms(BatteryMachineState::BMS_LOWPOWER);
   machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_LowPower);
 }
 
@@ -155,6 +169,7 @@ void cyberdog::manager::CyberdogManager::OnSuspend()
 void cyberdog::manager::CyberdogManager::OnProtected()
 {
   ERROR("on protect");
+  // bcin_node_ptr->SetBms(BatteryMachineState::BMS_PROTECT);
   machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Protected);
 }
 
@@ -168,6 +183,7 @@ void cyberdog::manager::CyberdogManager::OnActive()
   }
   query_node_ptr_->Report(true);
   ready_node_ptr->Ready(true);
+  // bcin_node_ptr->SetBms(BatteryMachineState::BMS_NORMAL);
 }
 
 void cyberdog::manager::CyberdogManager::OnDeactive()

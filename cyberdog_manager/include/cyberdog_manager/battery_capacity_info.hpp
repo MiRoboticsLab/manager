@@ -24,17 +24,32 @@ namespace cyberdog
 {
 namespace manager
 {
+// enum class BatteryMachineState : uint8_t
+// {
+//   BMS_NORMAL    = 0,    // 正常
+//   BMS_PROTECT   = 1,    // 保护
+//   BMS_LOWPOWER  = 2,    // 低功耗
+//   BMS_UNKOWN    = 255,  // 未知
+// };
+
 class BatteryCapacityInfoNode final
 {
   using BCIN_CALLBACK = std::function<void ()>;
+  using BCINSOC_CALLBACK = std::function<void (uint8_t val)>;
 
 public:
-  explicit BatteryCapacityInfoNode(rclcpp::Node::SharedPtr node_ptr)
-  : protect_handler([](void) {}), active_handler([](void) {}),
-    shutdown_handler([](void) {}),
+  explicit BatteryCapacityInfoNode(
+    rclcpp::Node::SharedPtr node_ptr,
+    BCINSOC_CALLBACK bcin_soc)
+  : battery_capacity_info_node_(node_ptr),
+    // protect_handler([](void) {}),
+    // lowpower_handler([](void) {}),
+    // active_handler([](void) {}),
+    // shutdown_handler([](void) {}),
+    socnotify_handler(bcin_soc),
     is_protected(false), is_reported_charging(false)
+    // bms{BatteryMachineState::BMS_UNKOWN}
   {
-    battery_capacity_info_node_ = node_ptr;
   }
 
 public:
@@ -58,18 +73,26 @@ public:
       pub_options
       );
   }
-  void SetActive(BCIN_CALLBACK callback)
-  {
-    active_handler = callback;
-  }
-  void SetProtect(BCIN_CALLBACK callback)
-  {
-    protect_handler = callback;
-  }
-  void SetShutdown(BCIN_CALLBACK callback)
-  {
-    shutdown_handler = callback;
-  }
+  // void SetActive(BCIN_CALLBACK callback)
+  // {
+  //   active_handler = callback;
+  // }
+  // void SetProtect(BCIN_CALLBACK callback)
+  // {
+  //   protect_handler = callback;
+  // }
+  // void SetLowpower(BCIN_CALLBACK callback)
+  // {
+  //   lowpower_handler = callback;
+  // }
+  // void SetShutdown(BCIN_CALLBACK callback)
+  // {
+  //   shutdown_handler = callback;
+  // }
+  // void SetBms(BatteryMachineState b)
+  // {
+  //   bms = b;
+  // }
 
 private:
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
@@ -93,11 +116,11 @@ private:
       // msg.text = "电量低于5%,进入低电保护模式!请尽快充电";
       msg.text = "电量为0,关机中!";
       audio_play_extend_pub->publish(msg);
-      shutdown_handler();
+      // shutdown_handler();
     } else if (bms_status_.batt_soc <= 5) {
       if (!is_protected) {
         is_protected = true;
-        protect_handler();
+        // protect_handler();
         INFO(
           "Battery Capacity Info capacity:%d, %s protect mode.",
           bms_status_.batt_soc,
@@ -112,7 +135,7 @@ private:
     } else if (bms_status_.batt_soc > 20) {
       if (is_protected) {
         is_protected = false;
-        active_handler();
+        // active_handler();
         INFO(
           "Battery Capacity Info capacity:%d, %s protect mode.",
           bms_status_.batt_soc,
@@ -156,6 +179,7 @@ private:
         is_set_count = false;
       }
     }
+    socnotify_handler(bms_status_.batt_soc);
   }
 
 private:
@@ -164,11 +188,14 @@ private:
   rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_;
   rclcpp::Publisher<protocol::msg::AudioPlayExtend>::SharedPtr audio_play_extend_pub;
   protocol::msg::BmsStatus bms_status_;
-  BCIN_CALLBACK protect_handler;
-  BCIN_CALLBACK active_handler;
-  BCIN_CALLBACK shutdown_handler;
+  // BCIN_CALLBACK protect_handler;
+  // BCIN_CALLBACK lowpower_handler;
+  // BCIN_CALLBACK active_handler;
+  // BCIN_CALLBACK shutdown_handler;
+  BCINSOC_CALLBACK socnotify_handler;
   bool is_protected;
   bool is_reported_charging;
+  // BatteryMachineState bms;
 };
 }  // namespace manager
 }  // namespace cyberdog
