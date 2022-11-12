@@ -590,6 +590,11 @@ public:
       query_info_node_->create_client<protocol::srv::AudioNickName>(
       "set_nick_name",
       rmw_qos_profile_services_default, query_feedback_callback_group_);
+    aiconnect_state_sub_ =
+      query_info_node_->create_subscription<std_msgs::msg::Bool>(
+      "ai_connect_state", rclcpp::SystemDefaultsQoS(),
+      std::bind(&QueryInfoNode::AiStateCallback, this, std::placeholders::_1),
+      sub_options);
   }
 
   void Init()
@@ -664,26 +669,7 @@ private:
   }
   void UidCallback(const std_msgs::msg::String::SharedPtr msg)
   {
-    bool dog_info_notify = false;
-    if (true) {
-      auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
-      auto path = local_share_dir + std::string("/toml_config/manager/settings.json");
-      Document json_document(kObjectType);
-      auto result = CyberdogJson::ReadJsonFromFile(path, json_document);
-      rapidjson::Value dog_val(rapidjson::kObjectType);
-      if (!result) {
-        dog_info_notify = true;
-      } else {
-        result = CyberdogJson::Get(json_document, "dog_info", dog_val);
-        if (!result) {
-          dog_info_notify = true;
-        } else {
-          if (!dog_val.HasMember("activate_date")) {
-            dog_info_notify = true;
-          }
-        }
-      }
-    }
+    dog_info_notify_ = false;
     uid_ = msg->data;
     query_node_ptr_->SetUid(uid_);
     INFO("user id:%s", uid_.c_str());
@@ -697,27 +683,6 @@ private:
         CyberdogJson::WriteJsonToFile(json_file, json_document);
       });
     t.join();
-    if (dog_info_notify) {
-      if (!dev_name_set_client_->wait_for_service(std::chrono::seconds(3))) {
-        INFO(
-          "call setnickname server not avaiable"
-        );
-        return;
-      }
-      std::chrono::seconds timeout(3);
-      auto req = std::make_shared<protocol::srv::AudioNickName::Request>();
-      req->nick_name = "铁蛋";
-      req->wake_name = "铁蛋铁蛋";
-      auto future_result = dev_name_set_client_->async_send_request(req);
-      std::future_status status = future_result.wait_for(timeout);
-      if (status == std::future_status::ready) {
-        INFO(
-          "success to call setnickname request services.");
-      } else {
-        INFO(
-          "Failed to call setnickname request  services.");
-      }
-    }
   }
   void DogInfoUpdate(const std_msgs::msg::Bool::SharedPtr msg)
   {
@@ -781,6 +746,54 @@ private:
     query_node_ptr_->GetBms() = *msg;
   }
 
+  void AiStateCallback(const std_msgs::msg::Bool::SharedPtr msg)
+  {
+    INFO("ai connect state:%s", msg->data ? "true" : "false");
+    if (msg->data) {
+      if (!dog_info_notify_) {
+        auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
+        auto path = local_share_dir + std::string("/toml_config/manager/settings.json");
+        Document json_document(kObjectType);
+        auto result = CyberdogJson::ReadJsonFromFile(path, json_document);
+        rapidjson::Value dog_val(rapidjson::kObjectType);
+        if (!result) {
+          dog_info_notify_ = true;
+        } else {
+          result = CyberdogJson::Get(json_document, "dog_info", dog_val);
+          if (!result) {
+            dog_info_notify_ = true;
+          } else {
+            if (!dog_val.HasMember("activate_date")) {
+              dog_info_notify_ = true;
+            }
+          }
+        }
+      }
+      if (dog_info_notify_) {
+        if (!dev_name_set_client_->wait_for_service(std::chrono::seconds(3))) {
+          INFO(
+            "call setnickname server not avaiable"
+          );
+          return;
+        }
+        std::chrono::seconds timeout(3);
+        auto req = std::make_shared<protocol::srv::AudioNickName::Request>();
+        req->nick_name = "铁蛋";
+        req->wake_name = "铁蛋铁蛋";
+        auto future_result = dev_name_set_client_->async_send_request(req);
+        std::future_status status = future_result.wait_for(timeout);
+        if (status == std::future_status::ready) {
+          INFO(
+            "success to call setnickname request services.");
+          dog_info_notify_ = true;
+        } else {
+          INFO(
+            "Failed to call setnickname request  services.");
+        }
+      }
+    }
+  }
+
 private:
   std::string uid_;
   rclcpp::Node::SharedPtr query_info_node_ {nullptr};
@@ -795,8 +808,10 @@ private:
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_;
   rclcpp::Subscription<protocol::msg::ConnectorStatus>::SharedPtr connect_status_sub_;
   rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr aiconnect_state_sub_;
   rclcpp::Client<protocol::srv::AudioNickName>::SharedPtr dev_name_set_client_;
   bool is_reporting_ {false};
+  bool dog_info_notify_ {false};
 };
 
 }  // namespace manager
