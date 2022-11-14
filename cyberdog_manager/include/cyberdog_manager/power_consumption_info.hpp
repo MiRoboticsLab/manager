@@ -38,8 +38,9 @@ class PowerConsumptionInfoNode final
   using PCIN_CALLBACK = std::function<void ()>;
 
 public:
-  explicit PowerConsumptionInfoNode(rclcpp::Node::SharedPtr node_ptr)
+  explicit PowerConsumptionInfoNode(rclcpp::Node::SharedPtr node_ptr, PCIN_CALLBACK callback)
   // : request_handler([](void) {}), release_handler([](void) {})
+  : enter_lowpower_handler(callback)
   {
     power_consumption_info_node_ = node_ptr;
     lpc_ptr_ = std::make_unique<cyberdog::manager::LowPowerConsumption>();
@@ -165,6 +166,7 @@ private:
         // {
         //   INFO("low power consumption enter success.");
         // }
+        enter_lowpower_handler();
         convert_motion_flage = false;
         lay_count = 0;
       }
@@ -214,6 +216,7 @@ private:
   // PCIN_CALLBACK request_handler;
   // PCIN_CALLBACK release_handler;
   // PowerMachineState pms {PowerMachineState::PMS_UNKOWN};
+  PCIN_CALLBACK enter_lowpower_handler;
 };
 }  // namespace manager
 }  // namespace cyberdog

@@ -156,6 +156,13 @@ public:
       }
     }
   }
+  void ContinueKeepDown()
+  {
+    if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+      return;
+    }
+    SwitchState(MsscMachineState::MSSC_LOWPOWER);
+  }
 
 private:
   void MachineStateSwitch(const std_msgs::msg::UInt8::SharedPtr msg)
