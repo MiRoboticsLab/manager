@@ -41,13 +41,15 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   machine_state_ptr_ = std::make_unique<cyberdog::manager::StateContext>(name_ + "_machine");
   query_node_ptr_ = std::make_unique<QueryInfoNode>(node_ptr_);
   account_node_ptr_ = std::make_unique<AccountInfoNode>(node_ptr_);
-  power_consumption_node_ptr = std::make_unique<PowerConsumptionInfoNode>(node_ptr_);
+  mssc_context_ptr_ = std::make_shared<cyberdog::manager::MachineStateSwitchContext>(node_ptr_);
+  power_consumption_node_ptr = std::make_unique<PowerConsumptionInfoNode>(
+    node_ptr_,
+    std::bind(&MachineStateSwitchContext::ContinueKeepDown, mssc_context_ptr_));
   ready_node_ptr = std::make_unique<ReadyNotifyNode>(name_ + "_ready");
   heart_beat_ptr_ = std::make_unique<cyberdog::manager::HeartContext>(
     node_ptr_,
     std::bind(&CyberdogManager::SetState, this, std::placeholders::_1, std::placeholders::_2));
   error_context_ptr_ = std::make_unique<cyberdog::manager::ErrorContext>(name_ + "_error");
-  mssc_context_ptr_ = std::make_shared<cyberdog::manager::MachineStateSwitchContext>(node_ptr_);
   bcin_node_ptr = std::make_unique<BatteryCapacityInfoNode>(
     node_ptr_,
     std::bind(
