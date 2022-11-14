@@ -97,6 +97,7 @@ bool cyberdog::manager::CyberdogManager::Init()
   if (!SelfCheck() ) {
     // if (false) {
     ERROR(">>>XXXXX---machine state self check error!");
+    audio_node_ptr->Error("自检失败!自检失败!自检失败!");
     return false;
   } else {
     heart_beat_ptr_->Init();
@@ -182,6 +183,8 @@ void cyberdog::manager::CyberdogManager::OnActive()
   if (result) {
     INFO("!!! All node in detectedc machine state is acitve ok !!!");
     audio_node_ptr->Init();
+  } else {
+    audio_node_ptr->Error("自检失败!自检失败!自检失败!");
   }
   query_node_ptr_->Report(true);
   ready_node_ptr->Ready(true);
