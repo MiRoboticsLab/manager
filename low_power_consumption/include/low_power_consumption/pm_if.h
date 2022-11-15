@@ -37,6 +37,7 @@ enum PM_DEV
   PM_ULTRA        = 1 << 15,  // 超声波组件
   PM_ALL          = 0xffffffff,
   PM_ALL_NO_MOTION = PM_ALL & (~PM_MOTION),
+  PM_ALL_NO_TOF = PM_ALL & (~PM_TOF),
 };
 
 int PmRequest(unsigned int devs, unsigned int * err);

@@ -25,13 +25,13 @@ namespace cyberdog
 {
 namespace manager
 {
-// enum class PowerMachineState : uint8_t
-// {
-//   PMS_NORMAL    = 0,    // 正常
-//   PMS_PROTECT   = 1,    // 保护
-//   PMS_LOWPOWER  = 2,    // 低功耗
-//   PMS_UNKOWN    = 255,  // 未知
-// };
+enum class PowerMachineState : uint8_t
+{
+  PMS_NORMAL    = 0,    // 正常
+  PMS_PROTECT   = 1,    // 保护
+  PMS_LOWPOWER  = 2,    // 低功耗
+  PMS_UNKOWN    = 255,  // 未知
+};
 
 class PowerConsumptionInfoNode final
 {
@@ -110,7 +110,7 @@ private:
     static int r_count = 0;
     INFO("[%d]EnterLowPower %s:start", (r_count + 1), (request->data ? "true" : "false"));
     // PM_DEV pd = PM_CAM_ALL;
-    PM_DEV pd = PM_ALL_NO_MOTION;
+    PM_DEV pd = PM_ALL_NO_TOF;
     unsigned int err;
     int code = -1;
     if (request->data) {
@@ -123,36 +123,15 @@ private:
     response->success = (code == 0 ? true : false);
     INFO("[%d]EnterLowPower %s:stop", (r_count + 1), (request->data ? "true" : "false"));
   }
+
   void sub_mostion_status_callback(const protocol::msg::MotionStatus msg)
   {
-    // INFO("sub motion_id messages*********");
     // motion_id: 趴下(101)、站立(111)
-    static bool convert_motion_flage = true;
+    static bool convert_motion_flage = false;
     static int lay_count = 0;
-    static bool times_flag = true;
-    static int count = 0;
-    PM_DEV pd = PM_ALL;
-    unsigned int err;
-    int code = -1;
-
-    // // 启动后不进行任何操作，60s后进入低功耗
-    // if (times_flag == true && msg.motion_id == 0) {
-    //   ++count;
-    //   if (count == 300) {
-    //     count = 0;
-    //     convert_motion_flage = false;
-    //     times_flag = false;
-    //     INFO("call low power consumption");
-    //     // release_handler();
-    //     // code = lpc_ptr_->LpcRelease(pd, &err);
-    //     // if(code == 0)
-    //     // {
-    //     //   INFO("low power consumption enter success.");
-    //     // }
-    //   }
-    // } else {
-    //   count = 0;
-    // }
+    PM_DEV pd = PM_ALL_NO_TOF;
+    // unsigned int err;
+    // int code = -1;
 
     // 运动状态转换至趴下，30s后启动低功耗
     if (convert_motion_flage == true && msg.motion_id == 101) {
@@ -176,7 +155,7 @@ private:
 
     // 状态切换到站立，启动正常功耗
     if (convert_motion_flage == false && msg.motion_id == 111) {
-      INFO("call nomal power consumption");
+      // INFO("call nomal power consumption");
       // code = lpc_ptr_->LpcRelease(pd, &err);
       // if(code == 0)
       // {
@@ -185,16 +164,14 @@ private:
       // }
       // request_handler();
       convert_motion_flage = true;
-      times_flag = true;
     }
   }
 
   void ShutdownCallback(
-    const std_srvs::srv::Trigger::Request::SharedPtr request,
+    const std_srvs::srv::Trigger::Request::SharedPtr,
     std_srvs::srv::Trigger::Response::SharedPtr response)
   {
     INFO("poweroff......");
-    request;
     PM_SYS pd = PM_SYS_SHUTDOWN;
     int code = -1;
     code = lpc_ptr_->LpcSysRequest(pd);
@@ -213,9 +190,9 @@ private:
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr power_off_srv_ {nullptr};
   std::unique_ptr<cyberdog::manager::LowPowerConsumption> lpc_ptr_ {nullptr};
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
-  // PCIN_CALLBACK request_handler;
-  // PCIN_CALLBACK release_handler;
-  // PowerMachineState pms {PowerMachineState::PMS_UNKOWN};
+  PCIN_CALLBACK request_handler;
+  PCIN_CALLBACK release_handler;
+  PowerMachineState pms {PowerMachineState::PMS_UNKOWN};
   PCIN_CALLBACK enter_lowpower_handler;
 };
 }  // namespace manager
