@@ -62,7 +62,7 @@ private:
       std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::system_clock::now().time_since_epoch());
     INFO("report_previous_time is %d", report_previous_time.count());
-    if (msg->touch_state == 3 &&
+    if (msg->touch_state == 3 && report_flag &&
       abs(reporting_time.count() - report_previous_time.count()) >= 3000)
     {
       INFO(
@@ -75,7 +75,7 @@ private:
       msg.is_online = true;
       msg.module_name = touch_info_node_->get_name();
       msg.text = "剩余电量为百分之" + std::to_string(battery_percent);
-      INFO("语言播报：%s", msg.text.c_str());
+      INFO("语言播报的电量为：%s", msg.text.c_str());
       audio_play_extend_pub->publish(msg);
     }
   }
@@ -83,6 +83,7 @@ private:
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
   {
     battery_percent = msg->batt_soc;
+    report_flag = true;
     INFO_MILLSECONDS(
       30000,
       "[cyberdog_manager:] touch_info-->> Enter BMS callback.the batt_soc is %d.",
@@ -98,6 +99,7 @@ private:
   int battery_percent;
   std::chrono::milliseconds reporting_time = std::chrono::duration_cast<std::chrono::milliseconds>(
     std::chrono::system_clock::now().time_since_epoch());
+  bool report_flag = false;
 };
 }  // namespace manager
 }  // namespace cyberdog
