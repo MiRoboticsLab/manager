@@ -99,12 +99,12 @@ private:
   {
     static bool is_battary_zero = false;
     static bool is_set_count = false;
+    bms_status_ = *msg;
     if (((bms_status_.batt_st & 0x02) >> 1) == 1) {
       is_set_count = false;
       is_reported_charging = false;
       return;
     }
-    bms_status_ = *msg;
     INFO_MILLSECONDS(
       30000, "Battery Capacity Info:%d",
       bms_status_.batt_soc);
