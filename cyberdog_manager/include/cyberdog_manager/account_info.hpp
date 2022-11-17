@@ -166,7 +166,7 @@ private:
       } else {
         INFO("Search ALL Account faile!");
         response->status = false;
-        response->data = "{\"error\":\"search failed!\"}";
+        response->data = "{\"code\":121}";
       }
     } else {
       INFO("search_one_user");
@@ -175,7 +175,7 @@ private:
       if (!obj.SearchUser(account_name, result)) {
         INFO("search %s faild, SearchUser() return 0", account_name.c_str());
         response->status = false;
-        response->data = "{\"error\":\"this account does not exist!\"}";
+        response->data = "{\"code\":121}";
         return;
       }
       int voice_state = result[0];
@@ -183,6 +183,7 @@ private:
       INFO(
         "account name:%s \n voice_state: %d \n face_stare: %d",
         account_name.c_str(), result[0], result[1]);
+      json_info.AddMember("code", 0, json_info.GetAllocator());
       rapidjson::Value value(account_name.c_str(), json_info.GetAllocator());
       js_obj.AddMember("name", value, json_info.GetAllocator());
       js_obj.AddMember("face_state", face_state, json_info.GetAllocator());
