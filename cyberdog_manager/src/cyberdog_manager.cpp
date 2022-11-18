@@ -59,6 +59,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   audio_node_ptr = std::make_unique<AudioInfoNode>(
     node_ptr_,
     std::bind(&MachineStateSwitchContext::AudioWakeUp, mssc_context_ptr_));
+  led_node_ptr = std::make_unique<LedInfoNode>(node_ptr_);
   executor_.add_node(node_ptr_);
   // black_box_ptr_ = std::make_shared<BlackBox>(node_ptr_);
 }
