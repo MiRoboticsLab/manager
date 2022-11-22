@@ -17,6 +17,8 @@
 #include "cyberdog_common/cyberdog_json.hpp"
 #include "ament_index_cpp/get_package_share_directory.hpp"
 
+#define MAX_SN_SIZE  50
+
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
 using rapidjson::kObjectType;
@@ -26,6 +28,10 @@ cyberdog::manager::CyberdogPermission::CyberdogPermission()
 {
   cyberdog_sn = BoardInfo::Get_Sn();
   INFO("sn:%s", cyberdog_sn.c_str());
+  if (cyberdog_sn.length() > MAX_SN_SIZE) {
+    cyberdog_sn.resize(MAX_SN_SIZE);
+    cyberdog_sn[MAX_SN_SIZE - 1] = '\0';
+  }
   sn_pub_ =
     this->create_publisher<std_msgs::msg::String>(
     "dog_sn",
