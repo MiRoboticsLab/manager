@@ -63,7 +63,7 @@ private:
       std::chrono::system_clock::now().time_since_epoch());
     INFO("report_previous_time is %d", report_previous_time.count());
     if (msg->touch_state == 3 && report_flag &&
-      abs(reporting_time.count() - report_previous_time.count()) >= 3000)
+      abs(reporting_time.count() - report_previous_time.count()) >= 2000)
     {
       INFO(
         "reporting_time - report_previous_time is %d",
