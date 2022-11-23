@@ -22,7 +22,17 @@ int main(int argc, char ** argv)
   rclcpp::init(argc, argv);
   auto permission_node =
     std::make_shared<cyberdog::manager::CyberdogPermission>();
-  rclcpp::spin(permission_node);
+  try {
+    rclcpp::spin(permission_node);
+  } catch (rclcpp::exceptions::RCLError & e) {
+    ERROR(
+      "node spin rcl error exception:(line:%d,file:%d,messgae:%s[%s])",
+      e.line, e.file, e.message, e.formatted_message);
+  } catch (const std::exception & e) {
+    std::cerr << e.what() << '\n';
+  } catch (...) {
+    ERROR("node spin unkown exception");
+  }
   rclcpp::shutdown();
   return 0;
 }
