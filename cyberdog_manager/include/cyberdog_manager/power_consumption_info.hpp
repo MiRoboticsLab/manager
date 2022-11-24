@@ -110,7 +110,7 @@ private:
     static int r_count = 0;
     INFO("[%d]EnterLowPower %s:start", (r_count + 1), (request->data ? "true" : "false"));
     // PM_DEV pd = PM_CAM_ALL;
-    PM_DEV pd = PM_ALL_NO_TOF;
+    PM_DEV pd = PM_NO_MOTION_TOF;
     unsigned int err;
     int code = -1;
     if (request->data) {
@@ -129,7 +129,7 @@ private:
     // motion_id: 趴下(101)、站立(111)
     static bool convert_motion_flage = false;
     static int lay_count = 0;
-    PM_DEV pd = PM_ALL_NO_TOF;
+    PM_DEV pd = PM_NO_MOTION_TOF;
     // unsigned int err;
     // int code = -1;
 
