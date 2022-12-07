@@ -137,18 +137,18 @@ private:
     if (convert_motion_flage == true && msg.motion_id == 101) {
       // motion_status的发布频率为10Hz，延时30s，lay_count == 300
       ++lay_count;
-      if (lay_count == 300) {
-        INFO("call low power consumption");
-        // release_handler();
-        // code = lpc_ptr_->LpcRelease(pd, &err);
-        // if(code == 0)
-        // {
-        //   INFO("low power consumption enter success.");
-        // }
-        enter_lowpower_handler();
-        convert_motion_flage = false;
-        lay_count = 0;
-      }
+      // if (lay_count == 300) {
+      //   INFO("call low power consumption");
+      //   // release_handler();
+      //   // code = lpc_ptr_->LpcRelease(pd, &err);
+      //   // if(code == 0)
+      //   // {
+      //   //   INFO("low power consumption enter success.");
+      //   // }
+      //   enter_lowpower_handler();
+      //   convert_motion_flage = false;
+      //   lay_count = 0;
+      // }
     } else {
       lay_count = 0;
     }

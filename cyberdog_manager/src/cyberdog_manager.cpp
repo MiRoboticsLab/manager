@@ -162,7 +162,7 @@ void cyberdog::manager::CyberdogManager::OnLowPower()
 {
   INFO("on lowpower");
   // bcin_node_ptr->SetBms(BatteryMachineState::BMS_LOWPOWER);
-  machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_LowPower);
+  // machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_LowPower);
 }
 
 void cyberdog::manager::CyberdogManager::OnSuspend()
@@ -174,7 +174,7 @@ void cyberdog::manager::CyberdogManager::OnProtected()
 {
   ERROR("on protect");
   // bcin_node_ptr->SetBms(BatteryMachineState::BMS_PROTECT);
-  machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Protected);
+  // machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Protected);
 }
 
 void cyberdog::manager::CyberdogManager::OnActive()

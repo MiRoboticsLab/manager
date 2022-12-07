@@ -196,13 +196,13 @@ private:
       case MsscMachineState::MSSC_PROTECT:
         {
           INFO("^^^ switch state:protected ^^^");
-          protect_handler();
+          // protect_handler();
         }
         break;
       case MsscMachineState::MSSC_LOWPOWER:
         {
           INFO("^^^ switch state:low-power ^^^");
-          lowpower_handler();
+          // lowpower_handler();
           lowpower(true);
         }
         break;
