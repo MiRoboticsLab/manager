@@ -129,7 +129,7 @@ private:
     // motion_id: 趴下(101)、站立(111)
     static bool convert_motion_flage = false;
     static int lay_count = 0;
-    PM_DEV pd = PM_ALL_NO_TOF;
+    // PM_DEV pd = PM_ALL_NO_TOF;
     // unsigned int err;
     // int code = -1;
 
