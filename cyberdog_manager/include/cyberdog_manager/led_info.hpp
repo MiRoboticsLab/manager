@@ -96,7 +96,7 @@ private:
         bool result = ReqLedService(poweroff_head, poweroff_tail, poweroff_mini);
         INFO("%s set led when the soc is 0", result ? "successed" : "failed");
       }
-    } else if (!is_set_led_five && msg->batt_soc <= 5) {
+    } else if (!is_set_led_five && msg->batt_soc < 5) {
       if (!msg->power_wired_charging) {
         is_low_power_ = true;
         is_set_led_five = true;
@@ -104,7 +104,7 @@ private:
         bool result = ReqLedService(low_power_tail);
         INFO("%s set led when the soc is less than 5", result ? "successed" : "failed");
       }
-    } else if (!is_set_led_thirty && msg->batt_soc > 5 && msg->batt_soc <= 30) {
+    } else if (!is_set_led_thirty && msg->batt_soc >= 5 && msg->batt_soc <= 30) {
       is_set_led_five = false;
       is_set_led_thirty = true;
       is_set_led_thirty_more = false;
@@ -129,7 +129,7 @@ private:
   void Motion_status(const protocol::msg::MotionStatus::SharedPtr msg)
   {
     // motion_id: 趴下(101)、站立(111)
-    static bool is_low_power {false};
+    // static bool is_low_power {false};
     static bool is_convert_motion_status {false};
     static int lay_count {0};
 
@@ -143,7 +143,7 @@ private:
         INFO("%s set led when enter low power ", result ? "successed" : "failed");
         is_convert_motion_status = false;
         lay_count = 0;
-        is_low_power = true;
+        is_low_power_ = true;
       }
     } else {
       lay_count = 0;
@@ -152,8 +152,8 @@ private:
     // 状态切换到站立
     if (is_convert_motion_status == false && msg->motion_id == 111) {
       is_convert_motion_status = true;
-      if (is_low_power) {
-        is_low_power = false;
+      if (is_low_power_) {
+        is_low_power_ = false;
       }
     }
   }
