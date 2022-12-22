@@ -17,6 +17,7 @@
 #include <string>
 #include <memory>
 #include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "protocol/srv/led_execute.hpp"
 #include "protocol/msg/bms_status.hpp"
 #include "protocol/msg/motion_status.hpp"
@@ -60,6 +61,11 @@ public:
       std::bind(&LedInfoNode::BmsStatus, this, std::placeholders::_1),
       sub_options);
 
+    wake_up_sub_ = led_info_node_->create_subscription<std_msgs::msg::Bool>(
+      "dog_wakeup", rclcpp::SystemDefaultsQoS(),
+      std::bind(&LedInfoNode::WakeUp, this, std::placeholders::_1),
+      sub_options);
+
     // motion_status sub
     motion_status_sub_ = led_info_node_->create_subscription<protocol::msg::MotionStatus>(
       "motion_status", rclcpp::SystemDefaultsQoS(),
@@ -76,8 +82,8 @@ private:
     static bool is_set_led_thirty_more = false;
 
     // 退出低功耗模式后更新灯效
-    if (is_stop_low_power) {
-      is_stop_low_power = false;
+    if (is_refresh_led_) {
+      is_refresh_led_ = false;
       is_set_led_thirty = false;
       is_set_led_thirty_more = false;
     }
@@ -90,15 +96,15 @@ private:
         bool result = ReqLedService(poweroff_head, poweroff_tail, poweroff_mini);
         INFO("%s set led when the soc is 0", result ? "successed" : "failed");
       }
-    } else if (!is_set_led_five && msg->batt_soc <= 5) {
-      is_set_led_five = true;
-      is_set_led_thirty = false;
-      is_set_led_thirty_more = false;
-      LedMode low_power_tail{"bms", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
-      bool result = ReqLedService(low_power_tail);
-      INFO("%s set led when the soc is less than 5", result ? "successed" : "failed");
-
-    } else if (!is_set_led_thirty && msg->batt_soc > 5 && msg->batt_soc <= 30) {
+    } else if (!is_set_led_five && msg->batt_soc < 5) {
+      if (!msg->power_wired_charging) {
+        is_low_power_ = true;
+        is_set_led_five = true;
+        LedMode low_power_tail{"bms", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
+        bool result = ReqLedService(low_power_tail);
+        INFO("%s set led when the soc is less than 5", result ? "successed" : "failed");
+      }
+    } else if (!is_set_led_thirty && msg->batt_soc >= 5 && msg->batt_soc <= 30) {
       is_set_led_five = false;
       is_set_led_thirty = true;
       is_set_led_thirty_more = false;
@@ -123,7 +129,7 @@ private:
   void Motion_status(const protocol::msg::MotionStatus::SharedPtr msg)
   {
     // motion_id: 趴下(101)、站立(111)
-    static bool is_low_power {false};
+    // static bool is_low_power {false};
     static bool is_convert_motion_status {false};
     static int lay_count {0};
 
@@ -137,7 +143,7 @@ private:
         INFO("%s set led when enter low power ", result ? "successed" : "failed");
         is_convert_motion_status = false;
         lay_count = 0;
-        is_low_power = true;
+        is_low_power_ = true;
       }
     } else {
       lay_count = 0;
@@ -146,10 +152,19 @@ private:
     // 状态切换到站立
     if (is_convert_motion_status == false && msg->motion_id == 111) {
       is_convert_motion_status = true;
-      if (is_low_power) {
-        is_low_power = false;
-        is_stop_low_power = true;
+      if (is_low_power_) {
+        is_low_power_ = false;
       }
+    }
+  }
+
+  void WakeUp(const std_msgs::msg::Bool msg)
+  {
+    (void)msg;
+    if (is_low_power_) {
+      // 刷新灯效
+      is_low_power_ = false;
+      is_refresh_led_ = true;
     }
   }
 
@@ -241,8 +256,10 @@ private:
   rclcpp::CallbackGroup::SharedPtr led_callback_group_;
   rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_ {nullptr};
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
   rclcpp::Client<protocol::srv::LedExecute>::SharedPtr led_excute_client_ {nullptr};
-  bool is_stop_low_power {false};
+  bool is_low_power_ {false};
+  bool is_refresh_led_ {false};
 
   // SHINE_CALLBACK light_shine_handler {[](uint8_t) {}};
 };
