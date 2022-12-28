@@ -121,14 +121,14 @@ public:
       }
     }
   }
-  void BatteryChargeUpdate(uint8_t bc)
+  void BatteryChargeUpdate(uint8_t bc, bool is_charging)
   {
     battery_charge_val = bc;
-    if (battery_charge_val <= 0) {
+    if (battery_charge_val <= 0 && (!is_charging)) {
       // 关机
       SwitchState(MsscMachineState::MSSC_SHUTDOWN);
     } else if (battery_charge_val < 5) {
-      if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+      if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER || is_charging) {
         return;
       } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
         // 切换到低功耗模式
@@ -139,6 +139,10 @@ public:
       }
     } else if (battery_charge_val < 20) {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+        if (is_charging) {
+          lowpower(false);
+          SwitchState(MsscMachineState::MSSC_PROTECT);
+        }
         return;
       } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
         return;
@@ -246,7 +250,7 @@ private:
     if (!low_power_client_->wait_for_service(std::chrono::seconds(2))) {
       ERROR("call low-power service not avalible");
     } else {
-      std::chrono::seconds timeout(3);
+      std::chrono::seconds timeout(10);
       auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
       req->data = is_enter;
       auto future_result = low_power_client_->async_send_request(req);

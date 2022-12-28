@@ -35,7 +35,7 @@ namespace manager
 class BatteryCapacityInfoNode final
 {
   using BCIN_CALLBACK = std::function<void ()>;
-  using BCINSOC_CALLBACK = std::function<void (uint8_t val)>;
+  using BCINSOC_CALLBACK = std::function<void (uint8_t val, bool val2)>;
 
 public:
   explicit BatteryCapacityInfoNode(
@@ -100,7 +100,8 @@ private:
     static bool is_battary_zero = false;
     static bool is_set_count = false;
     bms_status_ = *msg;
-    if (((bms_status_.batt_st & 0x02) >> 1) == 1) {
+    socnotify_handler(bms_status_.batt_soc, bms_status_.power_wired_charging);
+    if (bms_status_.power_wired_charging) {
       is_set_count = false;
       is_reported_charging = false;
       return;
@@ -179,7 +180,6 @@ private:
         is_set_count = false;
       }
     }
-    socnotify_handler(bms_status_.batt_soc);
   }
 
 private:

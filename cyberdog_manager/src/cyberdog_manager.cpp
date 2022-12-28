@@ -54,7 +54,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     node_ptr_,
     std::bind(
       &MachineStateSwitchContext::BatteryChargeUpdate, mssc_context_ptr_,
-      std::placeholders::_1));
+      std::placeholders::_1, std::placeholders::_2));
   touch_node_ptr = std::make_unique<TouchInfoNode>(node_ptr_);
   audio_node_ptr = std::make_unique<AudioInfoNode>(
     node_ptr_,
