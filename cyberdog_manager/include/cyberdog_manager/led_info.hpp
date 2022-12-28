@@ -100,11 +100,12 @@ private:
       if (!msg->power_wired_charging) {
         is_low_power_ = true;
         is_set_led_five = true;
+        is_set_led_thirty = false;
         LedMode low_power_tail{"bms", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
         bool result = ReqLedService(low_power_tail);
         INFO("%s set led when the soc is less than 5", result ? "successed" : "failed");
       }
-    } else if (!is_set_led_thirty && msg->batt_soc >= 5 && msg->batt_soc <= 30) {
+    } else if (!is_set_led_thirty && msg->batt_soc >= 5 && msg->batt_soc <= 20) {
       is_set_led_five = false;
       is_set_led_thirty = true;
       is_set_led_thirty_more = false;
@@ -114,7 +115,7 @@ private:
       bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
       INFO("%s set led when the soc is less than 30", result ? "successed" : "failed");
 
-    } else if (!is_set_led_thirty_more && msg->batt_soc > 30) {
+    } else if (!is_set_led_thirty_more && msg->batt_soc > 20) {
       is_set_led_five = false;
       is_set_led_thirty = false;
       is_set_led_thirty_more = true;
