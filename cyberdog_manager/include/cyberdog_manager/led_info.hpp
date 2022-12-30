@@ -103,7 +103,7 @@ private:
         is_set_led_thirty = false;
         LedMode low_power_tail{"bms", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
         bool result = ReqLedService(low_power_tail);
-        INFO("%s set led when the soc is less than 5", result ? "successed" : "failed");
+        INFO("[LowPower]: %s set led when the soc is less than 5", result ? "successed" : "failed");
       }
     } else if (!is_set_led_thirty && msg->batt_soc >= 5 && msg->batt_soc <= 20) {
       is_set_led_five = false;
@@ -138,10 +138,12 @@ private:
     if (is_convert_motion_status == true && msg->motion_id == 101) {
       ++lay_count;
       if (lay_count == 300) {
-        INFO("start to set tail led ");
+        INFO("[LowPower]: start to trun off tail led when dog lies down for 30s");
         LedMode low_power_tail{"bms", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
         bool result = ReqLedService(low_power_tail);
-        INFO("%s set led when enter low power ", result ? "successed" : "failed");
+        INFO(
+          "[LowPower]: %s trun off tail led when enter low power ",
+          result ? "successed" : "failed");
         is_convert_motion_status = false;
         lay_count = 0;
         is_low_power_ = true;
