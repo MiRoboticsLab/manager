@@ -95,27 +95,30 @@ public:
         return;
       } else {
         ERROR(
-          "switch state error1:wake up, battery charge val:%d, current state:%d",
+          "[LowPower]: switch state error1:wake up, battery charge val:%d, current state:%d",
           battery_charge_val, mssc_machine_state);
       }
     } else if (battery_charge_val < 20) {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
         lowpower(false);
         SwitchState(MsscMachineState::MSSC_PROTECT);
+        INFO("[LowPower]: wakeup from lowpower to protect");
       } else {
         ERROR(
-          "switch state error2:wake up, battery charge val:%d, current state:%d",
+          "[LowPower]: switch state error2:wakeup, battery charge val:%d, current state:%d",
           battery_charge_val, mssc_machine_state);
       }
     } else {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
         lowpower(false);
         SwitchState(MsscMachineState::MSSC_ACTIVE);
+        INFO("[LowPower]: wakeup from lowpower to active");
       } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
         ERROR(
-          "switch state error3:wake up, battery charge val:%d, current state:%d",
+          "[LowPower]: switch state error3:wake up, battery charge val:%d, current state:%d",
           battery_charge_val, mssc_machine_state);
         SwitchState(MsscMachineState::MSSC_ACTIVE);
+        INFO("[LowPower]: wakeup from protect to active");
       } else if (mssc_machine_state == MsscMachineState::MSSC_ACTIVE) {
         return;
       }
@@ -133,16 +136,15 @@ public:
       } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
         // 切换到低功耗模式
         SwitchState(MsscMachineState::MSSC_LOWPOWER);
+        INFO("[LowPower]: call low power consumption when battery soc is less than 5");
+
       } else if (mssc_machine_state == MsscMachineState::MSSC_ACTIVE) {
         // 切换到低功耗模式
         SwitchState(MsscMachineState::MSSC_LOWPOWER);
+        INFO("[LowPower]: call low power consumption when battery soc is less than 5");
       }
     } else if (battery_charge_val < 20) {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
-        if (is_charging) {
-          lowpower(false);
-          SwitchState(MsscMachineState::MSSC_PROTECT);
-        }
         return;
       } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
         return;
@@ -228,7 +230,7 @@ private:
 
   void poweroff()
   {
-    INFO("now dog start poweroff.");
+    INFO("cyberdog start poweroff when the battery soc is 0.");
     if (!power_off_client_->wait_for_service(std::chrono::seconds(2))) {
       ERROR("call poweroff service not avalible");
     } else {
@@ -246,9 +248,9 @@ private:
 
   bool lowpower(bool is_enter)
   {
-    INFO("now dog %s low-power model.", (is_enter ? "enter" : "exit"));
+    INFO("[LowPower]: now dog %s low-power model.", (is_enter ? "enter" : "exit"));
     if (!low_power_client_->wait_for_service(std::chrono::seconds(2))) {
-      ERROR("call low-power service not avalible");
+      ERROR("[LowPower]: call low-power service not avalible");
     } else {
       std::chrono::seconds timeout(10);
       auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
@@ -256,10 +258,10 @@ private:
       auto future_result = low_power_client_->async_send_request(req);
       std::future_status status = future_result.wait_for(timeout);
       if (status == std::future_status::ready) {
-        INFO("call low-power service success.");
+        INFO("[LowPower]: call low-power service success.");
         return future_result.get()->success;
       } else {
-        ERROR("call low-power service failed!");
+        ERROR("[LowPower]: call low-power service failed!");
       }
     }
     return false;

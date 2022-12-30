@@ -108,7 +108,9 @@ private:
     std_srvs::srv::SetBool::Response::SharedPtr response)
   {
     static int r_count = 0;
-    INFO("[%d]EnterLowPower %s:start", (r_count + 1), (request->data ? "true" : "false"));
+    INFO(
+      "[LowPower]: [%d]EnterLowPower %s:start", (r_count + 1),
+      (request->data ? "true" : "false"));
     // PM_DEV pd = PM_CAM_ALL;
     PM_DEV pd = PM_ALL_NO_TOF;
     unsigned int err;
@@ -121,7 +123,9 @@ private:
       ++r_count;
     }
     response->success = (code == 0 ? true : false);
-    INFO("[%d]EnterLowPower %s:stop", (r_count + 1), (request->data ? "true" : "false"));
+    INFO(
+      "[LowPower]: [%d]EnterLowPower %s:stop", (r_count + 1),
+      (request->data ? "true" : "false"));
   }
 
   void sub_mostion_status_callback(const protocol::msg::MotionStatus msg)
@@ -138,7 +142,7 @@ private:
       // motion_status的发布频率为10Hz，延时30s，lay_count == 300
       ++lay_count;
       if (lay_count == 300) {
-        INFO("call low power consumption");
+        INFO("[LowPower]: call low power consumption when the dog lies down for 30s");
         // release_handler();
         // code = lpc_ptr_->LpcRelease(pd, &err);
         // if(code == 0)
@@ -176,7 +180,7 @@ private:
     int code = -1;
     code = lpc_ptr_->LpcSysRequest(pd);
     if (code != 0) {
-      INFO("Shutdown failedpw, function LpcRequest call faild");
+      INFO("Shutdown failed, function LpcRequest call faild");
     } else {
       INFO("Shut down successfully");
     }
