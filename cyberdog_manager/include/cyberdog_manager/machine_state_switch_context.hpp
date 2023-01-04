@@ -22,6 +22,7 @@
 #include "std_msgs/msg/u_int8.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
+#include "protocol/msg/state_switch_status.hpp"
 
 namespace cyberdog
 {
@@ -67,6 +68,11 @@ public:
       mssc_node_->create_client<std_srvs::srv::SetBool>(
       "low_power_consumption",
       rmw_qos_profile_services_default, mssc_callback_group_);
+    rclcpp::PublisherOptions pub_options;
+    pub_options.callback_group = mssc_callback_group_;
+    state_swith_status_pub_ =
+      mssc_node_->create_publisher<protocol::msg::StateSwitchStatus>(
+      "state_switch_status", rclcpp::SystemDefaultsQoS(), pub_options);
   }
   void Init()
   {
@@ -197,17 +203,29 @@ private:
         {
           INFO("^^^ switch state:active ^^^");
           active_handler();
+          protocol::msg::StateSwitchStatus sss;
+          sss.code = 0;
+          sss.state = 0;
+          state_swith_status_pub_->publish(sss);
         }
         break;
       case MsscMachineState::MSSC_PROTECT:
         {
           INFO("^^^ switch state:protected ^^^");
+          protocol::msg::StateSwitchStatus sss;
+          sss.code = 0;
+          sss.state = 1;
+          state_swith_status_pub_->publish(sss);
           protect_handler();
         }
         break;
       case MsscMachineState::MSSC_LOWPOWER:
         {
           INFO("^^^ switch state:low-power ^^^");
+          protocol::msg::StateSwitchStatus sss;
+          sss.code = 0;
+          sss.state = 2;
+          state_swith_status_pub_->publish(sss);
           lowpower_handler();
           lowpower(true);
         }
@@ -216,6 +234,10 @@ private:
         {
           INFO("^^^ switch state:shutdown ^^^");
           // need modify
+          protocol::msg::StateSwitchStatus sss;
+          sss.code = 0;
+          sss.state = 4;
+          state_swith_status_pub_->publish(sss);
           poweroff();
           shutdown_handler();
         }
@@ -274,6 +296,7 @@ private:
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr state_valget_srv_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr power_off_client_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr low_power_client_;
+  rclcpp::Publisher<protocol::msg::StateSwitchStatus>::SharedPtr state_swith_status_pub_;
   MsscMachineState mssc_machine_state {MsscMachineState::MSSC_UNKOWN};
   std::mutex switch_mtx;
   BSSC_CALLBACK active_handler {[](void) {}};
