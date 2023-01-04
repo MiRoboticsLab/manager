@@ -18,6 +18,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
+#include "protocol/msg/self_check_status.hpp"
 
 namespace cyberdog
 {
@@ -36,6 +37,11 @@ public:
     options.callback_group = ready_notify_callback_group_;
     ready_notify_pub_ = ready_notify_node_->create_publisher<std_msgs::msg::Bool>(
       "ready_notify",
+      rclcpp::SystemDefaultsQoS(),
+      options
+    );
+    self_check_status_pub_ = ready_notify_node_->create_publisher<protocol::msg::SelfCheckStatus>(
+      "self_check_status",
       rclcpp::SystemDefaultsQoS(),
       options
     );
@@ -63,6 +69,29 @@ public:
     }
   }
 
+  void SelfCheck(bool is_ok)
+  {
+    is_ok_ = is_ok;
+    if (!notify_selfcheck_thread.joinable()) {
+      notify_selfcheck_thread = std::thread(
+        [this]() {
+          while (!exit_ && rclcpp::ok()) {
+            protocol::msg::SelfCheckStatus msg;
+            if (is_ok_) {
+              msg.code = 0;
+              msg.description = "ok";
+            } else {
+              msg.code = -1;
+              msg.description = "failed";
+            }
+            self_check_status_pub_->publish(msg);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            --count_;
+          }
+        });
+    }
+  }
+
   ~ReadyNotifyNode()
   {
     exit_ = true;
@@ -74,11 +103,14 @@ public:
 private:
   bool exit_ {false};
   bool ready_ {false};
+  bool is_ok_ {false};
   std::string name_;
   rclcpp::Node::SharedPtr ready_notify_node_ {nullptr};
   rclcpp::CallbackGroup::SharedPtr ready_notify_callback_group_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr ready_notify_pub_;
+  rclcpp::Publisher<protocol::msg::SelfCheckStatus>::SharedPtr self_check_status_pub_;
   std::thread notify_message_thread;
+  std::thread notify_selfcheck_thread;
   int count_;
 };
 }  // namespace manager
