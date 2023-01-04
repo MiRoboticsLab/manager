@@ -98,6 +98,7 @@ private:
   void DogWakeup(const std_msgs::msg::Bool::SharedPtr msg)
   {
     if (msg->data) {
+      INFO("[LowPower]: dog wakeup...");
       wakeup_handler();
     }
   }
