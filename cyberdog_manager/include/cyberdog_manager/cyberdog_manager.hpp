@@ -67,6 +67,7 @@ public:
   void OnActive() override;
   void OnDeactive();
   void OnTearDown();
+  void OnOta();
 
 private:
   std::string name_;
