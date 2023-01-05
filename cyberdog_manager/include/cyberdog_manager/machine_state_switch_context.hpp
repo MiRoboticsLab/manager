@@ -109,7 +109,9 @@ public:
   }
   void AudioWakeUp()
   {
-    if (battery_charge_val < 5) {
+    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+      return;
+    } else if (battery_charge_val < 5) {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
         return;
       } else {
@@ -146,7 +148,9 @@ public:
   void BatteryChargeUpdate(uint8_t bc, bool is_charging)
   {
     battery_charge_val = bc;
-    if (battery_charge_val <= 0 && (!is_charging)) {
+    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+      return;
+    } else if (battery_charge_val <= 0 && (!is_charging)) {
       // 关机
       SwitchState(MsscMachineState::MSSC_SHUTDOWN);
     } else if (battery_charge_val < 5) {
@@ -183,7 +187,9 @@ public:
   }
   void ContinueKeepDown()
   {
-    if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+      return;
+    } else if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
       return;
     }
     SwitchState(MsscMachineState::MSSC_LOWPOWER);
@@ -215,6 +221,9 @@ private:
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
         lowpower(false);
         INFO("[LowPower]: exit lowpower to ota");
+      } else if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+        response->success = true;
+        return;
       }
       SwitchState(MsscMachineState::MSSC_OTA);
     } else {
