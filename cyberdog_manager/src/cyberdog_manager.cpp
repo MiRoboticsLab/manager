@@ -81,6 +81,7 @@ void cyberdog::manager::CyberdogManager::Config()
   mssc_context_ptr_->SetActive(std::bind(&CyberdogManager::OnActive, this));
   mssc_context_ptr_->SetProtect(std::bind(&CyberdogManager::OnProtected, this));
   mssc_context_ptr_->SetLowpower(std::bind(&CyberdogManager::OnLowPower, this));
+  mssc_context_ptr_->SetOta(std::bind(&CyberdogManager::OnOta, this));
   mssc_context_ptr_->SetShutdown(std::bind(&CyberdogManager::OnTearDown, this));
 }
 
@@ -208,4 +209,10 @@ void cyberdog::manager::CyberdogManager::OnTearDown()
 {
   INFO("trigger state:on teardown");
   machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_TearDown);
+}
+
+void cyberdog::manager::CyberdogManager::OnOta()
+{
+  INFO("trigger state:on ota");
+  // machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_OTA);
 }

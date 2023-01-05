@@ -21,6 +21,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/u_int8.hpp"
 #include "std_srvs/srv/trigger.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 #include "protocol/msg/state_switch_status.hpp"
 
@@ -33,7 +34,8 @@ enum class MsscMachineState : uint8_t
   MSSC_ACTIVE    = 0,    // 正常
   MSSC_PROTECT   = 1,    // 保护
   MSSC_LOWPOWER  = 2,    // 低功耗
-  MSSC_SHUTDOWN  = 3,    // 关机
+  MSSC_OTA       = 3,    // OTA
+  MSSC_SHUTDOWN  = 4,    // 关机
   MSSC_UNKOWN    = 255,  // 未知
 };
 
@@ -58,6 +60,13 @@ public:
       "machine_state_valget",
       std::bind(
         &MachineStateSwitchContext::MachineStateGet, this, std::placeholders::_1,
+        std::placeholders::_2),
+      rmw_qos_profile_services_default, mssc_callback_group_);
+    switch_ota_state_srv_ =
+      mssc_node_->create_service<std_srvs::srv::SetBool>(
+      "ota_state_switch",
+      std::bind(
+        &MachineStateSwitchContext::OtaMachineState, this, std::placeholders::_1,
         std::placeholders::_2),
       rmw_qos_profile_services_default, mssc_callback_group_);
     power_off_client_ =
@@ -89,6 +98,10 @@ public:
   void SetLowpower(BSSC_CALLBACK callback)
   {
     lowpower_handler = callback;
+  }
+  void SetOta(BSSC_CALLBACK callback)
+  {
+    ota_handler = callback;
   }
   void SetShutdown(BSSC_CALLBACK callback)
   {
@@ -194,6 +207,21 @@ private:
     }
     response->success = true;
   }
+  void OtaMachineState(
+    const std_srvs::srv::SetBool::Request::SharedPtr request,
+    std_srvs::srv::SetBool::Response::SharedPtr response)
+  {
+    if (request->data) {
+      if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+        lowpower(false);
+        INFO("[LowPower]: exit lowpower to ota");
+      }
+      SwitchState(MsscMachineState::MSSC_OTA);
+    } else {
+      SwitchState(MsscMachineState::MSSC_ACTIVE);
+    }
+    response->success = true;
+  }
   void SwitchState(MsscMachineState mm)
   {
     std::lock_guard<std::mutex> lck(switch_mtx);
@@ -228,6 +256,16 @@ private:
           state_swith_status_pub_->publish(sss);
           lowpower_handler();
           lowpower(true);
+        }
+        break;
+      case MsscMachineState::MSSC_OTA:
+        {
+          INFO("^^^ switch state:ota ^^^");
+          protocol::msg::StateSwitchStatus sss;
+          sss.code = 0;
+          sss.state = 3;
+          state_swith_status_pub_->publish(sss);
+          ota_handler();
         }
         break;
       case MsscMachineState::MSSC_SHUTDOWN:
@@ -294,6 +332,7 @@ private:
   rclcpp::CallbackGroup::SharedPtr mssc_callback_group_;
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr state_set_sub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr state_valget_srv_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr switch_ota_state_srv_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr power_off_client_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr low_power_client_;
   rclcpp::Publisher<protocol::msg::StateSwitchStatus>::SharedPtr state_swith_status_pub_;
@@ -302,6 +341,7 @@ private:
   BSSC_CALLBACK active_handler {[](void) {}};
   BSSC_CALLBACK protect_handler {[](void) {}};
   BSSC_CALLBACK lowpower_handler {[](void) {}};
+  BSSC_CALLBACK ota_handler {[](void) {}};
   BSSC_CALLBACK shutdown_handler {[](void) {}};
   uint8_t battery_charge_val {100};
   const std::map<MsscMachineState, std::string> mssc_machine_state_code_map = {
