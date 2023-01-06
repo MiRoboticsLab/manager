@@ -84,6 +84,7 @@ private:
   void RollOverDB();
   std::string GetTime();
   std::string filename_ = "/opt/ros2/cyberdog/share/params/toml_config/manager";
+  std::string item = "cyberdog";
 
 public:
   // new function
@@ -95,6 +96,10 @@ public:
   bool ModifyUser(const std::string & name, int status, int newStatus);
   bool HasUser(const std::string & name);
   bool DataBaseExit(const std::string DB_path);
+
+  bool ModifyUnlockStatus(const std::string & details, int status);
+  bool readUnlockStatus(int * result);
+  bool CreateUnlockStatusDB();
 };  // class BlackBox
 }  // namespace manager
 }  // namespace cyberdog

@@ -41,11 +41,16 @@ void cyberdog::manager::BlackBox::RollOverDB()
 {
   while (rclcpp::ok()) {
     rclcpp::Rate(1).sleep();
-    if (!boost::filesystem::exists(DB_URL_)) {continue;}
-    if (boost::filesystem::file_size(DB_URL_) < db_size_threshold_ * 1024 * 1024) {continue;}
+    if (!boost::filesystem::exists(DB_URL_)) {
+      continue;
+    }
+    if (boost::filesystem::file_size(DB_URL_) < db_size_threshold_ * 1024 * 1024) {
+      continue;
+    }
 
     std::stringstream cmd;
-    cmd << "tar -cvf " << DB_URL_ << "-" << GetTime() << ".tgz" << " " << DB_URL_;
+    cmd << "tar -cvf " << DB_URL_ << "-" << GetTime() << ".tgz" <<
+      " " << DB_URL_;
     std::stringstream query;
     for (auto table : tables_) {
       query << " DELETE FROM " << table.second.name << ";";
@@ -56,7 +61,9 @@ void cyberdog::manager::BlackBox::RollOverDB()
     if (ppDb_) {
       int rc = SQLITE_OK;
       rc = sqlite3_exec(ppDb_, query.str().c_str(), 0, 0, 0);
-      if (rc != SQLITE_OK) {ERROR("Failed to clear %s", DB_URL_.c_str());}
+      if (rc != SQLITE_OK) {
+        ERROR("Failed to clear %s", DB_URL_.c_str());
+      }
     }
   }
 }
@@ -190,8 +197,7 @@ bool cyberdog::manager::BlackBox::InsertTouchStatus(
   std::string fields = fields_tmp.str();
   fields.erase(fields.size() - 1);
   query << "INSERT INTO " << tables_[topic_name].name << "(" << fields << ")VALUES(" <<
-    msg.timestamp << "," <<
-    msg.touch_state << ");";
+    msg.timestamp << "," << msg.touch_state << ");";
   if (!ppDb_) {
     return false;
   }
@@ -510,5 +516,106 @@ bool cyberdog::manager::BlackBox::DataBaseExit(const std::string DB_path)
   } else {
     INFO("[black_box]:the %s not exit", DB_path.c_str());
     return false;
+  }
+}
+bool cyberdog::manager::BlackBox::ModifyUnlockStatus(const std::string & details, int status)
+{
+  std::string filename = filename_ + "/UnlockStatus.db";
+  sqlite3 * db;
+  std::string query_update;
+  std::string details_ = "REBOOTSTATUS";
+  char * zErrMsg = 0;
+  if (std::strcmp(details_.c_str(), details.c_str()) == 0) {
+    query_update = std::string("UPDATE UnlockStatus SET REBOOTSTATUS = ") + std::to_string(status) +
+      std::string(" WHERE NAME =") + "\'" + item + "\'";
+  } else {
+    query_update = std::string("UPDATE UnlockStatus SET UPSENDSTATUS = ") + std::to_string(status) +
+      std::string(" WHERE NAME =") + "\'" + item + "\'";
+  }
+  INFO("[black_box]: %s", query_update.c_str());
+  int rc = sqlite3_open(filename.c_str(), &db);
+  INFO("[black_box]: modify return Code is :%d ", rc);
+  int rc_ = sqlite3_exec(db, query_update.c_str(), 0, 0, &zErrMsg);
+  INFO("[black_box]: modify exec return Code is :%d ", rc_);
+  sqlite3_close(db);
+  return true;
+}
+bool cyberdog::manager::BlackBox::readUnlockStatus(int * result)
+{
+  INFO("enter readUnlockStatus");
+  sqlite3 * db;
+  std::string sql;
+  char ** dbResult;
+  int nRow;
+  int nColumn;
+  cyberdog::manager::MemberInformaion memberInformation_;
+  std::string filename = filename_ + "/UnlockStatus.db";
+  if (!DataBaseExit(filename)) {
+    INFO("the unlock status record DB is not exit!!!");
+    return false;
+  } else {
+    int rc = sqlite3_open(filename.c_str(), &db);
+    if (rc) {
+      INFO("[black_box:] %s", sqlite3_errmsg(db));
+      return false;
+    }
+    sql = std::string("SELECT * FROM UnlockStatus") + std::string(" WHERE NAME =") + "\'" + item +
+      "\'";
+    rc = sqlite3_get_table(db, sql.c_str(), &dbResult, &nRow, &nColumn, 0);
+    if (rc == SQLITE_OK & nRow > 0) {
+      result[0] = std::atoi(dbResult[nColumn + 1]);
+      result[1] = std::atoi(dbResult[nColumn + 2]);
+      sqlite3_free_table(dbResult);
+      sqlite3_close(db);
+      INFO(
+        "[black_box]: UnlockStatus :REBOOTSTATUS:%d,UPSENDSTATUS:%d", result[0], result[1]);
+      return true;
+    } else {
+      INFO("[black_box]: UnlockStatus read failed");
+      return false;
+    }
+  }
+}
+bool cyberdog::manager::BlackBox::CreateUnlockStatusDB()
+{
+  std::string filename = filename_ + "/UnlockStatus.db";
+  sqlite3 * db;
+  char * sql;
+  char * zErrMsg = 0;
+  INFO("[black_box]: enter createUnlockStatusDB");
+  if (!DataBaseExit(filename)) {
+    int rc = sqlite3_open(filename.c_str(), &db);
+    INFO("[black_box]: create UnlockStatus sqlite_open = %d", rc);
+    INFO("%s", filename.c_str());
+    if (rc != SQLITE_OK) {
+      INFO("[black_box]: open database error");
+      return false;
+    }
+    sql = "CREATE TABLE UnlockStatus("
+      "NAME           TEXT PRIMARY KEY    NOT NULL,"
+      "REBOOTSTATUS          INT     NOT NULL,"
+      "UPSENDSTATUS          INT     NOT NULL );";
+    int hc = sqlite3_exec(db, sql, 0, 0, &zErrMsg);
+    INFO("[black_box]: test open UnlockStatus database ERROR CODE:%d", hc);
+    if (hc == SQLITE_OK) {
+      INFO("create unlock DB, insert information");
+      std::string sql_;
+      sql_ = std::string("INSERT INTO UnlockStatus (NAME,REBOOTSTATUS,UPSENDSTATUS) ") +
+        std::string("VALUES (") + "\'" + item + "\'" + ", 0, 0 ); ";
+
+      INFO("write sql is :%s", sql_.c_str());
+      int rc = sqlite3_exec(db, sql_.c_str(), 0, 0, &zErrMsg);
+      INFO("writer sqlite3_exec ERROR CODE: %d", rc);
+      sqlite3_close(db);
+      return true;
+    } else {
+      INFO("[black_box]: add user UnlockStatus failed!!!");
+      return false;
+    }
+  } else {
+    INFO("[black_box]:  the UnlockStatus.db exists");
+    ModifyUnlockStatus("REBOOTSTATUS", 0);
+    ModifyUnlockStatus("UPSENDSTATUS", 0);
+    return true;
   }
 }
