@@ -31,7 +31,6 @@
 #include "protocol/srv/motion_result_cmd.hpp"
 #include "protocol/msg/motion_status.hpp"
 #include "protocol/srv/unlock.hpp"
-#include "protocol/srv/unlock_status.hpp"
 #include "low_power_consumption/low_power_consumption.hpp"
 #include "protocol/srv/bes_http.hpp"
 #include "cyberdog_common/cyberdog_json.hpp"
@@ -103,7 +102,6 @@ private:
           flag = false;
           modify_flag = false;
           break;
-          // return;
         }
       }
       int unlockStatus_ = GetUnlockStatus();
