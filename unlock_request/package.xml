@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>unlock_request</name>
+  <version>0.0.0</version>
+  <description>TODO: Package description</description>
+  <maintainer email="dingsong1@xiaomi.com">dingsong</maintainer>
+  <license>TODO: License declaration</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <depend>rclcpp</depend>
+  <depend>rapidjson</depend>
+  <depend>cyberdog_common</depend>
+  <depend>protocol</depend>
+  <depend>std_srvs</depend>
+  <depend>cpp_httplib</depend>
+  <depend>motion_utils</depend>
+  <depend>low_power_consumption</depend>
+  <depend>bes_transmit</depend>
+  <depend>black_box</depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
