@@ -19,6 +19,7 @@
 #include "std_msgs/msg/bool.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 #include "protocol/msg/self_check_status.hpp"
+#include "protocol/msg/state_switch_status.hpp"
 
 namespace cyberdog
 {
@@ -45,6 +46,9 @@ public:
       rclcpp::SystemDefaultsQoS(),
       options
     );
+    state_swith_status_pub_ =
+      ready_notify_node_->create_publisher<protocol::msg::StateSwitchStatus>(
+      "state_switch_status", rclcpp::SystemDefaultsQoS(), options);
     std::thread(
       [this]() {
         rclcpp::spin(ready_notify_node_);
@@ -69,27 +73,42 @@ public:
     }
   }
 
-  void SelfCheck(bool is_ok)
+  void SelfCheck(int32_t state)
   {
-    is_ok_ = is_ok;
+    selfcheck_state_ = state;
     if (!notify_selfcheck_thread.joinable()) {
       notify_selfcheck_thread = std::thread(
         [this]() {
+          static int32_t scs = -1;
           while (!exit_ && rclcpp::ok()) {
             protocol::msg::SelfCheckStatus msg;
-            if (is_ok_) {
+            if (selfcheck_state_ == 0) {
               msg.code = 0;
               msg.description = "ok";
-            } else {
-              msg.code = -1;
+            } else if (selfcheck_state_ == 1) {
+              msg.code = 1;
+              msg.description = "checking";
+            } else if (selfcheck_state_ == 2) {
+              msg.code = 2;
               msg.description = "failed";
             }
             self_check_status_pub_->publish(msg);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            --count_;
+            INFO_EXPRESSION(
+              (selfcheck_state_ != scs), "self check status:%s",
+              msg.description.c_str());
+            scs = selfcheck_state_;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
           }
         });
     }
+  }
+
+  void MachineState(int32_t state)
+  {
+    protocol::msg::StateSwitchStatus sss;
+    sss.code = 0;
+    sss.state = state;
+    state_swith_status_pub_->publish(sss);
   }
 
   ~ReadyNotifyNode()
@@ -103,12 +122,13 @@ public:
 private:
   bool exit_ {false};
   bool ready_ {false};
-  bool is_ok_ {false};
+  int32_t selfcheck_state_ {-1};
   std::string name_;
   rclcpp::Node::SharedPtr ready_notify_node_ {nullptr};
   rclcpp::CallbackGroup::SharedPtr ready_notify_callback_group_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr ready_notify_pub_;
   rclcpp::Publisher<protocol::msg::SelfCheckStatus>::SharedPtr self_check_status_pub_;
+  rclcpp::Publisher<protocol::msg::StateSwitchStatus>::SharedPtr state_swith_status_pub_;
   std::thread notify_message_thread;
   std::thread notify_selfcheck_thread;
   int count_;
