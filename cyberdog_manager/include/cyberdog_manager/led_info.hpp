@@ -29,6 +29,7 @@ namespace manager
 {
 struct LedMode
 {
+  bool occupation;
   std::string client;
   uint8_t target;
   uint8_t mode;
@@ -76,52 +77,35 @@ public:
 private:
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
   {
+    battery_soc_ = msg->batt_soc;
     static bool is_set_led_zero = false;
     static bool is_set_led_five = false;
-    static bool is_set_led_thirty = false;
-    static bool is_set_led_thirty_more = false;
+    static bool is_set_led_twenty = false;
 
-    // 退出低功耗模式后更新灯效
-    if (is_refresh_led_) {
-      is_refresh_led_ = false;
-      is_set_led_thirty = false;
-      is_set_led_thirty_more = false;
-    }
-    if (msg->batt_soc <= 0 && !is_set_led_zero) {
+    if (!is_set_led_zero && battery_soc_ <= 0) {
       if (!msg->power_wired_charging) {
         is_set_led_zero = true;
-        LedMode poweroff_head{"bms", 1, 0x02, 0x03, 0xFF, 0x32, 0x32};
-        LedMode poweroff_tail{"bms", 2, 0x02, 0x03, 0xFF, 0x32, 0x32};
-        LedMode poweroff_mini{"bms", 3, 0x02, 0x31, 0xFF, 0x32, 0x32};
+        LedMode poweroff_head{true, "bms", 1, 0x01, 0xA3, 0x00, 0x00, 0x00};
+        LedMode poweroff_tail{true, "bms", 2, 0x01, 0xA3, 0x00, 0x00, 0x00};
+        LedMode poweroff_mini{true, "bms", 3, 0x01, 0x31, 0xFF, 0x32, 0x32};
         bool result = ReqLedService(poweroff_head, poweroff_tail, poweroff_mini);
         INFO("%s set led when the soc is 0", result ? "successed" : "failed");
       }
-    } else if (!is_set_led_five && msg->batt_soc < 5) {
+    } else if (!is_set_led_five && battery_soc_ < 5) {
       if (!msg->power_wired_charging) {
         is_low_power_ = true;
         is_set_led_five = true;
-        is_set_led_thirty = false;
-        LedMode low_power_tail{"bms", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
+        is_set_led_twenty = false;
+        LedMode low_power_tail{true, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
         bool result = ReqLedService(low_power_tail);
         INFO("[LowPower]: %s set led when the soc is less than 5", result ? "successed" : "failed");
       }
-    } else if (!is_set_led_thirty && msg->batt_soc >= 5 && msg->batt_soc <= 20) {
+    } else if (!is_set_led_twenty && battery_soc_ >= 5 && battery_soc_ <= 20) {
       is_set_led_five = false;
-      is_set_led_thirty = true;
-      is_set_led_thirty_more = false;
-      LedMode bringup_head{"bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
-      LedMode bringup_tail{"bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
-      LedMode bringup_mini{"bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
-      bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
-      INFO("%s set led when the soc is less than 30", result ? "successed" : "failed");
-
-    } else if (!is_set_led_thirty_more && msg->batt_soc > 20) {
-      is_set_led_five = false;
-      is_set_led_thirty = false;
-      is_set_led_thirty_more = true;
-      LedMode bringup_head{"bms", 1, 0x02, 0x09, 0x06, 0x21, 0xE2};
-      LedMode bringup_tail{"bms", 2, 0x02, 0x09, 0x06, 0x21, 0xE2};
-      LedMode bringup_mini{"bms", 3, 0x02, 0x30, 0x06, 0x21, 0xE2};
+      is_set_led_twenty = true;
+      LedMode bringup_head{true, "bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
+      LedMode bringup_tail{true, "bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
+      LedMode bringup_mini{true, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
       bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
       INFO("%s set led when the soc more than 30", result ? "successed" : "failed");
     }
@@ -139,7 +123,7 @@ private:
       ++lay_count;
       if (lay_count == 300) {
         INFO("[LowPower]: start to trun off tail led when dog lies down for 30s");
-        LedMode low_power_tail{"bms", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
+        LedMode low_power_tail{true, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
         bool result = ReqLedService(low_power_tail);
         INFO(
           "[LowPower]: %s trun off tail led when enter low power ",
@@ -164,16 +148,24 @@ private:
   void WakeUp(const std_msgs::msg::Bool msg)
   {
     (void)msg;
+    // 刷新灯效
     if (is_low_power_) {
-      // 刷新灯效
+      if (battery_soc_ < 5) {
+        INFO("[LowPower]:turn on tail led rejected, batter soc less than 5");
+        return;
+      }
+
+      LedMode low_power_tail{false, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
+      bool result = ReqLedService(low_power_tail);
+      INFO("[LowPower]: %s turn on tail led when wakeup", result ? "successed" : "failed");
       is_low_power_ = false;
-      is_refresh_led_ = true;
     }
   }
 
 private:
   void ReqAssignment(std::shared_ptr<protocol::srv::LedExecute::Request> req, LedMode & data)
   {
+    req->occupation = data.occupation;
     req->client = data.client;
     req->target = data.target;
     req->mode = data.mode;
@@ -261,8 +253,8 @@ private:
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
   rclcpp::Client<protocol::srv::LedExecute>::SharedPtr led_excute_client_ {nullptr};
+  uint8_t battery_soc_ {100};
   bool is_low_power_ {false};
-  bool is_refresh_led_ {false};
 
   // SHINE_CALLBACK light_shine_handler {[](uint8_t) {}};
 };
