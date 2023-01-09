@@ -109,6 +109,11 @@ public:
   }
   void AudioWakeUp()
   {
+    if (is_switching_ms_) {
+      INFO("[LowPower]: wakeup rejected, now switching machine state");
+      return;
+    }
+
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
     } else if (battery_charge_val < 5) {
@@ -235,6 +240,7 @@ private:
   {
     std::lock_guard<std::mutex> lck(switch_mtx);
     mssc_machine_state = mm;
+    is_switching_ms_ = true;
     switch (mssc_machine_state) {
       case MsscMachineState::MSSC_ACTIVE:
         {
@@ -295,6 +301,7 @@ private:
         }
         break;
     }
+    is_switching_ms_ = false;
   }
 
   void poweroff()
@@ -360,6 +367,7 @@ private:
     {MsscMachineState::MSSC_SHUTDOWN, "shutdown"},
     {MsscMachineState::MSSC_UNKOWN, "unkown"}
   };
+  bool is_switching_ms_ {false};
 };
 }  // namespace manager
 }  // namespace cyberdog
