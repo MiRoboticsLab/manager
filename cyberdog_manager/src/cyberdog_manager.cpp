@@ -87,6 +87,7 @@ void cyberdog::manager::CyberdogManager::Config()
 
 bool cyberdog::manager::CyberdogManager::Init()
 {
+  ready_node_ptr->SelfCheck(1);
   error_context_ptr_->Init();
   if (!machine_state_ptr_->Init()) {
     ERROR(">>>XXXXX---machine state init error!");
@@ -100,7 +101,7 @@ bool cyberdog::manager::CyberdogManager::Init()
     // if (false) {
     ERROR(">>>XXXXX---machine state self check error!");
     audio_node_ptr->Error("自检失败!自检失败!自检失败!");
-    ready_node_ptr->SelfCheck(false);
+    ready_node_ptr->SelfCheck(2);
     return false;
   } else {
     heart_beat_ptr_->Init();
@@ -188,11 +189,13 @@ void cyberdog::manager::CyberdogManager::OnActive()
     INFO("!!! All node in detectedc machine state is acitve ok !!!");
     audio_node_ptr->Init();
     ready_node_ptr->Ready(true);
-    ready_node_ptr->SelfCheck(true);
+    ready_node_ptr->MachineState(0);
+    ready_node_ptr->SelfCheck(0);
   } else {
     audio_node_ptr->Error("自检失败!自检失败!自检失败!");
     ready_node_ptr->Ready(false);
-    ready_node_ptr->SelfCheck(false);
+    ready_node_ptr->MachineState(-2);
+    ready_node_ptr->SelfCheck(2);
   }
   // bcin_node_ptr->SetBms(BatteryMachineState::BMS_NORMAL);
 }
