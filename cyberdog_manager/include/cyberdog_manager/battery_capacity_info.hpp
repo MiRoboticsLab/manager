@@ -123,7 +123,7 @@ private:
         is_protected = true;
         // protect_handler();
         INFO(
-          "Battery Capacity Info capacity:%d, %s protect mode.",
+          "Battery Capacity Info capacity:%d, %s lowpower mode.",
           bms_status_.batt_soc,
           (is_protected ? "enter" : "exit"));
         protocol::msg::AudioPlayExtend msg;

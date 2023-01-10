@@ -81,6 +81,7 @@ private:
     static bool is_set_led_zero = false;
     static bool is_set_led_five = false;
     static bool is_set_led_twenty = false;
+    static bool is_set_led_more_twenty = false;
 
     if (!is_set_led_zero && battery_soc_ <= 0) {
       if (!msg->power_wired_charging) {
@@ -93,7 +94,7 @@ private:
       }
     } else if (!is_set_led_five && battery_soc_ < 5) {
       if (!msg->power_wired_charging) {
-        is_low_power_ = true;
+        is_lowpower_ = true;
         is_set_led_five = true;
         is_set_led_twenty = false;
         LedMode low_power_tail{true, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
@@ -103,45 +104,72 @@ private:
     } else if (!is_set_led_twenty && battery_soc_ >= 5 && battery_soc_ <= 20) {
       is_set_led_five = false;
       is_set_led_twenty = true;
+      is_set_led_more_twenty = false;
       LedMode bringup_head{true, "bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
       LedMode bringup_tail{true, "bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
       LedMode bringup_mini{true, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
       bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
       INFO("%s set led when the soc more than 30", result ? "successed" : "failed");
+    } else if (!is_set_led_more_twenty && battery_soc_ > 20) {
+      is_set_led_twenty = false;
+      is_set_led_more_twenty = true;
+      LedMode bringup_head{false, "bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
+      LedMode bringup_tail{false, "bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
+      LedMode bringup_mini{false, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
     }
   }
 
   void Motion_status(const protocol::msg::MotionStatus::SharedPtr msg)
   {
-    // motion_id: 趴下(101)、站立(111)
-    // static bool is_low_power {false};
-    static bool is_convert_motion_status {false};
-    static int lay_count {0};
+    int motion_id = msg->motion_id;
+    static int lay_count = 0;
+    static int times = 0;
 
-    // 运动状态转换至趴下，30s后启动低功耗, 关闭尾灯
-    if (is_convert_motion_status == true && msg->motion_id == 101) {
-      ++lay_count;
-      if (lay_count == 300) {
-        INFO("[LowPower]: start to trun off tail led when dog lies down for 30s");
-        LedMode low_power_tail{true, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
-        bool result = ReqLedService(low_power_tail);
-        INFO(
-          "[LowPower]: %s trun off tail led when enter low power ",
-          result ? "successed" : "failed");
-        is_convert_motion_status = false;
+    if (!is_lowpower_) {
+      if (motion_id == 0) {
+        ++lay_count;
+        // 进入低功耗后切换状态机会让motion_id变为101,因此提前0.3s关灯。
+        if (lay_count == 1197) {
+          INFO("[LowPower]: start to trun off tail led when dog lies down for 2min");
+          LedMode low_power_tail{true, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
+          bool result = ReqLedService(low_power_tail);
+          INFO(
+            "[LowPower]: %s trun off tail led when enter low power ",
+            result ? "successed" : "failed");
+          ++times;
+          is_lowpower_ = true;
+        }
+      } else if (motion_id == 101) {
+        ++lay_count;
+        if (times == 0) {
+          if (lay_count == 300) {
+            INFO("[LowPower]: start to trun off tail led when dog lies down for 30s");
+            LedMode low_power_tail{true, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
+            bool result = ReqLedService(low_power_tail);
+            INFO(
+              "[LowPower]: %s trun off tail led when enter low power ",
+              result ? "successed" : "failed");
+            ++times;
+            is_lowpower_ = true;
+          }
+        } else {
+          // 低功耗的退出耗时5~8s，因此为同步两者的时间暂定led多计时6s
+          if (lay_count == 1260) {
+            INFO("[LowPower]: start to trun off tail led when dog lies down for 2min");
+            LedMode low_power_tail{true, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
+            bool result = ReqLedService(low_power_tail);
+            INFO(
+              "[LowPower]: %s trun off tail led when enter low power ",
+              result ? "successed" : "failed");
+            is_lowpower_ = true;
+          }
+        }
+      } else {
+        times = 0;
         lay_count = 0;
-        is_low_power_ = true;
       }
     } else {
       lay_count = 0;
-    }
-
-    // 状态切换到站立
-    if (is_convert_motion_status == false && msg->motion_id == 111) {
-      is_convert_motion_status = true;
-      if (is_low_power_) {
-        is_low_power_ = false;
-      }
     }
   }
 
@@ -149,7 +177,7 @@ private:
   {
     (void)msg;
     // 刷新灯效
-    if (is_low_power_) {
+    if (is_lowpower_) {
       if (battery_soc_ < 5) {
         INFO("[LowPower]:turn on tail led rejected, batter soc less than 5");
         return;
@@ -158,7 +186,7 @@ private:
       LedMode low_power_tail{false, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
       bool result = ReqLedService(low_power_tail);
       INFO("[LowPower]: %s turn on tail led when wakeup", result ? "successed" : "failed");
-      is_low_power_ = false;
+      is_lowpower_ = false;
     }
   }
 
@@ -254,7 +282,7 @@ private:
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
   rclcpp::Client<protocol::srv::LedExecute>::SharedPtr led_excute_client_ {nullptr};
   uint8_t battery_soc_ {100};
-  bool is_low_power_ {false};
+  bool is_lowpower_ {false};
 
   // SHINE_CALLBACK light_shine_handler {[](uint8_t) {}};
 };

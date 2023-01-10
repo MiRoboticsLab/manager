@@ -67,10 +67,9 @@ public:
     options.callback_group = power_consumption_callback_group_;
     motion_status_sub_ = power_consumption_info_node_->
       create_subscription<protocol::msg::MotionStatus>(
-      "motion_status", 10, std::bind(
+      "motion_status", rclcpp::SystemDefaultsQoS(), std::bind(
         &PowerConsumptionInfoNode::sub_mostion_status_callback,
-        this, std::placeholders::_1),
-      options);
+        this, std::placeholders::_1), options);
   }
 
 public:
@@ -117,9 +116,11 @@ private:
     int code = -1;
     if (request->data) {
       code = lpc_ptr_->LpcRelease(pd, &err);
+      is_lowpower_ = true;
       ++r_count;
     } else {
       code = lpc_ptr_->LpcRequest(pd, &err);
+      is_lowpower_ = false;
       ++r_count;
     }
     response->success = (code == 0 ? true : false);
@@ -128,46 +129,41 @@ private:
       (request->data ? "true" : "false"));
   }
 
-  void sub_mostion_status_callback(const protocol::msg::MotionStatus msg)
+  void sub_mostion_status_callback(const protocol::msg::MotionStatus::SharedPtr msg)
   {
     // motion_id: 趴下(101)、站立(111)
-    static bool convert_motion_flage = false;
+    int motion_id = msg->motion_id;
     static int lay_count = 0;
-    // PM_DEV pd = PM_ALL_NO_TOF;
-    // unsigned int err;
-    // int code = -1;
+    static int times = 0;
 
-    // 运动状态转换至趴下，30s后启动低功耗
-    if (convert_motion_flage == true && msg.motion_id == 101) {
-      // motion_status的发布频率为10Hz，延时30s，lay_count == 300
-      ++lay_count;
-      if (lay_count == 300) {
-        INFO("[LowPower]: call low power consumption when the dog lies down for 30s");
-        // release_handler();
-        // code = lpc_ptr_->LpcRelease(pd, &err);
-        // if(code == 0)
-        // {
-        //   INFO("low power consumption enter success.");
-        // }
-        enter_lowpower_handler();
-        convert_motion_flage = false;
+    if (!is_lowpower_) {
+      if (motion_id == 0) {
+        ++lay_count;
+        if (lay_count == 1200) {
+          INFO("[LowPower]: enter lowpower, start up time is greater than 2min");
+          enter_lowpower_handler();
+          ++times;
+        }
+      } else if (motion_id == 101) {
+        ++lay_count;
+        if (times == 0) {
+          if (lay_count == 300) {
+            INFO("[LowPower]: call low power consumption when the dog lies down for 30s");
+            enter_lowpower_handler();
+            ++times;
+          }
+        } else {
+          if (lay_count == 1200) {
+            INFO("[LowPower]: call low power consumption when the dog lies down for 2min");
+            enter_lowpower_handler();
+          }
+        }
+      } else {
+        times = 0;
         lay_count = 0;
       }
     } else {
       lay_count = 0;
-    }
-
-    // 状态切换到站立，启动正常功耗
-    if (convert_motion_flage == false && msg.motion_id == 111) {
-      // INFO("call nomal power consumption");
-      // code = lpc_ptr_->LpcRelease(pd, &err);
-      // if(code == 0)
-      // {
-      //   request_handler();
-      //   INFO("nomal power consumption enter success.");
-      // }
-      // request_handler();
-      convert_motion_flage = true;
     }
   }
 
@@ -198,6 +194,7 @@ private:
   PCIN_CALLBACK release_handler;
   PowerMachineState pms {PowerMachineState::PMS_UNKOWN};
   PCIN_CALLBACK enter_lowpower_handler;
+  bool is_lowpower_ {false};
 };
 }  // namespace manager
 }  // namespace cyberdog
