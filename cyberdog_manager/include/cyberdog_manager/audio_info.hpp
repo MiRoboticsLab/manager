@@ -71,7 +71,8 @@ public:
       }
       AudioMsg text_msg;
       text_msg.module_name = audio_info_node_->get_name();
-      text_msg.is_online = true;
+      text_msg.is_online = false;
+      text_msg.speech.play_id = protocol::msg::AudioPlay::PID_SELF_CHECK_SUCCESS;
       text_msg.text = "自检完成,状态就绪!";
       audio_play_pub_->publish(text_msg);
       rclcpp::SubscriptionOptions sub_options;
@@ -89,7 +90,8 @@ public:
   {
     AudioMsg text_msg;
     text_msg.module_name = audio_info_node_->get_name();
-    text_msg.is_online = true;
+    text_msg.is_online = false;
+    text_msg.speech.play_id = protocol::msg::AudioPlay::PID_SELF_CHECK_FAILED;
     text_msg.text = error_text;
     audio_play_pub_->publish(text_msg);
   }
