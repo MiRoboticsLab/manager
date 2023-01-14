@@ -34,6 +34,7 @@
 #include "protocol/msg/motion_status.hpp"
 #include "protocol/srv/uid_sn.hpp"
 #include "protocol/srv/audio_nick_name.hpp"
+#include "protocol/srv/trigger.hpp"
 
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
@@ -86,7 +87,7 @@ public:
       "motor_temp",
       rmw_qos_profile_services_default, qdev_callback_group_);
     audio_active_state_client_ =
-      query_node_ptr_->create_client<std_srvs::srv::Trigger>(
+      query_node_ptr_->create_client<protocol::srv::Trigger>(
       "audio_active_state",
       rmw_qos_profile_services_default, qdev_callback_group_);
   }
@@ -135,7 +136,7 @@ public:
     return wifi_info_ptr_;
   }
 
-  const std::string QueryDeviceInfo(std::vector<bool> & enables)
+  const std::string QueryDeviceInfo(std::vector<bool> & enables, std::string app_uid = "")
   {
     Document json_info(kObjectType);
     std::string info;
@@ -448,7 +449,8 @@ public:
           CyberdogJson::Add(json_info, "audio_state", false);
         } else {
           std::chrono::seconds timeout(3);
-          auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
+          auto req = std::make_shared<protocol::srv::Trigger::Request>();
+          req->data = app_uid;
           auto future_result = audio_active_state_client_->async_send_request(req);
           std::future_status status = future_result.wait_for(timeout);
           if (status == std::future_status::ready) {
@@ -505,7 +507,7 @@ private:
   rclcpp::Client<protocol::srv::AudioExecute>::SharedPtr audio_execute_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_action_get_client_;
   rclcpp::Client<protocol::srv::MotorTemp>::SharedPtr motor_temper_client_;
-  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_active_state_client_;
+  rclcpp::Client<protocol::srv::Trigger>::SharedPtr audio_active_state_client_;
 };
 
 class QueryInfoNode final
@@ -637,7 +639,7 @@ public:
           req->enables[11] = is_device_model;
           req->enables[12] = is_stand_up;
           std_msgs::msg::String msg;
-          msg.data = query_node_ptr_->QueryDeviceInfo(req->enables);
+          msg.data = query_node_ptr_->QueryDeviceInfo(req->enables, req->uid);
           back_to_end_pub_->publish(msg);
           INFO("[stop:back to end upload device info-------------------]");
         }
