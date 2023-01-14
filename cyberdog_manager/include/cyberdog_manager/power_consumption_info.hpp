@@ -20,6 +20,7 @@
 #include "std_srvs/srv/trigger.hpp"
 #include "protocol/msg/motion_status.hpp"
 #include "low_power_consumption/low_power_consumption.hpp"
+#include "protocol/msg/state_switch_status.hpp"
 
 namespace cyberdog
 {
@@ -69,6 +70,11 @@ public:
       create_subscription<protocol::msg::MotionStatus>(
       "motion_status", rclcpp::SystemDefaultsQoS(), std::bind(
         &PowerConsumptionInfoNode::sub_mostion_status_callback,
+        this, std::placeholders::_1), options);
+    state_swith_status_sub_ = power_consumption_info_node_->
+      create_subscription<protocol::msg::StateSwitchStatus>(
+      "state_switch_status", rclcpp::SystemDefaultsQoS(), std::bind(
+        &PowerConsumptionInfoNode::sub_state_switch_status_callback,
         this, std::placeholders::_1), options);
   }
 
@@ -131,6 +137,9 @@ private:
 
   void sub_mostion_status_callback(const protocol::msg::MotionStatus::SharedPtr msg)
   {
+    if (is_ota_) {
+      return;
+    }
     // motion_id: 趴下(101)、站立(111)
     int motion_id = msg->motion_id;
     static int lay_count = 0;
@@ -167,6 +176,15 @@ private:
     }
   }
 
+  void sub_state_switch_status_callback(const protocol::msg::StateSwitchStatus::SharedPtr msg)
+  {
+    if (msg->state = 3) {
+      is_ota_ = true;
+    } else {
+      is_ota_ = false;
+    }
+  }
+
   void ShutdownCallback(
     const std_srvs::srv::Trigger::Request::SharedPtr,
     std_srvs::srv::Trigger::Response::SharedPtr response)
@@ -190,11 +208,14 @@ private:
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr power_off_srv_ {nullptr};
   std::unique_ptr<cyberdog::manager::LowPowerConsumption> lpc_ptr_ {nullptr};
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
+  rclcpp::Subscription<protocol::msg::StateSwitchStatus>::SharedPtr \
+    state_swith_status_sub_ {nullptr};
   PCIN_CALLBACK request_handler;
   PCIN_CALLBACK release_handler;
   PowerMachineState pms {PowerMachineState::PMS_UNKOWN};
   PCIN_CALLBACK enter_lowpower_handler;
   bool is_lowpower_ {false};
+  bool is_ota_ {false};
 };
 }  // namespace manager
 }  // namespace cyberdog
