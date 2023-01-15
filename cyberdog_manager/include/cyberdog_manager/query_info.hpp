@@ -639,7 +639,7 @@ public:
           req->enables[11] = is_device_model;
           req->enables[12] = is_stand_up;
           std_msgs::msg::String msg;
-          msg.data = query_node_ptr_->QueryDeviceInfo(req->enables, req->uid);
+          msg.data = query_node_ptr_->QueryDeviceInfo(req->enables);
           back_to_end_pub_->publish(msg);
           INFO("[stop:back to end upload device info-------------------]");
         }
@@ -667,7 +667,7 @@ private:
       response->info = info;
       return;
     }
-    response->info = query_node_ptr_->QueryDeviceInfo(request->enables);
+    response->info = query_node_ptr_->QueryDeviceInfo(request->enables, request->uid);
   }
   void UidCallback(const std_msgs::msg::String::SharedPtr msg)
   {
