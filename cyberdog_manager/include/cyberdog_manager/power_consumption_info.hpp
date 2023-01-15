@@ -138,6 +138,7 @@ private:
   void sub_mostion_status_callback(const protocol::msg::MotionStatus::SharedPtr msg)
   {
     if (is_ota_) {
+      INFO_MILLSECONDS(3000, "[LowPower]: in ota state return.");
       return;
     }
     // motion_id: 趴下(101)、站立(111)
@@ -178,7 +179,7 @@ private:
 
   void sub_state_switch_status_callback(const protocol::msg::StateSwitchStatus::SharedPtr msg)
   {
-    if (msg->state = 3) {
+    if (msg->state == 3) {
       is_ota_ = true;
     } else {
       is_ota_ = false;
