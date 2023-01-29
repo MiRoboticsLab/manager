@@ -104,7 +104,7 @@ bool cyberdog::manager::CyberdogManager::Init()
     ready_node_ptr->SelfCheck(2);
     return false;
   } else {
-    heart_beat_ptr_->Init();
+    // heart_beat_ptr_->Init();
   }
 
   // heart_beat_ptr_->Init();
@@ -120,6 +120,8 @@ bool cyberdog::manager::CyberdogManager::Init()
   mssc_context_ptr_->Init();
 
   OnActive();
+
+  heart_beat_ptr_->Init();
 
   return true;
 }

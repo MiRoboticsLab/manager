@@ -91,6 +91,11 @@ public:
       std::bind(&HeartContext::HeartbeatsCallback, this, std::placeholders::_1),
       options);
     // start heartbeats check work
+    // std::chrono::seconds sec =
+    //   std::chrono::duration_cast<std::chrono::seconds>(
+    //     std::chrono::system_clock::now().time_since_epoch());
+    // INFO("heart beats run time:%ld", sec.count());
+    INFO("heart beats start running.");
     heart_beats_ptr_->HeartRun();
     set_state_func_((int8_t)system::ManagerState::kActive, "{}");
   }
@@ -102,6 +107,11 @@ private:
     for (auto & elem : heartbeats_map_) {
       Document node_document(kObjectType);
       CyberdogJson::Add(node_document, "alive", !elem.second.lost);
+      // std::chrono::milliseconds mill_sec =
+      //   std::chrono::duration_cast<std::chrono::milliseconds>(
+      //     std::chrono::system_clock::now().time_since_epoch());
+      // uint64_t mill_count = mill_sec.count();
+      // CyberdogJson::Add(node_document, "timepoint", mill_count);
       CyberdogJson::Add(json_document, elem.first, node_document);
     }
     std::string json_string("{}");
@@ -122,6 +132,11 @@ private:
     }
     has_error_ = has_error_ | lost;
     if (has_error_ && lost) {
+      // std::chrono::seconds sec =
+      //   std::chrono::duration_cast<std::chrono::seconds>(
+      //     std::chrono::system_clock::now().time_since_epoch());
+      // uint64_t sec_count = sec.count();
+      // ERROR("%s node lost, time point:%ld", iter->first.c_str(), sec_count);
       ERROR("%s node lost", iter->first.c_str());
     }
     iter->second.lost = lost;
