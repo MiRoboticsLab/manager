@@ -78,13 +78,14 @@ private:
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
   {
     battery_soc_ = msg->batt_soc;
+    bool power_wired_charging = msg->power_wired_charging;
     static bool is_set_led_zero = false;
     static bool is_set_led_five = false;
     static bool is_set_led_twenty = false;
     static bool is_set_led_more_twenty = false;
 
-    if (!is_set_led_zero && battery_soc_ <= 0) {
-      if (!msg->power_wired_charging) {
+    if (battery_soc_ <= 0) {
+      if (!power_wired_charging && !is_set_led_zero) {
         is_set_led_zero = true;
         LedMode poweroff_head{true, "bms", 1, 0x01, 0xA3, 0x00, 0x00, 0x00};
         LedMode poweroff_tail{true, "bms", 2, 0x01, 0xA3, 0x00, 0x00, 0x00};
@@ -92,8 +93,8 @@ private:
         bool result = ReqLedService(poweroff_head, poweroff_tail, poweroff_mini);
         INFO("%s set led when the soc is 0", result ? "successed" : "failed");
       }
-    } else if (!is_set_led_five && battery_soc_ < 5) {
-      if (!msg->power_wired_charging) {
+    } else if (battery_soc_ < 5) {
+      if (!power_wired_charging && !is_set_led_five) {
         is_lowpower_ = true;
         is_set_led_five = true;
         is_set_led_twenty = false;
@@ -101,21 +102,27 @@ private:
         bool result = ReqLedService(low_power_tail);
         INFO("[LowPower]: %s set led when the soc is less than 5", result ? "successed" : "failed");
       }
-    } else if (!is_set_led_twenty && battery_soc_ >= 5 && battery_soc_ <= 20) {
-      is_set_led_five = false;
-      is_set_led_twenty = true;
-      is_set_led_more_twenty = false;
-      LedMode bringup_head{true, "bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
-      LedMode bringup_tail{true, "bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
-      LedMode bringup_mini{true, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
-      bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
-      INFO("%s set led when the soc more than 30", result ? "successed" : "failed");
-    } else if (!is_set_led_more_twenty && battery_soc_ > 20) {
-      is_set_led_twenty = false;
-      is_set_led_more_twenty = true;
-      LedMode bringup_head{false, "bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
-      LedMode bringup_tail{false, "bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
-      LedMode bringup_mini{false, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
+    } else if (battery_soc_ <= 20) {
+      if (!is_set_led_twenty) {
+        is_set_led_five = false;
+        is_set_led_twenty = true;
+        is_set_led_more_twenty = false;
+        LedMode bringup_head{true, "bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
+        LedMode bringup_tail{true, "bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
+        LedMode bringup_mini{true, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
+        bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
+        INFO("%s set led when the soc less than 20", result ? "successed" : "failed");
+      }
+    } else {
+      if (!is_set_led_more_twenty) {
+        is_set_led_twenty = false;
+        is_set_led_more_twenty = true;
+        LedMode bringup_head{false, "bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
+        LedMode bringup_tail{false, "bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
+        LedMode bringup_mini{false, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
+        bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
+        INFO("%s release led when the soc more than 20", result ? "successed" : "failed");
+      }
     }
   }
 
