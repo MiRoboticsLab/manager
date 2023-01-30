@@ -63,6 +63,14 @@ public:
         std::placeholders::_1, std::placeholders::_2),
       rmw_qos_profile_services_default, power_consumption_callback_group_);
 
+    reboot_srv_ =
+      power_consumption_info_node_->create_service<std_srvs::srv::Trigger>(
+      "reboot",
+      std::bind(
+        &PowerConsumptionInfoNode::RebootCallback, this,
+        std::placeholders::_1, std::placeholders::_2),
+      rmw_qos_profile_services_default, power_consumption_callback_group_);
+
     // sub motion init
     rclcpp::SubscriptionOptions options;
     options.callback_group = power_consumption_callback_group_;
@@ -186,6 +194,22 @@ private:
     }
   }
 
+  void RebootCallback(
+    const std_srvs::srv::Trigger::Request::SharedPtr,
+    std_srvs::srv::Trigger::Response::SharedPtr response)
+  {
+    INFO("reboot......");
+    PM_SYS pd = PM_SYS_REBOOT;
+    int code = -1;
+    code = lpc_ptr_->LpcSysRequest(pd);
+    if (code != 0) {
+      INFO("reboot failed, function LpcRequest call faild");
+    } else {
+      INFO("reboot successfully");
+    }
+    response->success = (code == 0 ? true : false);
+  }
+
   void ShutdownCallback(
     const std_srvs::srv::Trigger::Request::SharedPtr,
     std_srvs::srv::Trigger::Response::SharedPtr response)
@@ -197,7 +221,7 @@ private:
     if (code != 0) {
       INFO("Shutdown failed, function LpcRequest call faild");
     } else {
-      INFO("Shut down successfully");
+      INFO("Shutdown successfully");
     }
     response->success = (code == 0 ? true : false);
   }
@@ -206,6 +230,7 @@ private:
   rclcpp::Node::SharedPtr power_consumption_info_node_ {nullptr};
   rclcpp::CallbackGroup::SharedPtr power_consumption_callback_group_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_consumption_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reboot_srv_ {nullptr};
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr power_off_srv_ {nullptr};
   std::unique_ptr<cyberdog::manager::LowPowerConsumption> lpc_ptr_ {nullptr};
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
