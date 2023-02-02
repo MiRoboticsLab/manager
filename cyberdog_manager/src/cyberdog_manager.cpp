@@ -92,6 +92,7 @@ bool cyberdog::manager::CyberdogManager::Init()
   if (!machine_state_ptr_->Init()) {
     ERROR(">>>XXXXX---machine state init error!");
   }
+  mssc_context_ptr_->SetStateHandler(machine_state_ptr_->GetAchieveStates());
   error_context_ptr_->ClearError();
   Config();
   if (!RegisterStateHandler(node_ptr_)) {
