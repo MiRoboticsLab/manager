@@ -16,6 +16,7 @@
 
 #include <string>
 #include <memory>
+#include <vector>
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "cyberdog_machine/cyberdog_fs_machine.hpp"
 
@@ -68,6 +69,11 @@ public:
       return false;
     }
     return true;
+  }
+
+  const std::vector<std::string> & GetAchieveStates()
+  {
+    return machine_controller_ptr_->GetNeedAchieveStates();
   }
 
 private:

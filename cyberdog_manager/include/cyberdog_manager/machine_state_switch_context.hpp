@@ -18,6 +18,7 @@
 #include <memory>
 #include <map>
 #include <mutex>
+#include <vector>
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/u_int8.hpp"
 #include "std_srvs/srv/trigger.hpp"
@@ -38,10 +39,22 @@ enum class MsscMachineState : uint8_t
   MSSC_SHUTDOWN  = 4,    // 关机
   MSSC_UNKOWN    = 255,  // 未知
 };
+enum class MachineStateChild : uint8_t
+{
+  MSC_SELFCHECK   = 0,
+  MSC_ACTIVE      = 1,
+  MSC_DEACTIVE    = 2,
+  MSC_PROTECTED   = 3,
+  MSC_LOWPOWER    = 4,
+  MSC_OTA         = 5,
+  MSC_TEARDOWN    = 6,
+  MSC_ERROR       = 7,
+};
 
 class MachineStateSwitchContext final
 {
   using BSSC_CALLBACK = std::function<void ()>;
+  using MACHINE_STATE_CALLBACK = std::function<void ()>;
 
 public:
   explicit MachineStateSwitchContext(rclcpp::Node::SharedPtr node_ptr)
@@ -107,69 +120,84 @@ public:
   {
     shutdown_handler = callback;
   }
+  void SetStateHandler(const std::vector<std::string> & state_vec)
+  {
+    for (auto & elem : state_vec) {
+      if (elem == "SelfCheck") {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_SELFCHECK] =
+          std::bind(&MachineStateSwitchContext::OnSelfCheck, this);
+      } else if (elem == "TearDown") {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_TEARDOWN] =
+          std::bind(&MachineStateSwitchContext::OnTearDown, this);
+      } else if (elem == "Active") {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_ACTIVE] =
+          std::bind(&MachineStateSwitchContext::OnActive, this);
+      } else if (elem == "DeActive") {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_DEACTIVE] =
+          std::bind(&MachineStateSwitchContext::OnDeactive, this);
+      } else if (elem == "Protected") {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_PROTECTED] =
+          std::bind(&MachineStateSwitchContext::OnProtected, this);
+      } else if (elem == "LowPower") {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_LOWPOWER] =
+          std::bind(&MachineStateSwitchContext::OnLowPower, this);
+      } else if (elem == "OTA") {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_OTA] =
+          std::bind(&MachineStateSwitchContext::OnOta, this);
+      } else if (elem == "Error") {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_ERROR] =
+          std::bind(&MachineStateSwitchContext::OnError, this);
+      }
+    }
+  }
   void AudioWakeUp()
   {
     if (is_switching_ms_) {
-      INFO("[LowPower]: wakeup rejected, now switching machine state");
+      INFO("[MachineState-Switch]: wakeup, now in switching machine state");
       return;
     }
-
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
     } else if (battery_charge_val < 5) {
-      if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
-        return;
-      } else {
-        ERROR(
-          "[LowPower]: switch state error1:wake up, battery charge val:%d, current state:%d",
-          battery_charge_val, mssc_machine_state);
-      }
+      std::lock_guard<std::mutex> lck(state_mtx_);
+      machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
     } else if (battery_charge_val < 20) {
-      if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
-        lowpower(false);
-        SwitchState(MsscMachineState::MSSC_PROTECT);
-        INFO("[LowPower]: wakeup from lowpower to protect");
-      } else {
-        ERROR(
-          "[LowPower]: switch state error2:wakeup, battery charge val:%d, current state:%d",
-          battery_charge_val, mssc_machine_state);
-      }
+      std::lock_guard<std::mutex> lck(state_mtx_);
+      machine_state_handler_map[MachineStateChild::MSC_PROTECTED]();
     } else {
-      if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
-        lowpower(false);
-        SwitchState(MsscMachineState::MSSC_ACTIVE);
-        INFO("[LowPower]: wakeup from lowpower to active");
-      } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
-        ERROR(
-          "[LowPower]: switch state error3:wake up, battery charge val:%d, current state:%d",
-          battery_charge_val, mssc_machine_state);
-        SwitchState(MsscMachineState::MSSC_ACTIVE);
-        INFO("[LowPower]: wakeup from protect to active");
-      } else if (mssc_machine_state == MsscMachineState::MSSC_ACTIVE) {
-        return;
-      }
+      std::lock_guard<std::mutex> lck(state_mtx_);
+      machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
     }
   }
   void BatteryChargeUpdate(uint8_t bc, bool is_charging)
   {
     battery_charge_val = bc;
+    is_charging_ = is_charging;
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
     } else if (battery_charge_val <= 0 && (!is_charging)) {
       // 关机
-      SwitchState(MsscMachineState::MSSC_SHUTDOWN);
+      std::lock_guard<std::mutex> lck(state_mtx_);
+      machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
     } else if (battery_charge_val < 5) {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER || is_charging) {
         return;
       } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
         // 切换到低功耗模式
-        SwitchState(MsscMachineState::MSSC_LOWPOWER);
-        INFO("[LowPower]: call low power consumption when battery soc is less than 5");
-
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
       } else if (mssc_machine_state == MsscMachineState::MSSC_ACTIVE) {
         // 切换到低功耗模式
-        SwitchState(MsscMachineState::MSSC_LOWPOWER);
-        INFO("[LowPower]: call low power consumption when battery soc is less than 5");
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
       }
     } else if (battery_charge_val < 20) {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
@@ -178,13 +206,15 @@ public:
         return;
       } else if (mssc_machine_state == MsscMachineState::MSSC_ACTIVE) {
         // 切换到保护模式
-        SwitchState(MsscMachineState::MSSC_PROTECT);
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_PROTECTED]();
       }
     } else {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
         return;
       } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
-        SwitchState(MsscMachineState::MSSC_ACTIVE);
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
       } else if (mssc_machine_state == MsscMachineState::MSSC_ACTIVE) {
         return;
       }
@@ -192,12 +222,8 @@ public:
   }
   void ContinueKeepDown()
   {
-    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
-      return;
-    } else if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
-      return;
-    }
-    SwitchState(MsscMachineState::MSSC_LOWPOWER);
+    std::lock_guard<std::mutex> lck(state_mtx_);
+    machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
   }
 
 private:
@@ -343,6 +369,87 @@ private:
     return false;
   }
 
+  void OnSelfCheck()
+  {
+  }
+
+  void OnLowPower()
+  {
+    if (is_switching_ms_) {
+      INFO("[MachineState-LowPower]: rejected, now in switching machine state");
+      return;
+    }
+    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+      return;
+    }
+    if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+      return;
+    }
+    SwitchState(MsscMachineState::MSSC_LOWPOWER);
+  }
+
+  void OnProtected()
+  {
+    if (is_switching_ms_) {
+      INFO("[MachineState-Protected]: rejected, now in switching machine state");
+      return;
+    }
+    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+      return;
+    }
+    if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+      lowpower(false);
+    }
+    SwitchState(MsscMachineState::MSSC_PROTECT);
+  }
+
+  void OnActive()
+  {
+    if (is_switching_ms_) {
+      INFO("[MachineState-Active]: rejected, now in switching machine state");
+      return;
+    }
+    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+      return;
+    }
+    if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+      lowpower(false);
+    }
+    SwitchState(MsscMachineState::MSSC_ACTIVE);
+  }
+
+  void OnDeactive()
+  {
+  }
+
+  void OnTearDown()
+  {
+    if (is_switching_ms_) {
+      INFO("[MachineState-ShutDown]: rejected, now in switching machine state");
+      return;
+    }
+    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+      return;
+    } else if (battery_charge_val <= 0 && (!is_charging_)) {
+      // 关机
+      SwitchState(MsscMachineState::MSSC_SHUTDOWN);
+    }
+    SwitchState(MsscMachineState::MSSC_SHUTDOWN);
+  }
+
+  void OnOta()
+  {
+    if (is_switching_ms_) {
+      INFO("[MachineState-Ota]: rejected, now switching machine state");
+      return;
+    }
+    SwitchState(MsscMachineState::MSSC_OTA);
+  }
+
+  void OnError()
+  {
+  }
+
 private:
   rclcpp::Node::SharedPtr mssc_node_ {nullptr};
   rclcpp::CallbackGroup::SharedPtr mssc_callback_group_;
@@ -360,6 +467,7 @@ private:
   BSSC_CALLBACK ota_handler {[](void) {}};
   BSSC_CALLBACK shutdown_handler {[](void) {}};
   uint8_t battery_charge_val {100};
+  bool is_charging_ {false};
   const std::map<MsscMachineState, std::string> mssc_machine_state_code_map = {
     {MsscMachineState::MSSC_ACTIVE, "active"},
     {MsscMachineState::MSSC_PROTECT, "protected"},
@@ -368,6 +476,17 @@ private:
     {MsscMachineState::MSSC_UNKOWN, "unkown"}
   };
   bool is_switching_ms_ {false};
+  std::mutex state_mtx_;
+  std::map<MachineStateChild, MACHINE_STATE_CALLBACK> machine_state_handler_map = {
+    {MachineStateChild::MSC_SELFCHECK, []() {}},
+    {MachineStateChild::MSC_ACTIVE, []() {}},
+    {MachineStateChild::MSC_DEACTIVE, []() {}},
+    {MachineStateChild::MSC_PROTECTED, []() {}},
+    {MachineStateChild::MSC_LOWPOWER, []() {}},
+    {MachineStateChild::MSC_OTA, []() {}},
+    {MachineStateChild::MSC_TEARDOWN, []() {}},
+    {MachineStateChild::MSC_ERROR, []() {}},
+  };
 };
 }  // namespace manager
 }  // namespace cyberdog
