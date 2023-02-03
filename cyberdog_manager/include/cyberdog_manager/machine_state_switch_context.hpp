@@ -158,6 +158,29 @@ public:
       }
     }
   }
+
+  void MachineStateHandler(uint8_t ms)
+  {
+    MsscMachineState ss = static_cast<MsscMachineState>(ms);
+    switch (ss) {
+      case MsscMachineState::MSSC_ACTIVE:
+        OnActive();
+        break;
+      case MsscMachineState::MSSC_PROTECT:
+        OnProtected();
+        break;
+      case MsscMachineState::MSSC_LOWPOWER:
+        OnLowPower();
+        break;
+      case MsscMachineState::MSSC_SHUTDOWN:
+        OnTearDown();
+        break;
+      default:
+          INFO("switch state target error");
+        break;
+    }
+  }
+
   void AudioWakeUp()
   {
     if (is_switching_ms_) {

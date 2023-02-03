@@ -28,25 +28,27 @@ namespace manager
 {
 enum class PowerMachineState : uint8_t
 {
-  PMS_NORMAL    = 0,    // 正常
+  PMS_ACTIVE    = 0,    // 正常
   PMS_PROTECT   = 1,    // 保护
   PMS_LOWPOWER  = 2,    // 低功耗
+  PMS_OTA       = 3,    // OTA
+  PMS_SHUTDOWN  = 4,    // 关机
   PMS_UNKOWN    = 255,  // 未知
 };
 
 class PowerConsumptionInfoNode final
 {
-  using PCIN_CALLBACK = std::function<void ()>;
+  using PCIN_CALLBACK = std::function<void (int)>;
 
 public:
   explicit PowerConsumptionInfoNode(rclcpp::Node::SharedPtr node_ptr, PCIN_CALLBACK callback)
-  // : request_handler([](void) {}), release_handler([](void) {})
-  : enter_lowpower_handler(callback)
+  : machine_state_switch_handle(callback)
   {
     power_consumption_info_node_ = node_ptr;
     lpc_ptr_ = std::make_unique<cyberdog::manager::LowPowerConsumption>();
-    power_consumption_callback_group_ =
+    power_consumption_callback_group_ = 
       power_consumption_info_node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+    
     low_power_consumption_srv_ =
       power_consumption_info_node_->create_service<std_srvs::srv::SetBool>(
       "low_power_consumption",
@@ -55,20 +57,16 @@ public:
         std::placeholders::_2),
       rmw_qos_profile_services_default, power_consumption_callback_group_);
 
-    power_off_srv_ =
+    reboot_srv_ =
       power_consumption_info_node_->create_service<std_srvs::srv::Trigger>(
-      "poweroff",
-      std::bind(
-        &PowerConsumptionInfoNode::ShutdownCallback, this,
+      "reboot", std::bind(&PowerConsumptionInfoNode::RebootCallback, this,
         std::placeholders::_1, std::placeholders::_2),
       rmw_qos_profile_services_default, power_consumption_callback_group_);
 
-    reboot_srv_ =
+    power_off_srv_ =
       power_consumption_info_node_->create_service<std_srvs::srv::Trigger>(
-      "reboot",
-      std::bind(
-        &PowerConsumptionInfoNode::RebootCallback, this,
-        std::placeholders::_1, std::placeholders::_2),
+      "poweroff", std::bind(&PowerConsumptionInfoNode::ShutdownCallback, this,
+      std::placeholders::_1, std::placeholders::_2),
       rmw_qos_profile_services_default, power_consumption_callback_group_);
 
     // sub motion init
@@ -79,118 +77,128 @@ public:
       "motion_status", rclcpp::SystemDefaultsQoS(), std::bind(
         &PowerConsumptionInfoNode::sub_mostion_status_callback,
         this, std::placeholders::_1), options);
-    state_swith_status_sub_ = power_consumption_info_node_->
+
+    state_switch_status_sub_ = power_consumption_info_node_->
       create_subscription<protocol::msg::StateSwitchStatus>(
       "state_switch_status", rclcpp::SystemDefaultsQoS(), std::bind(
-        &PowerConsumptionInfoNode::sub_state_switch_status_callback,
+        &PowerConsumptionInfoNode::machine_state_switch_callback,
         this, std::placeholders::_1), options);
   }
 
 public:
-  // void SetActive(PCIN_CALLBACK callback)
-  // {
-  //   request_handler = callback;
-  // }
-  // void SetDeactive(PCIN_CALLBACK callback)
-  // {
-  //   release_handler = callback;
-  // }
-  // void SetPms(PowerMachineState p)
-  // {
-  //   pms = p;
-  // }
-  // void NotifyState(uint8_t state)
-  // {
-  //   switch (state)
-  //   {
-  //   case 0:
-  //     break;
-  //   case 1:
-  //     break;
-  //   case 2:
-  //     break;
+  void Init() 
+  {
+    toml::value value_table;
+    auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
+    auto path = local_config_dir + std::string("/toml_config/manager/lowpower.toml");
+    if (access(local_config_dir.c_str(), F_OK) != 0) {
+      ERROR(" %s do not exist!", local_config_dir.c_str());
+      return false;
+    } else {
+      INFO("load lowpoer toml file successfully");
+    }
+    if (!cyberdog::common::CyberdogToml::ParseFile(local_config_dir, value_table)) {
+      ERROR("fail to read data from lowpoer_priority toml");
+      return false;
+    }
+    if (!value_table.is_table()) {
+      ERROR("Toml format error");
+      return false;
+    }
+    cyberdog::common::CyberdogToml::Get(value_table, "enable_lowpower", enable_lowpower_);
+    cyberdog::common::CyberdogToml::Get(value_table, "enter_lp_time", enter_lp_times_);
+    cyberdog::common::CyberdogToml::Get(value_table, "re-enter_lp_time", enter_lp_times_);
+  }
 
-  //   default:
-  //     break;
-  //   }
+  void SwitchMachinsState(PowerMachineState machine_state)
+  {
+    int ms = static_cast<int>(machine_state);
+    is_switching_ms_ = true;
+    machine_state_switch_handler(ss);
+    is_switching_ms_ = false;
+  }
+
+  void ActivedHandler() {
+    if (machine_state_ == PMS_ACTIVE || machine_state_ == PMS_LOWPOWER)
+    SwitchMachinsState(PowerMachineState::PMS_ACTIVE);
+  }
+
+  void ProtectHandler() {
+    if (machine_state_ == PMS_PROTECT || machine_state_ == PMS_LOWPOWER) return;
+    SwitchMachinsState(PowerMachineState::PMS_PROTECT);
+  }
+
+  void LowPowerHandler() {
+    if (machine_state_ == PMS_LOWPOWER) return;
+    SwitchMachinsState(PowerMachineState::PMS_LOWPOWER);
+    SysLowpowerEntry(true);
+  }
+  
+  void ShutdownHandler() {
+    SwitchMachinsState(PowerMachineState::PMS_SHUTDOWN)
+    poweroff();
+  }
+
+  // void SetMachine(PCIN_CALLBACK callback)
+  // {
+  //   machine_state_switch_handle = callback;
   // }
+
+  void UpdataBatterySoc(int soc) {
+    battery_soc_ = soc;
+  }
 
 private:
+  void ShutdownHandler() {
+    SwitchMachinsState(PowerMachineState::PMS_SHUTDOWN)
+    poweroff();
+  }
+
+  void LowPowerHandler() {
+    if (machine_state_ == PMS_LOWPOWER) return;
+    SwitchMachinsState(PowerMachineState::PMS_LOWPOWER);
+    SysLowpowerEntry(true);
+  }
+
+  void ProtectHandler() {
+    if (machine_state_ == PMS_PROTECT || machine_state_ == PMS_LOWPOWER) return;
+    SwitchMachinsState(PowerMachineState::PMS_PROTECT);
+  }
+
+  void ActivedHandler() {
+    if (machine_state_ == PMS_ACTIVE || machine_state_ == PMS_LOWPOWER)
+    SwitchMachinsState(PowerMachineState::PMS_ACTIVE);
+  }
+
   void EnterLowPower(
     const std_srvs::srv::SetBool::Request::SharedPtr request,
     std_srvs::srv::SetBool::Response::SharedPtr response)
   {
+    // PM_DEV pd = PM_CAM_ALL;
+    PM_DEV pd = PM_ALL_NO_TOF;
     static int r_count = 0;
+    unsigned int err;
+    int code = -1;
     INFO(
       "[LowPower]: [%d]EnterLowPower %s:start", (r_count + 1),
       (request->data ? "true" : "false"));
-    // PM_DEV pd = PM_CAM_ALL;
-    PM_DEV pd = PM_ALL_NO_TOF;
-    unsigned int err;
-    int code = -1;
     if (request->data) {
       code = lpc_ptr_->LpcRelease(pd, &err);
-      is_lowpower_ = true;
       ++r_count;
     } else {
       code = lpc_ptr_->LpcRequest(pd, &err);
-      is_lowpower_ = false;
       ++r_count;
     }
     response->success = (code == 0 ? true : false);
+    if (response->success) {
+      ERROR("[LowPower]: %s lowpoer false, Lpc error code is %d",
+        (request->data ? "enter" : "exit"), code)
+    }
     INFO(
       "[LowPower]: [%d]EnterLowPower %s:stop", (r_count + 1),
       (request->data ? "true" : "false"));
-  }
-
-  void sub_mostion_status_callback(const protocol::msg::MotionStatus::SharedPtr msg)
-  {
-    if (is_ota_) {
-      INFO_MILLSECONDS(3000, "[LowPower]: in ota state return.");
-      return;
-    }
-    // motion_id: 趴下(101)、站立(111)
-    int motion_id = msg->motion_id;
-    static int lay_count = 0;
-    static int times = 0;
-
-    if (!is_lowpower_) {
-      if (motion_id == 0) {
-        ++lay_count;
-        if (lay_count == 1200) {
-          INFO("[LowPower]: enter lowpower, start up time is greater than 2min");
-          enter_lowpower_handler();
-          ++times;
-        }
-      } else if (motion_id == 101) {
-        ++lay_count;
-        if (times == 0) {
-          if (lay_count == 300) {
-            INFO("[LowPower]: call low power consumption when the dog lies down for 30s");
-            enter_lowpower_handler();
-            ++times;
-          }
-        } else {
-          if (lay_count == 1200) {
-            INFO("[LowPower]: call low power consumption when the dog lies down for 2min");
-            enter_lowpower_handler();
-          }
-        }
-      } else {
-        times = 0;
-        lay_count = 0;
-      }
-    } else {
-      lay_count = 0;
-    }
-  }
-
-  void sub_state_switch_status_callback(const protocol::msg::StateSwitchStatus::SharedPtr msg)
-  {
-    if (msg->state == 3) {
-      is_ota_ = true;
-    } else {
-      is_ota_ = false;
+    if (code != 0) {
+      INFO("[LowPower]: %s":)
     }
   }
 
@@ -203,7 +211,8 @@ private:
     int code = -1;
     code = lpc_ptr_->LpcSysRequest(pd);
     if (code != 0) {
-      INFO("reboot failed, function LpcRequest call faild");
+      ERROR("reboot failed, LpcRequest error code is %d", code);
+
     } else {
       INFO("reboot successfully");
     }
@@ -219,13 +228,109 @@ private:
     int code = -1;
     code = lpc_ptr_->LpcSysRequest(pd);
     if (code != 0) {
-      INFO("Shutdown failed, function LpcRequest call faild");
+      INFO("Shutdown failed, LpcRequest error code is %d", code);
     } else {
-      INFO("Shutdown successfully");
+      INFO("Shut down successfully");
     }
     response->success = (code == 0 ? true : false);
   }
 
+  void SysLowpowerEntry(bool is_enter)
+  {
+    INFO("[LowPower]: now dog %s low-power model.", (is_enter ? "enter" : "exit"));
+    if (!low_power_client_->wait_for_service(std::chrono::seconds(2))) {
+      ERROR("[LowPower]: call low-power service not avalible");
+    } else {
+      std::chrono::seconds timeout(10);
+      auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
+      req->data = is_enter;
+      auto future_result = low_power_client_->async_send_request(req);
+      std::future_status status = future_result.wait_for(timeout);
+      if (status == std::future_status::ready) {
+        INFO("[LowPower]: call low-power service success.");
+      } else {
+        ERROR("[LowPower]: call low-power service failed!");
+      }
+    }
+  }
+
+  void sub_mostion_status_callback(const protocol::msg::MotionStatus::SharedPtr msg)
+  {
+    if (machine_state_ == PowerMachineState::PMS_OTA) {
+      INFO_MILLSECONDS(3000, "[LowPower]: in ota state return.");
+      return;
+    }
+
+    if (machine_state_ == PowerMachineState::PMS_LOWPOWER) {
+      lay_count = 0;
+      return;
+    }
+
+    // motion_id: 趴下(101)、站立(111)
+    int motion_id = msg->motion_id;
+    static int lay_count = 0;
+    static int times = 0;
+
+    if (motion_id == 0) {
+      ++lay_count;
+      if (lay_count == wait_times_) {
+        INFO("[LowPower]: call low power consumption when the dog lies down for 2min");
+        LowPowerHandler();
+        ++times;
+      }
+    } else if (motion_id == 101) {
+      ++lay_count;
+      if (times == 0) {
+        if (lay_count == 300) {
+          INFO("[LowPower]: call low power consumption when the dog lies down for 30s");
+          LowPowerHandler();
+          ++times;
+        }
+      } else {
+        if (lay_count == wait_times_) {
+          INFO("[LowPower]: call low power consumption when the dog lies down for 2min");
+          LowPowerHandler();
+        }
+      }
+    } else {
+      times = 0;
+      lay_count = 0;
+    }
+    
+  }
+
+  void AudioWakeUp()
+  {
+    if (is_switching_ms_) {
+      INFO("[LowPower]: wakeup rejected, now switching machine state");
+      return;
+    }
+
+    if (machine_state_ == PowerMachineState::PMS_OTA || battery_soc_ < 5) {
+      return;
+    }
+
+    if (machine_state_ != PowerMachineState::PMS_LOWPOWER) {
+      return;
+    }
+
+    if (battery_soc_ < 20) {
+      SysLowpowerEntry(false);
+      SwitchMachinsState(PowerMachineState::PMS_PROTECT);
+    } else {
+      if (machine_state_ == PowerMachineState::PMS_LOWPOWER) {
+        SysLowpowerEntry(false);
+      }
+      SwitchMachinsState(PowerMachineState::PMS_ACTIVE);
+    }
+  }
+
+  void machine_state_switch_callback(const protocol::msg::StateSwitchStatus::SharedPtr msg)
+  {
+    // 0-active；1-低电量；2-低功耗；3-OTA；4-关机
+    machine_state_ = static_cast<PowerMachineState>(msg->state);
+  }
+  
 private:
   rclcpp::Node::SharedPtr power_consumption_info_node_ {nullptr};
   rclcpp::CallbackGroup::SharedPtr power_consumption_callback_group_;
@@ -234,16 +339,14 @@ private:
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr power_off_srv_ {nullptr};
   std::unique_ptr<cyberdog::manager::LowPowerConsumption> lpc_ptr_ {nullptr};
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
-  rclcpp::Subscription<protocol::msg::StateSwitchStatus>::SharedPtr \
-    state_swith_status_sub_ {nullptr};
-  PCIN_CALLBACK request_handler;
-  PCIN_CALLBACK release_handler;
-  PowerMachineState pms {PowerMachineState::PMS_UNKOWN};
-  PCIN_CALLBACK enter_lowpower_handler;
-  bool is_lowpower_ {false};
-  bool is_ota_ {false};
-};
-}  // namespace manager
-}  // namespace cyberdog
-
-#endif  // CYBERDOG_MANAGER__POWER_CONSUMPTION_INFO_HPP_
+  rclcpp::Subscription<protocol::msg::StateSwitchStatus>::SharedPtr state_switch_status_sub_ {nullptr};
+  PCIN_CALLBACK machine_state_switch_handle {[](int) {}};
+  uint8_t machine_state_ {PowerMachineState::PMS_UNKOWN};
+  u_int32_t enter_lp_times_ {30};
+  u_int32_t renter_lp_times_ {120};
+  uint8_t battery_soc_ {100};
+  bool enable_lowpower_ {true};
+  bool is_switching_ms_ {false};
+}
+}
+}

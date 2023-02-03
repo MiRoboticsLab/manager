@@ -44,7 +44,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   mssc_context_ptr_ = std::make_shared<cyberdog::manager::MachineStateSwitchContext>(node_ptr_);
   power_consumption_node_ptr = std::make_unique<PowerConsumptionInfoNode>(
     node_ptr_,
-    std::bind(&MachineStateSwitchContext::ContinueKeepDown, mssc_context_ptr_));
+    std::bind(&MachineStateSwitchContext::MachineStateHandler, mssc_context_ptr_));
   ready_node_ptr = std::make_unique<ReadyNotifyNode>(name_ + "_ready");
   heart_beat_ptr_ = std::make_unique<cyberdog::manager::HeartContext>(
     node_ptr_,
@@ -52,15 +52,17 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   error_context_ptr_ = std::make_unique<cyberdog::manager::ErrorContext>(name_ + "_error");
   bcin_node_ptr = std::make_unique<BatteryCapacityInfoNode>(
     node_ptr_,
-    std::bind(
-      &MachineStateSwitchContext::BatteryChargeUpdate, mssc_context_ptr_,
-      std::placeholders::_1, std::placeholders::_2));
+    std::bind(&PowerConsumptionInfoNode::UpdataBatterySoc, mssc_context_ptr_),
+    std::bind(&PowerConsumptionInfoNode::ActivedHandler, mssc_context_ptr_),
+    std::bind(&PowerConsumptionInfoNode::ProtectHandler, mssc_context_ptr_),
+    std::bind(&PowerConsumptionInfoNode::LowPowerHandler, mssc_context_ptr_),
+    std::bind(&PowerConsumptionInfoNode::ShutdownHandler, mssc_context_ptr_));
   touch_node_ptr = std::make_unique<TouchInfoNode>(node_ptr_);
   audio_node_ptr = std::make_unique<AudioInfoNode>(
     node_ptr_,
     std::bind(&MachineStateSwitchContext::AudioWakeUp, mssc_context_ptr_));
-  led_node_ptr = std::make_unique<LedInfoNode>(node_ptr_);
-  executor_.add_node(node_ptr_);
+  // led_node_ptr = std::make_unique<LedInfoNode>(node_ptr_);
+  // executor_.add_node(node_ptr_);
   // black_box_ptr_ = std::make_shared<BlackBox>(node_ptr_);
 }
 
