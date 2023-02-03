@@ -82,6 +82,13 @@ public:
         &MachineStateSwitchContext::OtaMachineState, this, std::placeholders::_1,
         std::placeholders::_2),
       rmw_qos_profile_services_default, mssc_callback_group_);
+    low_power_enable_srv_ =
+      mssc_node_->create_service<std_srvs::srv::SetBool>(
+      "low_power_enable",
+      std::bind(
+        &MachineStateSwitchContext::LowPowerEnable, this, std::placeholders::_1,
+        std::placeholders::_2),
+      rmw_qos_profile_services_default, mssc_callback_group_);
     power_off_client_ =
       mssc_node_->create_client<std_srvs::srv::Trigger>(
       "poweroff",
@@ -259,6 +266,21 @@ private:
       SwitchState(MsscMachineState::MSSC_OTA);
     } else {
       SwitchState(MsscMachineState::MSSC_ACTIVE);
+    }
+    response->success = true;
+  }
+  void LowPowerEnable(
+    const std_srvs::srv::SetBool::Request::SharedPtr request,
+    std_srvs::srv::SetBool::Response::SharedPtr response)
+  {
+    std::lock_guard<std::mutex> lck(state_mtx_);
+    if (request->data) {
+      machine_state_handler_map[MachineStateChild::MSC_LOWPOWER] =
+        std::bind(&MachineStateSwitchContext::OnLowPower, this);
+    } else {
+      machine_state_handler_map[MachineStateChild::MSC_LOWPOWER] =
+        []() {};
+      machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
     }
     response->success = true;
   }
@@ -456,6 +478,7 @@ private:
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr state_set_sub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr state_valget_srv_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr switch_ota_state_srv_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_enable_srv_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr power_off_client_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr low_power_client_;
   rclcpp::Publisher<protocol::msg::StateSwitchStatus>::SharedPtr state_swith_status_pub_;
