@@ -36,7 +36,7 @@
 #include "cyberdog_common/cyberdog_json.hpp"
 #include "protocol/srv/reboot_machine.hpp"
 #include "black_box/black_box.hpp"
-// using namespace std::chrono_literals;
+#include "protocol/msg/self_check_status.hpp"
 namespace cyberdog
 {
 namespace manager
@@ -69,12 +69,21 @@ public:
     bes_http_client_ =
       this->create_client<protocol::srv::BesHttp>("bes_http_srv");
     lpc_ptr_ = std::make_unique<cyberdog::manager::LowPowerConsumption>();
-    std::thread UpSendThread = std::thread(&UnlockRequestNode::SendUnlockStatus_, this);
-    UpSendThread.detach();
+    self_check_sub =
+      this->create_subscription<protocol::msg::SelfCheckStatus>(
+      "self_check_status",
+      10, std::bind(&UnlockRequestNode::SelfCheckTopicCallback, this, std::placeholders::_1));
     INFO("unlock request node init success");
   }
 
 private:
+  void SelfCheckTopicCallback(const protocol::msg::SelfCheckStatus::SharedPtr msg)
+  {
+    if (msg->code == 0 || msg->code == 2) {
+      INFO("enter SelfCheckTopicCallback");
+      SendUnlockStatus();
+    }
+  }
   std::string GetKeyFile()
   {
     std::string ShellCommand_ = "cd /SDCARD && tar -xf pub_key.tar";
@@ -84,24 +93,22 @@ private:
     }
     return "/SDCARD";
   }
-  void SendUnlockStatus_()
+  void SendUnlockStatus()
   {
     INFO("enter SendUnlockStatus_");
     bool modify_flag = true;
-    while (flag) {
-      std::string filename_ = "/opt/ros2/cyberdog/share/params/toml_config/manager";
-      std::string filename = filename_ + "/UnlockStatus.db";
-      int result[2];
+    std::string filename_ = "/opt/ros2/cyberdog/share/params/toml_config/manager";
+    std::string filename = filename_ + "/UnlockStatus.db";
+    int result[2];
+    if (flag) {
       if (!black_box.readUnlockStatus(result)) {
-        flag = false;
         modify_flag = false;
-        break;
+        return;
       } else {
         if (result[0] == 0 && result[1] == 1) {
           INFO("[SendUnlockStatus_]>>UpSend has successed and not reboot");
-          flag = false;
           modify_flag = false;
-          break;
+          return;
         }
       }
       int unlockStatus_ = GetUnlockStatus();
@@ -110,16 +117,17 @@ private:
         INFO("[SendUnlockStatus_]>>send success");
         black_box.ModifyUnlockStatus("UPSENDSTATUS", 1);
         flag = false;
-        break;
       } else {
         INFO("[SendUnlockStatus_]>>send failed");
         black_box.ModifyUnlockStatus("UPSENDSTATUS", 0);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10000));
         flag = true;
+        // counter ++;
+        // flag = counter < 5 ? true : false;
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-    }
-    if (modify_flag) {
-      black_box.ModifyUnlockStatus("REBOOTSTATUS", 0);
+      if (modify_flag) {
+        black_box.ModifyUnlockStatus("REBOOTSTATUS", 0);
+      }
     }
   }
   int GetUnlockStatus()
@@ -141,6 +149,10 @@ private:
     std::string parammentKey = KeyPath + "/cyberdog-key";
     std::string parammentKey_ = KeyPath + "/cyber-pub.pem";
     std::string ShellCommand = "/usr/bin/cyberdog_get_info " + parammentKey + " " + parammentKey_;
+    // std::string parammentKey = KeyPath + "/cyberdog-key";
+    // std::string parammentKey = "/home/mi/cyberdog-key";
+    // std::string ShellCommand = "/home/mi/cyberdog_get_info unlock-request " + parammentKey;
+    // std::string ShellCommand = "/usr/bin/cyberdog_get_info unlock-request " + parammentKey;
     INFO("%s", ShellCommand.c_str());
     FILE * ShellResult = popen(ShellCommand.c_str(), "r");
     char ShellResultBuffer_[256];
@@ -239,10 +251,9 @@ private:
       return;
     }
     black_box.CreateUnlockStatusDB();              // 创建或复原上报状态记录文件
-    INFO("%s", request->httplink.c_str());
+    INFO("request httplink is %s", request->httplink.c_str());
     std::string httpCom = "https://cnbj2m.fds.api.xiaomi.com";
     std::string httpFilePath = request->httplink.substr(httpCom.length());
-    INFO("request httplink is %s", request->httplink.c_str());
     INFO("http link path is %s", httpFilePath.c_str());
     httplib::Client cli(httpCom);
     cli.set_read_timeout(10, 0);
@@ -314,6 +325,7 @@ private:
   }
 
 private:
+  rclcpp::Subscription<protocol::msg::SelfCheckStatus>::SharedPtr self_check_sub;
   rclcpp::Service<protocol::srv::Unlock>::SharedPtr unlock_requset_srv_;
   rclcpp::Service<protocol::srv::RebootMachine>::SharedPtr reboot_machine_srv_;
   rclcpp::Client<protocol::srv::MotionResultCmd>::SharedPtr motion_result_client_;
@@ -322,6 +334,7 @@ private:
   std::unique_ptr<cyberdog::manager::LowPowerConsumption> lpc_ptr_{nullptr};
   cyberdog::manager::BlackBox black_box;
   bool flag = true;
+  // int counter = 0;  // 记录失败时上报的次数
 };
 }  // namespace manager
 }  // namespace cyberdog
