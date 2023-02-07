@@ -43,14 +43,10 @@ struct LedMode
 class BatteryCapacityInfoNode final
 {
   using BCIN_CALLBACK = std::function<void ()>;
-  using BCINSOC_CALLBACK = std::function<void (uint8_t val)>;
+  using BCINSOC_CALLBACK = std::function<void (uint8_t)>;
 public:
-  BatteryCapacityInfoNode(rclcpp::Node::SharedPtr node_ptr, BCINSOC_CALLBACK soc_cb, \
-    BCIN_CALLBACK active_cb, BCIN_CALLBACK protect_cb, \
-    BCIN_CALLBACK lowpower_cb, BCIN_CALLBACK shutdown_cb)
-  : battery_capacity_info_node_(node_ptr), socnotify_handler(soc_cb), \
-    active_handler(active_cb), protect_handler(protect_cb), \
-    lowpower_handler(lowpower_cb), shutdown_handler(shutdown_cb)
+  BatteryCapacityInfoNode(rclcpp::Node::SharedPtr node_ptr, BCINSOC_CALLBACK soc_cb)
+  : battery_capacity_info_node_(node_ptr)
   {
     bc_callback_group_ = battery_capacity_info_node_->create_callback_group(
       rclcpp::CallbackGroupType::Reentrant);
@@ -74,48 +70,22 @@ public:
 
   }
 
-  // void Init()
-  // {
-
-  // }
-
-  // void ShutdownHandler(BCIN_CALLBACK callback)
-  // {
-  //   shutdown_handler = callback;
-  // }
-
-  // void LowpowerHandler(BCIN_CALLBACK callback)
-  // {
-  //   lowpower_handler = callback;
-  // }
-
-  // void ProtectHandler(BCIN_CALLBACK callback)
-  // {
-  //   protect_handler = callback;
-  // }
-
-  // void ActiveHandler(BCIN_CALLBACK callback)
-  // {
-  //   active_handler = callback;
-  // }
-
 private:
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
   {
     bms_status_ = *msg;
-    static int pre_bms_soc = bms_status_.batt_soc;
+    static uint8_t pre_bms_soc = bms_status_.batt_soc;
     static bool is_exec_zero = false;
     static bool is_exec_five = false;
     static bool is_exec_twenty = false;
     static bool is_exec_thirty = false;
 
-    socnotify_handler(bms_status_.batt_soc);
+    socnotify_handler(bms_status_.batt_soc, bms_status_.power_wired_charging);
     INFO_MILLSECONDS(30000, "Battery Capacity Info:%d", bms_status_.batt_soc);
 
     if (bms_status_.batt_soc == 0 && !bms_status_.power_wired_charging) {
       if (!is_exec_zero) {
         SetLed(bms_status_.batt_soc);
-        shutdown_handler();
         std::string text{"电量为0,关机中"};
         AudioPrompts(text);
         return;
@@ -127,7 +97,6 @@ private:
         is_exec_five = true;
         is_exec_twenty = false;
         // SetLed(bms_status_.batt_soc);  放到低功耗
-        lowpower_handler();
         if (bms_status_.batt_volt < pre_bms_soc) {
             std::string text{"电量低于5%，电池即将耗尽，请尽快充电!"};
             AudioPrompts(text);
@@ -139,7 +108,6 @@ private:
           is_exec_twenty = true;
           is_exec_thirty = false;
           SetLed(bms_status_.batt_soc);
-          protect_handler();
           if (bms_status_.batt_volt < pre_bms_soc) {
             std::string text{"电量低于20%，部分功能受限"};
             AudioPrompts(text);
@@ -150,7 +118,6 @@ private:
         is_exec_twenty = false;
         is_exec_thirty = true;
         SetLed(bms_status_.batt_soc);
-        active_handler();
         if (bms_status_.batt_volt < pre_bms_soc) {
           std::string text{"电量低于30%，请尽快充电"};
           AudioPrompts(text);
@@ -255,10 +222,6 @@ private:
     rclcpp::Publisher<protocol::msg::AudioPlayExtend>::SharedPtr audio_play_extend_pub_;
     rclcpp::Client<protocol::srv::LedExecute>::SharedPtr led_excute_client_;
     BCINSOC_CALLBACK socnotify_handler;
-    BCIN_CALLBACK active_handler;
-    BCIN_CALLBACK protect_handler;
-    BCIN_CALLBACK lowpower_handler;
-    BCIN_CALLBACK shutdown_handler;
     protocol::msg::BmsStatus bms_status_;
     
 };

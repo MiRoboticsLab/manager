@@ -52,11 +52,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   error_context_ptr_ = std::make_unique<cyberdog::manager::ErrorContext>(name_ + "_error");
   bcin_node_ptr = std::make_unique<BatteryCapacityInfoNode>(
     node_ptr_,
-    std::bind(&PowerConsumptionInfoNode::UpdataBatterySoc, power_consumption_node_ptr, std::placeholders::_1),
-    std::bind(&PowerConsumptionInfoNode::ActivedHandler, power_consumption_node_ptr),
-    std::bind(&PowerConsumptionInfoNode::ProtectHandler, power_consumption_node_ptr),
-    std::bind(&PowerConsumptionInfoNode::LowPowerHandler, power_consumption_node_ptr),
-    std::bind(&PowerConsumptionInfoNode::ShutdownHandler, power_consumption_node_ptr));
+    std::bind(&PowerConsumptionInfoNode::UpdataBatterySoc, power_consumption_node_ptr, std::placeholders::_1));
   touch_node_ptr = std::make_unique<TouchInfoNode>(node_ptr_);
   audio_node_ptr = std::make_unique<AudioInfoNode>(node_ptr_);
   // led_node_ptr = std::make_unique<LedInfoNode>(node_ptr_);

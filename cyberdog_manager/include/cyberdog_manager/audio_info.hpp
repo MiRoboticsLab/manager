@@ -34,7 +34,7 @@ class AudioInfoNode final
 
 public:
   explicit AudioInfoNode(rclcpp::Node::SharedPtr node_ptr)
-  : audio_info_node_(node_ptr), wakeup_handler(callback)
+  : audio_info_node_(node_ptr)
   {
     audio_callback_group_ =
       audio_info_node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
