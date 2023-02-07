@@ -33,7 +33,7 @@ class AudioInfoNode final
   using WAKEUP_CALLBACK = std::function<void ()>;
 
 public:
-  explicit AudioInfoNode(rclcpp::Node::SharedPtr node_ptr, WAKEUP_CALLBACK callback)
+  explicit AudioInfoNode(rclcpp::Node::SharedPtr node_ptr)
   : audio_info_node_(node_ptr), wakeup_handler(callback)
   {
     audio_callback_group_ =
@@ -101,7 +101,7 @@ private:
   {
     if (msg->data) {
       INFO("[LowPower]: dog wakeup...");
-      wakeup_handler();
+      // wakeup_handler();
     }
   }
 
@@ -111,7 +111,7 @@ private:
   rclcpp::Publisher<AudioMsg>::SharedPtr audio_play_pub_ {nullptr};
   rclcpp::Client<protocol::srv::AudioTextPlay>::SharedPtr audio_text_play_client_ {nullptr};
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
-  WAKEUP_CALLBACK wakeup_handler {[](void) {}};
+  // WAKEUP_CALLBACK wakeup_handler {[](void) {}};
   bool init_ {false};
 };
 

@@ -181,68 +181,69 @@ public:
     }
   }
 
-  void AudioWakeUp()
-  {
-    if (is_switching_ms_) {
-      INFO("[MachineState-Switch]: wakeup, now in switching machine state");
-      return;
-    }
-    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
-      return;
-    } else if (battery_charge_val < 5) {
-      std::lock_guard<std::mutex> lck(state_mtx_);
-      machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
-    } else if (battery_charge_val < 20) {
-      std::lock_guard<std::mutex> lck(state_mtx_);
-      machine_state_handler_map[MachineStateChild::MSC_PROTECTED]();
-    } else {
-      std::lock_guard<std::mutex> lck(state_mtx_);
-      machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
-    }
-  }
-  void BatteryChargeUpdate(uint8_t bc, bool is_charging)
-  {
-    battery_charge_val = bc;
-    is_charging_ = is_charging;
-    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
-      return;
-    } else if (battery_charge_val <= 0 && (!is_charging)) {
-      // 关机
-      std::lock_guard<std::mutex> lck(state_mtx_);
-      machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
-    } else if (battery_charge_val < 5) {
-      if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER || is_charging) {
-        return;
-      } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
-        // 切换到低功耗模式
-        std::lock_guard<std::mutex> lck(state_mtx_);
-        machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
-      } else if (mssc_machine_state == MsscMachineState::MSSC_ACTIVE) {
-        // 切换到低功耗模式
-        std::lock_guard<std::mutex> lck(state_mtx_);
-        machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
-      }
-    } else if (battery_charge_val < 20) {
-      if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
-        return;
-      } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
-        return;
-      } else if (mssc_machine_state == MsscMachineState::MSSC_ACTIVE) {
-        // 切换到保护模式
-        std::lock_guard<std::mutex> lck(state_mtx_);
-        machine_state_handler_map[MachineStateChild::MSC_PROTECTED]();
-      }
-    } else {
-      if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
-        return;
-      } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
-        std::lock_guard<std::mutex> lck(state_mtx_);
-        machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
-      } else if (mssc_machine_state == MsscMachineState::MSSC_ACTIVE) {
-        return;
-      }
-    }
-  }
+  // void AudioWakeUp()
+  // {
+  //   if (is_switching_ms_) {
+  //     INFO("[MachineState-Switch]: wakeup, now in switching machine state");
+  //     return;
+  //   }
+  //   if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+  //     return;
+  //   } else if (battery_charge_val < 5) {
+  //     std::lock_guard<std::mutex> lck(state_mtx_);
+  //     machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
+  //   } else if (battery_charge_val < 20) {
+  //     std::lock_guard<std::mutex> lck(state_mtx_);
+  //     machine_state_handler_map[MachineStateChild::MSC_PROTECTED]();
+  //   } else {
+  //     std::lock_guard<std::mutex> lck(state_mtx_);
+  //     machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
+  //   }
+  // }
+
+  // void BatteryChargeUpdate(uint8_t bc, bool is_charging)
+  // {
+  //   battery_charge_val = bc;
+  //   is_charging_ = is_charging;
+  //   if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+  //     return;
+  //   } else if (battery_charge_val <= 0 && (!is_charging)) {
+  //     // 关机
+  //     std::lock_guard<std::mutex> lck(state_mtx_);
+  //     machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
+  //   } else if (battery_charge_val < 5) {
+  //     if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER || is_charging) {
+  //       return;
+  //     } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
+  //       // 切换到低功耗模式
+  //       std::lock_guard<std::mutex> lck(state_mtx_);
+  //       machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
+  //     } else if (mssc_machine_state == MsscMachineState::MSSC_ACTIVE) {
+  //       // 切换到低功耗模式
+  //       std::lock_guard<std::mutex> lck(state_mtx_);
+  //       machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
+  //     }
+  //   } else if (battery_charge_val < 20) {
+  //     if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+  //       return;
+  //     } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
+  //       return;
+  //     } else if (mssc_machine_state == MsscMachineState::MSSC_ACTIVE) {
+  //       // 切换到保护模式
+  //       std::lock_guard<std::mutex> lck(state_mtx_);
+  //       machine_state_handler_map[MachineStateChild::MSC_PROTECTED]();
+  //     }
+  //   } else {
+  //     if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+  //       return;
+  //     } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
+  //       std::lock_guard<std::mutex> lck(state_mtx_);
+  //       machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
+  //     } else if (mssc_machine_state == MsscMachineState::MSSC_ACTIVE) {
+  //       return;
+  //     }
+  //   }
+  // }
   void ContinueKeepDown()
   {
     std::lock_guard<std::mutex> lck(state_mtx_);
@@ -273,7 +274,7 @@ private:
   {
     if (request->data) {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
-        lowpower(false);
+        // lowpower(false);
         INFO("[LowPower]: exit lowpower to ota");
       } else if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
         response->success = true;
@@ -319,7 +320,7 @@ private:
           sss.state = 2;
           state_swith_status_pub_->publish(sss);
           lowpower_handler();
-          lowpower(true);
+          // owpower(true);
         }
         break;
       case MsscMachineState::MSSC_OTA:
@@ -340,7 +341,7 @@ private:
           sss.code = 0;
           sss.state = 4;
           state_swith_status_pub_->publish(sss);
-          poweroff();
+          // poweroff();
           shutdown_handler();
         }
         break;
@@ -353,44 +354,44 @@ private:
     is_switching_ms_ = false;
   }
 
-  void poweroff()
-  {
-    INFO("cyberdog start poweroff when the battery soc is 0.");
-    if (!power_off_client_->wait_for_service(std::chrono::seconds(2))) {
-      ERROR("call poweroff service not avalible");
-    } else {
-      std::chrono::seconds timeout(3);
-      auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
-      auto future_result = power_off_client_->async_send_request(req);
-      std::future_status status = future_result.wait_for(timeout);
-      if (status == std::future_status::ready) {
-        INFO("call poweroff service success.");
-      } else {
-        ERROR("call poweroff service failed!");
-      }
-    }
-  }
+  // void poweroff()
+  // {
+  //   INFO("cyberdog start poweroff when the battery soc is 0.");
+  //   if (!power_off_client_->wait_for_service(std::chrono::seconds(2))) {
+  //     ERROR("call poweroff service not avalible");
+  //   } else {
+  //     std::chrono::seconds timeout(3);
+  //     auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
+  //     auto future_result = power_off_client_->async_send_request(req);
+  //     std::future_status status = future_result.wait_for(timeout);
+  //     if (status == std::future_status::ready) {
+  //       INFO("call poweroff service success.");
+  //     } else {
+  //       ERROR("call poweroff service failed!");
+  //     }
+  //   }
+  // }
 
-  bool lowpower(bool is_enter)
-  {
-    INFO("[LowPower]: now dog %s low-power model.", (is_enter ? "enter" : "exit"));
-    if (!low_power_client_->wait_for_service(std::chrono::seconds(2))) {
-      ERROR("[LowPower]: call low-power service not avalible");
-    } else {
-      std::chrono::seconds timeout(10);
-      auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
-      req->data = is_enter;
-      auto future_result = low_power_client_->async_send_request(req);
-      std::future_status status = future_result.wait_for(timeout);
-      if (status == std::future_status::ready) {
-        INFO("[LowPower]: call low-power service success.");
-        return future_result.get()->success;
-      } else {
-        ERROR("[LowPower]: call low-power service failed!");
-      }
-    }
-    return false;
-  }
+  // bool lowpower(bool is_enter)
+  // {
+  //   INFO("[LowPower]: now dog %s low-power model.", (is_enter ? "enter" : "exit"));
+  //   if (!low_power_client_->wait_for_service(std::chrono::seconds(2))) {
+  //     ERROR("[LowPower]: call low-power service not avalible");
+  //   } else {
+  //     std::chrono::seconds timeout(10);
+  //     auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
+  //     req->data = is_enter;
+  //     auto future_result = low_power_client_->async_send_request(req);
+  //     std::future_status status = future_result.wait_for(timeout);
+  //     if (status == std::future_status::ready) {
+  //       INFO("[LowPower]: call low-power service success.");
+  //       return future_result.get()->success;
+  //     } else {
+  //       ERROR("[LowPower]: call low-power service failed!");
+  //     }
+  //   }
+  //   return false;
+  // }
 
   void OnSelfCheck()
   {
@@ -421,7 +422,7 @@ private:
       return;
     }
     if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
-      lowpower(false);
+      // lowpower(false);
     }
     SwitchState(MsscMachineState::MSSC_PROTECT);
   }
@@ -436,7 +437,7 @@ private:
       return;
     }
     if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
-      lowpower(false);
+      // lowpower(false);
     }
     SwitchState(MsscMachineState::MSSC_ACTIVE);
   }

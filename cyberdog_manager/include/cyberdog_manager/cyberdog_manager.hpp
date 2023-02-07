@@ -40,7 +40,6 @@
 #include "cyberdog_manager/heart_context.hpp"
 #include "cyberdog_manager/error_context.hpp"
 #include "cyberdog_manager/machine_state_switch_context.hpp"
-#include "cyberdog_manager/led_info.hpp"
 
 namespace cyberdog
 {
