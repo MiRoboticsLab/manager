@@ -62,6 +62,10 @@ public:
     qdev_callback_group_ =
       query_node_ptr_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
     wifi_info_ptr_ = std::make_unique<cyberdog::manager::WifiInfo>();
+    sn_notify_sub_ =
+      query_node_ptr_->create_subscription<std_msgs::msg::String>(
+      "dog_sn", rclcpp::SystemDefaultsQoS(),
+      std::bind(&QueryInfo::DogsnCallback, this, std::placeholders::_1));
     audio_sn_ger_srv_ =
       query_node_ptr_->create_client<std_srvs::srv::Trigger>(
       "get_dog_sn",
@@ -134,6 +138,11 @@ public:
   std::unique_ptr<cyberdog::manager::WifiInfo> & GetWifiPtr()
   {
     return wifi_info_ptr_;
+  }
+
+  void DogsnCallback(const std_msgs::msg::String::SharedPtr msg)
+  {
+    sn_ = msg->data;
   }
 
   const std::string QueryDeviceInfo(std::vector<bool> & enables, std::string app_uid = "")
@@ -501,6 +510,7 @@ private:
   protocol::msg::BmsStatus bms_status_;
   bool standed_{false};
   std::unique_ptr<cyberdog::manager::WifiInfo> wifi_info_ptr_ {nullptr};
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sn_notify_sub_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_sn_ger_srv_;
   rclcpp::Client<protocol::srv::OtaServerCmd>::SharedPtr ota_ver_get_srv_;
   rclcpp::Client<protocol::srv::AudioVolumeGet>::SharedPtr audio_volume_get_client_;

@@ -24,10 +24,12 @@ int main(int argc, char ** argv)
 
   std::shared_ptr<cyberdog::manager::CyberdogManager> manager =
     std::make_shared<cyberdog::manager::CyberdogManager>("cyberdog_manager");
-  if (!manager->Init()) {
-    ERROR("init error");
-  }
+  std::thread t([&]() {
+      if (!manager->Init()) {
+        ERROR("init error");
+      }
+    });
+  t.detach();
   manager->Run();
-
   return 0;
 }

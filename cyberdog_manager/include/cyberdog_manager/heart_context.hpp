@@ -137,7 +137,7 @@ private:
       //     std::chrono::system_clock::now().time_since_epoch());
       // uint64_t sec_count = sec.count();
       // ERROR("%s node lost, time point:%ld", iter->first.c_str(), sec_count);
-      ERROR("%s node lost", iter->first.c_str());
+      ERROR("%s node heart beat lost", iter->first.c_str());
     }
     iter->second.lost = lost;
     iter->second.timestamp = GetMsTime();

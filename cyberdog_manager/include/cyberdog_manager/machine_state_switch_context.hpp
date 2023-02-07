@@ -25,6 +25,7 @@
 #include "std_srvs/srv/set_bool.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 #include "protocol/msg/state_switch_status.hpp"
+#include "protocol/srv/machine_state.hpp"
 
 namespace cyberdog
 {
@@ -87,6 +88,20 @@ public:
       "low_power_enable",
       std::bind(
         &MachineStateSwitchContext::LowPowerEnable, this, std::placeholders::_1,
+        std::placeholders::_2),
+      rmw_qos_profile_services_default, mssc_callback_group_);
+    low_power_exit_srv_ =
+      mssc_node_->create_service<std_srvs::srv::Trigger>(
+      "low_power_exit",
+      std::bind(
+        &MachineStateSwitchContext::LowPowerExit, this, std::placeholders::_1,
+        std::placeholders::_2),
+      rmw_qos_profile_services_default, mssc_callback_group_);
+    low_power_onoff_srv_ =
+      mssc_node_->create_service<std_srvs::srv::SetBool>(
+      "low_power_onoff",
+      std::bind(
+        &MachineStateSwitchContext::LowPowerOnoff, this, std::placeholders::_1,
         std::placeholders::_2),
       rmw_qos_profile_services_default, mssc_callback_group_);
     power_off_client_ =
@@ -281,6 +296,29 @@ private:
       machine_state_handler_map[MachineStateChild::MSC_LOWPOWER] =
         []() {};
       machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
+    }
+    response->success = true;
+  }
+  void LowPowerExit(
+    const std_srvs::srv::Trigger::Request::SharedPtr,
+    std_srvs::srv::Trigger::Response::SharedPtr response)
+  {
+    std::lock_guard<std::mutex> lck(state_mtx_);
+    machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
+    response->success = true;
+  }
+  void LowPowerOnoff(
+    const std_srvs::srv::SetBool::Request::SharedPtr request,
+    std_srvs::srv::SetBool::Response::SharedPtr response)
+  {
+    if (disable_lowpower_ != request->data) {
+      disable_lowpower_ = request->data;
+      if (disable_lowpower_) {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_LOWPOWER] =
+          []() {};
+        machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
+      }
     }
     response->success = true;
   }
@@ -479,6 +517,8 @@ private:
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr state_valget_srv_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr switch_ota_state_srv_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_enable_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr low_power_exit_srv_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_onoff_srv_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr power_off_client_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr low_power_client_;
   rclcpp::Publisher<protocol::msg::StateSwitchStatus>::SharedPtr state_swith_status_pub_;
@@ -510,6 +550,7 @@ private:
     {MachineStateChild::MSC_TEARDOWN, []() {}},
     {MachineStateChild::MSC_ERROR, []() {}},
   };
+  bool disable_lowpower_ {false};
 };
 }  // namespace manager
 }  // namespace cyberdog
