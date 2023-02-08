@@ -77,11 +77,11 @@ public:
       audio_play_pub_->publish(text_msg);
       rclcpp::SubscriptionOptions sub_options;
       sub_options.callback_group = audio_callback_group_;
-      wake_up_sub_ =
-        audio_info_node_->create_subscription<std_msgs::msg::Bool>(
-        "dog_wakeup", rclcpp::SystemDefaultsQoS(),
-        std::bind(&AudioInfoNode::DogWakeup, this, std::placeholders::_1),
-        sub_options);
+      // wake_up_sub_ =
+      //   audio_info_node_->create_subscription<std_msgs::msg::Bool>(
+      //   "dog_wakeup", rclcpp::SystemDefaultsQoS(),
+      //   std::bind(&AudioInfoNode::DogWakeup, this, std::placeholders::_1),
+      //   sub_options);
       init_ = true;
     }
   }
@@ -97,21 +97,11 @@ public:
   }
 
 private:
-  void DogWakeup(const std_msgs::msg::Bool::SharedPtr msg)
-  {
-    if (msg->data) {
-      INFO("[LowPower]: dog wakeup...");
-      // wakeup_handler();
-    }
-  }
-
-private:
   rclcpp::Node::SharedPtr audio_info_node_{nullptr};
   rclcpp::CallbackGroup::SharedPtr audio_callback_group_;
   rclcpp::Publisher<AudioMsg>::SharedPtr audio_play_pub_ {nullptr};
   rclcpp::Client<protocol::srv::AudioTextPlay>::SharedPtr audio_text_play_client_ {nullptr};
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
-  // WAKEUP_CALLBACK wakeup_handler {[](void) {}};
   bool init_ {false};
 };
 

@@ -86,10 +86,6 @@ public:
       mssc_node_->create_client<std_srvs::srv::Trigger>(
       "poweroff",
       rmw_qos_profile_services_default, mssc_callback_group_);
-    low_power_client_ =
-      mssc_node_->create_client<std_srvs::srv::SetBool>(
-      "low_power_consumption",
-      rmw_qos_profile_services_default, mssc_callback_group_);
     rclcpp::PublisherOptions pub_options;
     pub_options.callback_group = mssc_callback_group_;
     state_swith_status_pub_ =
@@ -176,7 +172,7 @@ public:
         OnTearDown();
         break;
       default:
-          INFO("switch state target error");
+        INFO("switch state target error");
         break;
     }
   }
@@ -481,7 +477,6 @@ private:
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr state_valget_srv_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr switch_ota_state_srv_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr power_off_client_;
-  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr low_power_client_;
   rclcpp::Publisher<protocol::msg::StateSwitchStatus>::SharedPtr state_swith_status_pub_;
   MsscMachineState mssc_machine_state {MsscMachineState::MSSC_UNKOWN};
   std::mutex switch_mtx;
