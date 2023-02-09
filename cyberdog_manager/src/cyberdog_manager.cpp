@@ -38,13 +38,13 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   name_(name)
 {
   node_ptr_ = rclcpp::Node::make_shared(name_);
-  machine_state_ptr_ = std::make_unique<cyberdog::manager::StateContext>(name_ + "_machine");
+  // machine_state_ptr_ = std::make_unique<cyberdog::manager::StateContext>(name_ + "_machine");
   query_node_ptr_ = std::make_unique<QueryInfoNode>(node_ptr_);
   account_node_ptr_ = std::make_unique<AccountInfoNode>(node_ptr_);
   mssc_context_ptr_ = std::make_shared<cyberdog::manager::MachineStateSwitchContext>(node_ptr_);
-  power_consumption_node_ptr = std::make_unique<PowerConsumptionInfoNode>(
+  power_consumption_node_ptr = std::make_shared<PowerConsumptionInfoNode>(
     node_ptr_,
-    std::bind(&MachineStateSwitchContext::ContinueKeepDown, mssc_context_ptr_));
+    std::bind(&MachineStateSwitchContext::KeepDownOverTime, mssc_context_ptr_));
   ready_node_ptr = std::make_unique<ReadyNotifyNode>(name_ + "_ready");
   heart_beat_ptr_ = std::make_unique<cyberdog::manager::HeartContext>(
     node_ptr_,
@@ -57,8 +57,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
       std::placeholders::_1, std::placeholders::_2));
   touch_node_ptr = std::make_unique<TouchInfoNode>(node_ptr_);
   audio_node_ptr = std::make_unique<AudioInfoNode>(
-    node_ptr_,
-    std::bind(&MachineStateSwitchContext::AudioWakeUp, mssc_context_ptr_));
+    node_ptr_);
   led_node_ptr = std::make_unique<LedInfoNode>(node_ptr_);
   executor_.add_node(node_ptr_);
   // black_box_ptr_ = std::make_shared<BlackBox>(node_ptr_);
@@ -72,12 +71,6 @@ cyberdog::manager::CyberdogManager::~CyberdogManager()
 void cyberdog::manager::CyberdogManager::Config()
 {
   INFO("config state handler");
-  // power_consumption_node_ptr->SetActive(std::bind(&CyberdogManager::OnActive, this));
-  // power_consumption_node_ptr->SetDeactive(std::bind(&CyberdogManager::OnDeactive, this));
-  // bcin_node_ptr->SetProtect(std::bind(&CyberdogManager::OnProtected, this));
-  // bcin_node_ptr->SetLowpower(std::bind(&CyberdogManager::OnLowPower, this));
-  // bcin_node_ptr->SetActive(std::bind(&CyberdogManager::OnActive, this));
-  // bcin_node_ptr->SetShutdown(std::bind(&CyberdogManager::OnTearDown, this));
   mssc_context_ptr_->SetActive(std::bind(&CyberdogManager::OnActive, this));
   mssc_context_ptr_->SetProtect(std::bind(&CyberdogManager::OnProtected, this));
   mssc_context_ptr_->SetLowpower(std::bind(&CyberdogManager::OnLowPower, this));
@@ -89,31 +82,28 @@ bool cyberdog::manager::CyberdogManager::Init()
 {
   ready_node_ptr->SelfCheck(1);
   error_context_ptr_->Init();
-  if (!machine_state_ptr_->Init()) {
-    ERROR(">>>XXXXX---machine state init error!");
-  }
-  mssc_context_ptr_->SetStateHandler(machine_state_ptr_->GetAchieveStates());
+  // if (!machine_state_ptr_->Init()) {
+  //   ERROR(">>>XXXXX---machine state init error!");
+  // }
+  // mssc_context_ptr_->SetStateHandler(machine_state_ptr_->GetAchieveStates());
+  mssc_context_ptr_->ExecuteSetUp();
+  mssc_context_ptr_->SetLowpowerEnterAndExitCallback(
+    std::bind(
+      &PowerConsumptionInfoNode::EnterLowPower, power_consumption_node_ptr,
+      std::placeholders::_1));
   error_context_ptr_->ClearError();
   Config();
   if (!RegisterStateHandler(node_ptr_)) {
     return false;
   }
-  if (!SelfCheck() ) {
-    // if (false) {
+  // if (!SelfCheck() ) {
+  if (!mssc_context_ptr_->ExecuteSelfCheck()) {
     ERROR(">>>XXXXX---machine state self check error!");
     audio_node_ptr->Error("自检失败!自检失败!自检失败!");
     ready_node_ptr->SelfCheck(2);
     return false;
   } else {
     // heart_beat_ptr_->Init();
-  }
-
-  // heart_beat_ptr_->Init();
-
-  // if (!black_box_ptr_->Init()) {
-  if (true) {
-    // error msg
-    // send msg to app ?
   }
 
   query_node_ptr_->Init();
@@ -129,29 +119,9 @@ bool cyberdog::manager::CyberdogManager::Init()
 
 bool cyberdog::manager::CyberdogManager::SelfCheck()
 {
-  return machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_SelfCheck);
+  // return machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_SelfCheck);
+  return true;
 }
-
-// void cyberdog::manager::CyberdogManager::HeartbeatsCheck()
-// {
-//   auto current_time = GetMsTime();
-//   std::for_each(
-//     heartbeats_map_.begin(), heartbeats_map_.end(),
-//     [this, &current_time](
-//       std::map<std::string, HeartbeatsRecorder>::reference recorder) {
-//       if (current_time - recorder.second.timestamp > 500) {
-//         if (++recorder.second.counter > 5) {
-//           // error msg
-//           this->SetState((int8_t)system::ManagerState::kError);
-//         } else {
-//           // error msg
-//         }
-//       } else {
-//         recorder.second.counter = 0;
-//       }
-//     }
-//   );
-// }
 
 void cyberdog::manager::CyberdogManager::Run()
 {
@@ -168,7 +138,7 @@ void cyberdog::manager::CyberdogManager::OnLowPower()
 {
   INFO("on lowpower");
   // bcin_node_ptr->SetBms(BatteryMachineState::BMS_LOWPOWER);
-  machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_LowPower);
+  // machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_LowPower);
 }
 
 void cyberdog::manager::CyberdogManager::OnSuspend()
@@ -180,15 +150,16 @@ void cyberdog::manager::CyberdogManager::OnProtected()
 {
   ERROR("on protect");
   // bcin_node_ptr->SetBms(BatteryMachineState::BMS_PROTECT);
-  machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Protected);
+  // machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Protected);
 }
 
 void cyberdog::manager::CyberdogManager::OnActive()
 {
   INFO("trigger state:on active");
-  bool result = machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
+  // bool result = machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
   query_node_ptr_->Report(true);
-  if (result) {
+  // if (result) {
+  if (true) {
     INFO("!!! All node in detectedc machine state is acitve ok !!!");
     audio_node_ptr->Init();
     ready_node_ptr->Ready(true);
@@ -206,7 +177,7 @@ void cyberdog::manager::CyberdogManager::OnActive()
 void cyberdog::manager::CyberdogManager::OnDeactive()
 {
   INFO("trigger state:on deactive");
-  machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_DeActive);
+  // machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_DeActive);
   query_node_ptr_->Report(false);
   ready_node_ptr->Ready(false);
 }
@@ -214,7 +185,7 @@ void cyberdog::manager::CyberdogManager::OnDeactive()
 void cyberdog::manager::CyberdogManager::OnTearDown()
 {
   INFO("trigger state:on teardown");
-  machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_TearDown);
+  // machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_TearDown);
 }
 
 void cyberdog::manager::CyberdogManager::OnOta()

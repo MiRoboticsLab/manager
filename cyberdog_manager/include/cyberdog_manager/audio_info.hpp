@@ -19,7 +19,6 @@
 #include "rclcpp/rclcpp.hpp"
 #include "protocol/msg/audio_play_extend.hpp"
 #include "protocol/srv/audio_text_play.hpp"
-#include "std_msgs/msg/bool.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 
 namespace cyberdog
@@ -30,11 +29,10 @@ namespace manager
 class AudioInfoNode final
 {
   using AudioMsg = protocol::msg::AudioPlayExtend;
-  using WAKEUP_CALLBACK = std::function<void ()>;
 
 public:
-  explicit AudioInfoNode(rclcpp::Node::SharedPtr node_ptr, WAKEUP_CALLBACK callback)
-  : audio_info_node_(node_ptr), wakeup_handler(callback)
+  explicit AudioInfoNode(rclcpp::Node::SharedPtr node_ptr)
+  : audio_info_node_(node_ptr)
   {
     audio_callback_group_ =
       audio_info_node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
@@ -52,11 +50,6 @@ public:
   void Init()
   {
     if (!init_) {
-      // AudioMsg msg;
-      // msg.module_name = audio_info_node_->get_name();
-      // msg.is_online = false;
-      // msg.speech.play_id = protocol::msg::AudioPlay::PID_SOUND_EFFECT_READY;
-      // audio_play_pub_->publish(msg);
       INFO("...now play sound effect ready...");
       std::chrono::seconds timeout(6);
       auto req = std::make_shared<protocol::srv::AudioTextPlay::Request>();
@@ -66,6 +59,7 @@ public:
       auto future_result = audio_text_play_client_->async_send_request(req);
       std::future_status status = future_result.wait_for(timeout);
       if (status == std::future_status::ready) {
+        ERROR("call play sound service success.");
       } else {
         ERROR("call play sound service failed!");
       }
@@ -75,13 +69,6 @@ public:
       text_msg.speech.play_id = protocol::msg::AudioPlay::PID_SELF_CHECK_SUCCESS;
       text_msg.text = "自检完成,状态就绪!";
       audio_play_pub_->publish(text_msg);
-      rclcpp::SubscriptionOptions sub_options;
-      sub_options.callback_group = audio_callback_group_;
-      wake_up_sub_ =
-        audio_info_node_->create_subscription<std_msgs::msg::Bool>(
-        "dog_wakeup", rclcpp::SystemDefaultsQoS(),
-        std::bind(&AudioInfoNode::DogWakeup, this, std::placeholders::_1),
-        sub_options);
       init_ = true;
     }
   }
@@ -97,21 +84,10 @@ public:
   }
 
 private:
-  void DogWakeup(const std_msgs::msg::Bool::SharedPtr msg)
-  {
-    if (msg->data) {
-      INFO("[LowPower]: dog wakeup...");
-      wakeup_handler();
-    }
-  }
-
-private:
   rclcpp::Node::SharedPtr audio_info_node_{nullptr};
   rclcpp::CallbackGroup::SharedPtr audio_callback_group_;
   rclcpp::Publisher<AudioMsg>::SharedPtr audio_play_pub_ {nullptr};
   rclcpp::Client<protocol::srv::AudioTextPlay>::SharedPtr audio_text_play_client_ {nullptr};
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
-  WAKEUP_CALLBACK wakeup_handler {[](void) {}};
   bool init_ {false};
 };
 

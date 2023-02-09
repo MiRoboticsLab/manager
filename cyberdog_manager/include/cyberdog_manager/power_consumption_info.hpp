@@ -40,20 +40,12 @@ class PowerConsumptionInfoNode final
 
 public:
   explicit PowerConsumptionInfoNode(rclcpp::Node::SharedPtr node_ptr, PCIN_CALLBACK callback)
-  // : request_handler([](void) {}), release_handler([](void) {})
   : enter_lowpower_handler(callback)
   {
     power_consumption_info_node_ = node_ptr;
     lpc_ptr_ = std::make_unique<cyberdog::manager::LowPowerConsumption>();
     power_consumption_callback_group_ =
       power_consumption_info_node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-    low_power_consumption_srv_ =
-      power_consumption_info_node_->create_service<std_srvs::srv::SetBool>(
-      "low_power_consumption",
-      std::bind(
-        &PowerConsumptionInfoNode::EnterLowPower, this, std::placeholders::_1,
-        std::placeholders::_2),
-      rmw_qos_profile_services_default, power_consumption_callback_group_);
 
     power_off_srv_ =
       power_consumption_info_node_->create_service<std_srvs::srv::Trigger>(
@@ -86,62 +78,66 @@ public:
         this, std::placeholders::_1), options);
   }
 
-public:
-  // void SetActive(PCIN_CALLBACK callback)
-  // {
-  //   request_handler = callback;
-  // }
-  // void SetDeactive(PCIN_CALLBACK callback)
-  // {
-  //   release_handler = callback;
-  // }
-  // void SetPms(PowerMachineState p)
-  // {
-  //   pms = p;
-  // }
-  // void NotifyState(uint8_t state)
-  // {
-  //   switch (state)
-  //   {
-  //   case 0:
-  //     break;
-  //   case 1:
-  //     break;
-  //   case 2:
-  //     break;
-
-  //   default:
-  //     break;
-  //   }
-  // }
-
-private:
-  void EnterLowPower(
-    const std_srvs::srv::SetBool::Request::SharedPtr request,
-    std_srvs::srv::SetBool::Response::SharedPtr response)
+  bool EnterLowPower(bool is_enter)
   {
     static int r_count = 0;
-    INFO(
-      "[LowPower]: [%d]EnterLowPower %s:start", (r_count + 1),
-      (request->data ? "true" : "false"));
-    // PM_DEV pd = PM_CAM_ALL;
     PM_DEV pd = PM_ALL_NO_TOF;
     unsigned int err;
     int code = -1;
-    if (request->data) {
+    bool result = false;
+    if (is_enter) {
+      INFO("[LowPower]: [%d]LowPower enter inner-call:start", (r_count + 1));
       code = lpc_ptr_->LpcRelease(pd, &err);
-      is_lowpower_ = true;
+      if (code == 0) {
+        is_lowpower_ = true;
+        INFO("[LowPower]: [%d]LowPower enter inner-call:success", (r_count + 1));
+        result = true;
+      } else {
+        INFO("[LowPower]: [%d]LowPower enter inner-call:failed!", (r_count + 1));
+      }
       ++r_count;
     } else {
+      INFO("[LowPower]: [%d]LowPower exit inner-call:start", (r_count + 1));
       code = lpc_ptr_->LpcRequest(pd, &err);
-      is_lowpower_ = false;
+      if (code == 0) {
+        is_lowpower_ = false;
+        INFO("[LowPower]: [%d]LowPower exit inner-call:success", (r_count + 1));
+        result = true;
+      } else {
+        INFO("[LowPower]: [%d]LowPower exit inner-call:failed!", (r_count + 1));
+      }
       ++r_count;
     }
-    response->success = (code == 0 ? true : false);
-    INFO(
-      "[LowPower]: [%d]EnterLowPower %s:stop", (r_count + 1),
-      (request->data ? "true" : "false"));
+    return result;
   }
+
+private:
+  // void EnterLowPower(
+  //   const std_srvs::srv::SetBool::Request::SharedPtr request,
+  //   std_srvs::srv::SetBool::Response::SharedPtr response)
+  // {
+  //   static int r_count = 0;
+  //   INFO(
+  //     "[LowPower]: [%d]EnterLowPower %s:start", (r_count + 1),
+  //     (request->data ? "true" : "false"));
+  //   // PM_DEV pd = PM_CAM_ALL;
+  //   PM_DEV pd = PM_ALL_NO_TOF;
+  //   unsigned int err;
+  //   int code = -1;
+  //   if (request->data) {
+  //     code = lpc_ptr_->LpcRelease(pd, &err);
+  //     is_lowpower_ = true;
+  //     ++r_count;
+  //   } else {
+  //     code = lpc_ptr_->LpcRequest(pd, &err);
+  //     is_lowpower_ = false;
+  //     ++r_count;
+  //   }
+  //   response->success = (code == 0 ? true : false);
+  //   INFO(
+  //     "[LowPower]: [%d]EnterLowPower %s:stop", (r_count + 1),
+  //     (request->data ? "true" : "false"));
+  // }
 
   void sub_mostion_status_callback(const protocol::msg::MotionStatus::SharedPtr msg)
   {
@@ -229,7 +225,7 @@ private:
 private:
   rclcpp::Node::SharedPtr power_consumption_info_node_ {nullptr};
   rclcpp::CallbackGroup::SharedPtr power_consumption_callback_group_;
-  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_consumption_srv_;
+  // rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_consumption_srv_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reboot_srv_ {nullptr};
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr power_off_srv_ {nullptr};
   std::unique_ptr<cyberdog::manager::LowPowerConsumption> lpc_ptr_ {nullptr};

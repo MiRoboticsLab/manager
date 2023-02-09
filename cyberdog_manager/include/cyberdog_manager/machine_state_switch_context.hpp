@@ -19,8 +19,11 @@
 #include <map>
 #include <mutex>
 #include <vector>
+#include "ament_index_cpp/get_package_share_directory.hpp"
+#include "cyberdog_machine/cyberdog_fs_machine.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/u_int8.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
@@ -38,6 +41,7 @@ enum class MsscMachineState : uint8_t
   MSSC_LOWPOWER  = 2,    // 低功耗
   MSSC_OTA       = 3,    // OTA
   MSSC_SHUTDOWN  = 4,    // 关机
+  MSSC_SELFCHECK = 5,    // 自检
   MSSC_UNKOWN    = 255,  // 未知
 };
 enum class MachineStateChild : uint8_t
@@ -52,15 +56,77 @@ enum class MachineStateChild : uint8_t
   MSC_ERROR       = 7,
 };
 
+class StateContext final
+{
+public:
+  explicit StateContext(const std::string & node_name)
+  : name_(node_name)
+  {
+    node_ptr_ = rclcpp::Node::make_shared(name_);
+    machine_context_ptr_ = std::make_unique<cyberdog::machine::MachineContext>();
+    current_state_ = machine_context_ptr_->Context(
+      cyberdog::machine::MachineState::MS_Uninitialized);
+    machine_controller_ptr_ = std::make_shared<cyberdog::machine::MachineController>();
+    std::thread(
+      [this]() {
+        rclcpp::spin(node_ptr_);
+      }).detach();
+  }
+
+  ~StateContext() {}
+
+  bool Init()
+  {
+    auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
+    auto path = local_share_dir + std::string("/toml_config/manager/state_machine_config.toml");
+    if (!machine_controller_ptr_->MachineControllerInit(
+        path, node_ptr_))
+    {
+      ERROR("Machine State Init failed!");
+      return false;
+    } else if (!machine_controller_ptr_->WaitActuatorsSetUp()) {
+      ERROR("Machine State Init failed, actuators setup failed!");
+      return false;
+    } else {
+      INFO("Machine State Init OK.");
+      return true;
+    }
+  }
+
+  bool SetState(cyberdog::machine::MachineState ms)
+  {
+    current_state_ = machine_context_ptr_->Context(ms);
+    if (!machine_controller_ptr_->SetState(current_state_)) {
+      ERROR("set state:%s failed, cannot running!", current_state_.c_str());
+      return false;
+    }
+    return true;
+  }
+
+  const std::vector<std::string> & GetAchieveStates()
+  {
+    return machine_controller_ptr_->GetNeedAchieveStates();
+  }
+
+private:
+  std::string name_;
+  rclcpp::Node::SharedPtr node_ptr_{nullptr};
+  std::shared_ptr<cyberdog::machine::MachineController> machine_controller_ptr_ {nullptr};
+  std::string current_state_;
+  std::unique_ptr<cyberdog::machine::MachineContext> machine_context_ptr_ {nullptr};
+};
+
 class MachineStateSwitchContext final
 {
   using BSSC_CALLBACK = std::function<void ()>;
   using MACHINE_STATE_CALLBACK = std::function<void ()>;
+  using LOWPOWER_ENTERANDEXIT_CALLBACK = std::function<bool (bool )>;
 
 public:
   explicit MachineStateSwitchContext(rclcpp::Node::SharedPtr node_ptr)
   : mssc_node_(node_ptr)
   {
+    machine_state_ptr_ = std::make_unique<cyberdog::manager::StateContext>("contex_machine");
     mssc_callback_group_ =
       mssc_node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
     rclcpp::SubscriptionOptions sub_options;
@@ -118,8 +184,26 @@ public:
       mssc_node_->create_publisher<protocol::msg::StateSwitchStatus>(
       "state_switch_status", rclcpp::SystemDefaultsQoS(), pub_options);
   }
+  void ExecuteSetUp()
+  {
+    if (!machine_state_ptr_->Init()) {
+      ERROR(">>>XXXXX---machine state init error!");
+    }
+    SetStateHandler(machine_state_ptr_->GetAchieveStates());
+  }
+  bool ExecuteSelfCheck()
+  {
+    return machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_SelfCheck);
+  }
   void Init()
   {
+    rclcpp::SubscriptionOptions sub_options;
+    sub_options.callback_group = mssc_callback_group_;
+    wake_up_sub_ =
+      mssc_node_->create_subscription<std_msgs::msg::Bool>(
+      "dog_wakeup", rclcpp::SystemDefaultsQoS(),
+      std::bind(&MachineStateSwitchContext::DogWakeup, this, std::placeholders::_1),
+      sub_options);
     mssc_machine_state = MsscMachineState::MSSC_ACTIVE;
   }
   void SetActive(BSSC_CALLBACK callback)
@@ -180,23 +264,30 @@ public:
       }
     }
   }
-  void AudioWakeUp()
+  void SetLowpowerEnterAndExitCallback(LOWPOWER_ENTERANDEXIT_CALLBACK callback)
   {
-    if (is_switching_ms_) {
-      INFO("[MachineState-Switch]: wakeup, now in switching machine state");
-      return;
-    }
-    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
-      return;
-    } else if (battery_charge_val < 5) {
-      std::lock_guard<std::mutex> lck(state_mtx_);
-      machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
-    } else if (battery_charge_val < 20) {
-      std::lock_guard<std::mutex> lck(state_mtx_);
-      machine_state_handler_map[MachineStateChild::MSC_PROTECTED]();
-    } else {
-      std::lock_guard<std::mutex> lck(state_mtx_);
-      machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
+    lowpower = callback;
+  }
+  void DogWakeup(const std_msgs::msg::Bool::SharedPtr msg)
+  {
+    if (msg->data) {
+      INFO("[MachineState-Switch]: dog wakeup...");
+      if (is_switching_ms_) {
+        INFO("[MachineState-Switch]: wakeup, now in switching machine state");
+        return;
+      }
+      if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+        return;
+      } else if (battery_charge_val < 5) {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
+      } else if (battery_charge_val < 20) {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_PROTECTED]();
+      } else {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
+      }
     }
   }
   void BatteryChargeUpdate(uint8_t bc, bool is_charging)
@@ -242,7 +333,7 @@ public:
       }
     }
   }
-  void ContinueKeepDown()
+  void KeepDownOverTime()
   {
     std::lock_guard<std::mutex> lck(state_mtx_);
     machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
@@ -331,6 +422,7 @@ private:
       case MsscMachineState::MSSC_ACTIVE:
         {
           INFO("^^^ switch state:active ^^^");
+          bool result = machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
           active_handler();
           protocol::msg::StateSwitchStatus sss;
           sss.code = 0;
@@ -346,6 +438,7 @@ private:
           sss.state = 1;
           state_swith_status_pub_->publish(sss);
           protect_handler();
+          machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Protected);
         }
         break;
       case MsscMachineState::MSSC_LOWPOWER:
@@ -356,6 +449,7 @@ private:
           sss.state = 2;
           state_swith_status_pub_->publish(sss);
           lowpower_handler();
+          machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_LowPower);
           lowpower(true);
         }
         break;
@@ -367,6 +461,7 @@ private:
           sss.state = 3;
           state_swith_status_pub_->publish(sss);
           ota_handler();
+          machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_OTA);
         }
         break;
       case MsscMachineState::MSSC_SHUTDOWN:
@@ -379,6 +474,7 @@ private:
           state_swith_status_pub_->publish(sss);
           poweroff();
           shutdown_handler();
+          machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_TearDown);
         }
         break;
       default:
@@ -408,29 +504,37 @@ private:
     }
   }
 
-  bool lowpower(bool is_enter)
-  {
-    INFO("[LowPower]: now dog %s low-power model.", (is_enter ? "enter" : "exit"));
-    if (!low_power_client_->wait_for_service(std::chrono::seconds(2))) {
-      ERROR("[LowPower]: call low-power service not avalible");
-    } else {
-      std::chrono::seconds timeout(10);
-      auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
-      req->data = is_enter;
-      auto future_result = low_power_client_->async_send_request(req);
-      std::future_status status = future_result.wait_for(timeout);
-      if (status == std::future_status::ready) {
-        INFO("[LowPower]: call low-power service success.");
-        return future_result.get()->success;
-      } else {
-        ERROR("[LowPower]: call low-power service failed!");
-      }
-    }
-    return false;
-  }
+  // bool lowpower(bool is_enter)
+  // {
+  //   INFO("[LowPower]: now dog %s low-power model.", (is_enter ? "enter" : "exit"));
+  //   if (!low_power_client_->wait_for_service(std::chrono::seconds(2))) {
+  //     ERROR("[LowPower]: call low-power service not avalible");
+  //   } else {
+  //     std::chrono::seconds timeout(10);
+  //     auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
+  //     req->data = is_enter;
+  //     auto future_result = low_power_client_->async_send_request(req);
+  //     std::future_status status = future_result.wait_for(timeout);
+  //     if (status == std::future_status::ready) {
+  //       INFO("[LowPower]: call low-power service success.");
+  //       return future_result.get()->success;
+  //     } else {
+  //       ERROR("[LowPower]: call low-power service failed!");
+  //     }
+  //   }
+  //   return false;
+  // }
 
   void OnSelfCheck()
   {
+    if (is_switching_ms_) {
+      INFO("[MachineState-SelfCheck]: rejected, now in switching machine state");
+      return;
+    }
+    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+      return;
+    }
+    SwitchState(MsscMachineState::MSSC_SELFCHECK);
   }
 
   void OnLowPower()
@@ -522,6 +626,7 @@ private:
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr power_off_client_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr low_power_client_;
   rclcpp::Publisher<protocol::msg::StateSwitchStatus>::SharedPtr state_swith_status_pub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
   MsscMachineState mssc_machine_state {MsscMachineState::MSSC_UNKOWN};
   std::mutex switch_mtx;
   BSSC_CALLBACK active_handler {[](void) {}};
@@ -551,6 +656,8 @@ private:
     {MachineStateChild::MSC_ERROR, []() {}},
   };
   bool disable_lowpower_ {false};
+  LOWPOWER_ENTERANDEXIT_CALLBACK lowpower {[](bool) {return true;}};
+  std::unique_ptr<cyberdog::manager::StateContext> machine_state_ptr_ {nullptr};
 };
 }  // namespace manager
 }  // namespace cyberdog
