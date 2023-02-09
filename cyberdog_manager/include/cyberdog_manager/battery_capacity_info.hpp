@@ -42,13 +42,8 @@ public:
     rclcpp::Node::SharedPtr node_ptr,
     BCINSOC_CALLBACK bcin_soc)
   : battery_capacity_info_node_(node_ptr),
-    // protect_handler([](void) {}),
-    // lowpower_handler([](void) {}),
-    // active_handler([](void) {}),
-    // shutdown_handler([](void) {}),
-    socnotify_handler(bcin_soc),
+    batsoc_notify_handler(bcin_soc),
     is_protected(false), is_reported_charging(false)
-    // bms{BatteryMachineState::BMS_UNKOWN}
   {
   }
 
@@ -73,26 +68,6 @@ public:
       pub_options
       );
   }
-  // void SetActive(BCIN_CALLBACK callback)
-  // {
-  //   active_handler = callback;
-  // }
-  // void SetProtect(BCIN_CALLBACK callback)
-  // {
-  //   protect_handler = callback;
-  // }
-  // void SetLowpower(BCIN_CALLBACK callback)
-  // {
-  //   lowpower_handler = callback;
-  // }
-  // void SetShutdown(BCIN_CALLBACK callback)
-  // {
-  //   shutdown_handler = callback;
-  // }
-  // void SetBms(BatteryMachineState b)
-  // {
-  //   bms = b;
-  // }
 
 private:
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
@@ -100,7 +75,7 @@ private:
     static bool is_battary_zero = false;
     static bool is_set_count = false;
     bms_status_ = *msg;
-    socnotify_handler(bms_status_.batt_soc, bms_status_.power_wired_charging);
+    batsoc_notify_handler(bms_status_.batt_soc, bms_status_.power_wired_charging);
     if (bms_status_.power_wired_charging) {
       is_set_count = false;
       is_reported_charging = false;
@@ -192,7 +167,7 @@ private:
   // BCIN_CALLBACK lowpower_handler;
   // BCIN_CALLBACK active_handler;
   // BCIN_CALLBACK shutdown_handler;
-  BCINSOC_CALLBACK socnotify_handler;
+  BCINSOC_CALLBACK batsoc_notify_handler;
   bool is_protected;
   bool is_reported_charging;
   // BatteryMachineState bms;
