@@ -300,7 +300,7 @@ public:
       // 关机
       std::lock_guard<std::mutex> lck(state_mtx_);
       machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
-    } else if (battery_charge_val < 5) {
+    } else if (battery_charge_val < 5 && !disable_lowpower_) {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER || is_charging) {
         return;
       } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
