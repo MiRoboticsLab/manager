@@ -157,6 +157,7 @@ void cyberdog::manager::CyberdogManager::OnActive()
 {
   INFO("trigger state:on active");
   // bool result = machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
+  mssc_context_ptr_->ExecuteActive();
   query_node_ptr_->Report(true);
   // if (result) {
   if (true) {
