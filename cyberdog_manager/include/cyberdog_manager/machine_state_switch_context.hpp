@@ -195,10 +195,6 @@ public:
   {
     return machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_SelfCheck);
   }
-  bool ExecuteActive()
-  {
-    return machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
-  }
   void Init()
   {
     rclcpp::SubscriptionOptions sub_options;
@@ -274,22 +270,24 @@ public:
   }
   void DogWakeup(const std_msgs::msg::Bool::SharedPtr msg)
   {
-    if (msg->data && mssc_machine_state != MsscMachineState::MSSC_LOWPOWER) {
-      return;
-    }
-    if (is_switching_ms_) {
-      INFO("[MachineState-Switch]: wakeup, now in switching machine state");
-      return;
-    }
-    INFO("[MachineState-Switch]: dog wakeup...");
-    if (battery_charge_val < 5) {
-      INFO("rejected wakeup, battery soc less than 5");
-    } else if (battery_charge_val < 20) {
-      std::lock_guard<std::mutex> lck(state_mtx_);
-      machine_state_handler_map[MachineStateChild::MSC_PROTECTED]();
-    } else {
-      std::lock_guard<std::mutex> lck(state_mtx_);
-      machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
+    if (msg->data) {
+      INFO("[MachineState-Switch]: dog wakeup...");
+      if (is_switching_ms_) {
+        INFO("[MachineState-Switch]: wakeup, now in switching machine state");
+        return;
+      }
+      if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+        return;
+      } else if (battery_charge_val < 5) {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
+      } else if (battery_charge_val < 20) {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_PROTECTED]();
+      } else {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
+      }
     }
   }
   void BatteryChargeUpdate(uint8_t bc, bool is_charging)
@@ -424,7 +422,7 @@ private:
       case MsscMachineState::MSSC_ACTIVE:
         {
           INFO("^^^ switch state:active ^^^");
-          machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
+          bool result = machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
           active_handler();
           protocol::msg::StateSwitchStatus sss;
           sss.code = 0;

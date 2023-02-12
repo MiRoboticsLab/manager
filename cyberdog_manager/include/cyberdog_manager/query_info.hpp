@@ -162,7 +162,6 @@ public:
     bool is_audio_state = false;
     bool is_device_model = false;
     bool is_stand_up = false;
-    bool is_lowpower_control = false;
     if (enables.size() > 0) {
       is_sn = enables[0];
     }
@@ -201,9 +200,6 @@ public:
     }
     if (enables.size() > 12) {
       is_stand_up = enables[12];
-    }
-    if (enables.size() > 13) {
-      is_lowpower_control = enables[13];
     }
     if (is_sn) {
       if (sn_ == "") {
@@ -484,14 +480,10 @@ public:
     if (is_stand_up) {
       CyberdogJson::Add(json_info, "stand", standed_);
     }
-    if (is_lowpower_control) {
-      CyberdogJson::Add(json_info, "lowpower_control", false);
-    }
     if (!CyberdogJson::Document2String(json_info, info)) {
       ERROR("error while encoding to json");
       info = "{\"error\": \"unkown encoding json error!\"}";
     }
-
     // INFO("info:%s", info.c_str());
     return info;
   }
@@ -640,7 +632,6 @@ public:
           bool is_audio_state = true;
           bool is_device_model = true;
           bool is_stand_up = true;
-          bool is_lowpower_control = false;
           std::chrono::seconds timeout(10);
           auto req = std::make_shared<protocol::srv::DeviceInfo::Request>();
           req->enables.resize(20);
@@ -657,7 +648,6 @@ public:
           req->enables[10] = is_audio_state;
           req->enables[11] = is_device_model;
           req->enables[12] = is_stand_up;
-          req->enables[13] = is_lowpower_control;
           std_msgs::msg::String msg;
           msg.data = query_node_ptr_->QueryDeviceInfo(req->enables);
           back_to_end_pub_->publish(msg);
