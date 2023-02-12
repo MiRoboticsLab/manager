@@ -46,27 +46,31 @@ namespace cyberdog
 namespace manager
 {
 
-class CyberdogManager : public ManagerBase
+class CyberdogManager /* : public ManagerBase */
 {
 public:
   explicit CyberdogManager(const std::string & name);
   ~CyberdogManager();
 
-  void Config() override;
-  bool Init() override;
-  void Run() override;
-  bool SelfCheck() override;
-  // void HeartbeatsCheck();
+  // void Config() override;
+  // bool Init() override;
+  // void Run() override;
+  void Config();
+  bool Init();
+  void Run();
 
-public:
-  void OnError() override;
-  void OnLowPower() override;
-  void OnSuspend() override;
-  void OnProtected() override;
-  void OnActive() override;
-  void OnDeactive();
-  void OnTearDown();
-  void OnOta();
+private:
+  void OnActive();
+  bool SetState(int8_t state, std::string json_data = "{}");
+  // bool SelfCheck() override;
+  // void OnError() override;
+  // void OnLowPower() override;
+  // void OnSuspend() override;
+  // void OnProtected() override;
+  // void OnActive() override;
+  // void OnDeactive();
+  // void OnTearDown();
+  // void OnOta();
 
 private:
   std::string name_;

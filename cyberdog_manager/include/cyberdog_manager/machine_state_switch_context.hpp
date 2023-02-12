@@ -195,6 +195,10 @@ public:
   {
     return machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_SelfCheck);
   }
+  bool ExecuteActive()
+  {
+    return machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
+  }
   void Init()
   {
     rclcpp::SubscriptionOptions sub_options;
@@ -206,26 +210,26 @@ public:
       sub_options);
     mssc_machine_state = MsscMachineState::MSSC_ACTIVE;
   }
-  void SetActive(BSSC_CALLBACK callback)
-  {
-    active_handler = callback;
-  }
-  void SetProtect(BSSC_CALLBACK callback)
-  {
-    protect_handler = callback;
-  }
-  void SetLowpower(BSSC_CALLBACK callback)
-  {
-    lowpower_handler = callback;
-  }
-  void SetOta(BSSC_CALLBACK callback)
-  {
-    ota_handler = callback;
-  }
-  void SetShutdown(BSSC_CALLBACK callback)
-  {
-    shutdown_handler = callback;
-  }
+  // void SetActive(BSSC_CALLBACK callback)
+  // {
+  //   active_handler = callback;
+  // }
+  // void SetProtect(BSSC_CALLBACK callback)
+  // {
+  //   protect_handler = callback;
+  // }
+  // void SetLowpower(BSSC_CALLBACK callback)
+  // {
+  //   lowpower_handler = callback;
+  // }
+  // void SetOta(BSSC_CALLBACK callback)
+  // {
+  //   ota_handler = callback;
+  // }
+  // void SetShutdown(BSSC_CALLBACK callback)
+  // {
+  //   shutdown_handler = callback;
+  // }
   void SetStateHandler(const std::vector<std::string> & state_vec)
   {
     for (auto & elem : state_vec) {
@@ -270,24 +274,22 @@ public:
   }
   void DogWakeup(const std_msgs::msg::Bool::SharedPtr msg)
   {
-    if (msg->data) {
-      INFO("[MachineState-Switch]: dog wakeup...");
-      if (is_switching_ms_) {
-        INFO("[MachineState-Switch]: wakeup, now in switching machine state");
-        return;
-      }
-      if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
-        return;
-      } else if (battery_charge_val < 5) {
-        std::lock_guard<std::mutex> lck(state_mtx_);
-        machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
-      } else if (battery_charge_val < 20) {
-        std::lock_guard<std::mutex> lck(state_mtx_);
-        machine_state_handler_map[MachineStateChild::MSC_PROTECTED]();
-      } else {
-        std::lock_guard<std::mutex> lck(state_mtx_);
-        machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
-      }
+    if (msg->data && mssc_machine_state != MsscMachineState::MSSC_LOWPOWER) {
+      return;
+    }
+    if (is_switching_ms_) {
+      INFO("[MachineState-Switch]: wakeup, now in switching machine state");
+      return;
+    }
+    INFO("[MachineState-Switch]: dog wakeup...");
+    if (battery_charge_val < 5 && !disable_lowpower_) {
+      INFO("[MachineState-Switch]: rejected switch, battery soc less than 5 and keep low-power");
+    } else if (battery_charge_val < 20) {
+      std::lock_guard<std::mutex> lck(state_mtx_);
+      machine_state_handler_map[MachineStateChild::MSC_PROTECTED]();
+    } else {
+      std::lock_guard<std::mutex> lck(state_mtx_);
+      machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
     }
   }
   void BatteryChargeUpdate(uint8_t bc, bool is_charging)
@@ -422,8 +424,8 @@ private:
       case MsscMachineState::MSSC_ACTIVE:
         {
           INFO("^^^ switch state:active ^^^");
-          bool result = machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
-          active_handler();
+          machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
+          // active_handler();
           protocol::msg::StateSwitchStatus sss;
           sss.code = 0;
           sss.state = 0;
@@ -437,7 +439,7 @@ private:
           sss.code = 0;
           sss.state = 1;
           state_swith_status_pub_->publish(sss);
-          protect_handler();
+          // protect_handler();
           machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Protected);
         }
         break;
@@ -448,7 +450,7 @@ private:
           sss.code = 0;
           sss.state = 2;
           state_swith_status_pub_->publish(sss);
-          lowpower_handler();
+          // lowpower_handler();
           machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_LowPower);
           lowpower(true);
         }
@@ -460,7 +462,7 @@ private:
           sss.code = 0;
           sss.state = 3;
           state_swith_status_pub_->publish(sss);
-          ota_handler();
+          // ota_handler();
           machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_OTA);
         }
         break;
@@ -473,7 +475,7 @@ private:
           sss.state = 4;
           state_swith_status_pub_->publish(sss);
           poweroff();
-          shutdown_handler();
+          // shutdown_handler();
           machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_TearDown);
         }
         break;
@@ -629,11 +631,11 @@ private:
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
   MsscMachineState mssc_machine_state {MsscMachineState::MSSC_UNKOWN};
   std::mutex switch_mtx;
-  BSSC_CALLBACK active_handler {[](void) {}};
-  BSSC_CALLBACK protect_handler {[](void) {}};
-  BSSC_CALLBACK lowpower_handler {[](void) {}};
-  BSSC_CALLBACK ota_handler {[](void) {}};
-  BSSC_CALLBACK shutdown_handler {[](void) {}};
+  // BSSC_CALLBACK active_handler {[](void) {}};
+  // BSSC_CALLBACK protect_handler {[](void) {}};
+  // BSSC_CALLBACK lowpower_handler {[](void) {}};
+  // BSSC_CALLBACK ota_handler {[](void) {}};
+  // BSSC_CALLBACK shutdown_handler {[](void) {}};
   uint8_t battery_charge_val {100};
   bool is_charging_ {false};
   const std::map<MsscMachineState, std::string> mssc_machine_state_code_map = {

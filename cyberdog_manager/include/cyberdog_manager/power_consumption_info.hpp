@@ -142,6 +142,7 @@ private:
   void sub_mostion_status_callback(const protocol::msg::MotionStatus::SharedPtr msg)
   {
     if (is_ota_) {
+      INFO_MILLSECONDS(10000, "[LowPower]: in ota state return.");
       return;
     }
     // motion_id: 趴下(101)、站立(111)
@@ -182,7 +183,7 @@ private:
 
   void sub_state_switch_status_callback(const protocol::msg::StateSwitchStatus::SharedPtr msg)
   {
-    if (msg->state = 3) {
+    if (msg->state == 3) {
       is_ota_ = true;
     } else {
       is_ota_ = false;
@@ -193,14 +194,14 @@ private:
     const std_srvs::srv::Trigger::Request::SharedPtr,
     std_srvs::srv::Trigger::Response::SharedPtr response)
   {
-    INFO("reboot......");
+    INFO("[PowerConsumption]: reboot......");
     PM_SYS pd = PM_SYS_REBOOT;
     int code = -1;
     code = lpc_ptr_->LpcSysRequest(pd);
     if (code != 0) {
-      INFO("reboot failed, function LpcRequest call faild");
+      INFO("[PowerConsumption]: reboot failed, function LpcRequest call faild");
     } else {
-      INFO("reboot successfully");
+      INFO("[PowerConsumption]: reboot successfully");
     }
     response->success = (code == 0 ? true : false);
   }
@@ -209,14 +210,14 @@ private:
     const std_srvs::srv::Trigger::Request::SharedPtr,
     std_srvs::srv::Trigger::Response::SharedPtr response)
   {
-    INFO("poweroff......");
+    INFO("[PowerConsumption]: poweroff......");
     PM_SYS pd = PM_SYS_SHUTDOWN;
     int code = -1;
     code = lpc_ptr_->LpcSysRequest(pd);
     if (code != 0) {
-      INFO("Shutdown failed, function LpcRequest call faild");
+      INFO("[PowerConsumption]: Shutdown failed, function LpcRequest call faild");
     } else {
-      INFO("Shutdown successfully");
+      INFO("[PowerConsumption]: Shutdown successfully");
     }
     response->success = (code == 0 ? true : false);
   }
