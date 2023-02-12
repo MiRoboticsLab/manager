@@ -36,13 +36,16 @@ class BatteryCapacityInfoNode final
 {
   using BCIN_CALLBACK = std::function<void ()>;
   using BCINSOC_CALLBACK = std::function<void (uint8_t val, bool val2)>;
+  using BCINBMS_CALLBACK = std::function<void (const protocol::msg::BmsStatus::SharedPtr)>;
 
 public:
   explicit BatteryCapacityInfoNode(
     rclcpp::Node::SharedPtr node_ptr,
-    BCINSOC_CALLBACK bcin_soc)
+    BCINSOC_CALLBACK bcin_soc,
+    BCINBMS_CALLBACK bcin_bms)
   : battery_capacity_info_node_(node_ptr),
     batsoc_notify_handler(bcin_soc),
+    bms_notify_handler(bcin_bms),
     is_protected(false), is_reported_charging(false)
   {
   }
@@ -75,7 +78,13 @@ private:
     static bool is_battary_zero = false;
     static bool is_set_count = false;
     bms_status_ = *msg;
-    batsoc_notify_handler(bms_status_.batt_soc, bms_status_.power_wired_charging);
+    if (bms_status_.batt_soc < 5) {
+      bms_notify_handler(msg);
+      batsoc_notify_handler(bms_status_.batt_soc, bms_status_.power_wired_charging);
+    } else {
+      batsoc_notify_handler(bms_status_.batt_soc, bms_status_.power_wired_charging);
+      bms_notify_handler(msg);
+    }
     if (bms_status_.power_wired_charging) {
       is_set_count = false;
       is_reported_charging = false;
@@ -163,14 +172,10 @@ private:
   rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_;
   rclcpp::Publisher<protocol::msg::AudioPlayExtend>::SharedPtr audio_play_extend_pub;
   protocol::msg::BmsStatus bms_status_;
-  // BCIN_CALLBACK protect_handler;
-  // BCIN_CALLBACK lowpower_handler;
-  // BCIN_CALLBACK active_handler;
-  // BCIN_CALLBACK shutdown_handler;
   BCINSOC_CALLBACK batsoc_notify_handler;
+  BCINBMS_CALLBACK bms_notify_handler;
   bool is_protected;
   bool is_reported_charging;
-  // BatteryMachineState bms;
 };
 }  // namespace manager
 }  // namespace cyberdog

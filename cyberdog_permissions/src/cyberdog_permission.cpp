@@ -47,7 +47,7 @@ cyberdog::manager::CyberdogPermission::CyberdogPermission()
           std::system(cmd.c_str());
         }
         uint16_t pub_cnt = 0;
-        while (rclcpp::ok() && (++pub_cnt < 3000)) {
+        while (rclcpp::ok() && (++pub_cnt < 3600)) {
           std_msgs::msg::String msg;
           msg.data = cyberdog_sn;
           sn_pub_->publish(msg);

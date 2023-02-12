@@ -112,37 +112,10 @@ public:
   }
 
 private:
-  // void EnterLowPower(
-  //   const std_srvs::srv::SetBool::Request::SharedPtr request,
-  //   std_srvs::srv::SetBool::Response::SharedPtr response)
-  // {
-  //   static int r_count = 0;
-  //   INFO(
-  //     "[LowPower]: [%d]EnterLowPower %s:start", (r_count + 1),
-  //     (request->data ? "true" : "false"));
-  //   // PM_DEV pd = PM_CAM_ALL;
-  //   PM_DEV pd = PM_ALL_NO_TOF;
-  //   unsigned int err;
-  //   int code = -1;
-  //   if (request->data) {
-  //     code = lpc_ptr_->LpcRelease(pd, &err);
-  //     is_lowpower_ = true;
-  //     ++r_count;
-  //   } else {
-  //     code = lpc_ptr_->LpcRequest(pd, &err);
-  //     is_lowpower_ = false;
-  //     ++r_count;
-  //   }
-  //   response->success = (code == 0 ? true : false);
-  //   INFO(
-  //     "[LowPower]: [%d]EnterLowPower %s:stop", (r_count + 1),
-  //     (request->data ? "true" : "false"));
-  // }
-
   void sub_mostion_status_callback(const protocol::msg::MotionStatus::SharedPtr msg)
   {
     if (is_ota_) {
-      INFO_MILLSECONDS(3000, "[LowPower]: in ota state return.");
+      INFO_MILLSECONDS(10000, "[LowPower]: in ota state return.");
       return;
     }
     // motion_id: 趴下(101)、站立(111)
@@ -194,14 +167,14 @@ private:
     const std_srvs::srv::Trigger::Request::SharedPtr,
     std_srvs::srv::Trigger::Response::SharedPtr response)
   {
-    INFO("reboot......");
+    INFO("[PowerConsumption]: reboot......");
     PM_SYS pd = PM_SYS_REBOOT;
     int code = -1;
     code = lpc_ptr_->LpcSysRequest(pd);
     if (code != 0) {
-      INFO("reboot failed, function LpcRequest call faild");
+      INFO("[PowerConsumption]: reboot failed, function LpcRequest call faild");
     } else {
-      INFO("reboot successfully");
+      INFO("[PowerConsumption]: reboot successfully");
     }
     response->success = (code == 0 ? true : false);
   }
@@ -210,14 +183,14 @@ private:
     const std_srvs::srv::Trigger::Request::SharedPtr,
     std_srvs::srv::Trigger::Response::SharedPtr response)
   {
-    INFO("poweroff......");
+    INFO("[PowerConsumption]: poweroff......");
     PM_SYS pd = PM_SYS_SHUTDOWN;
     int code = -1;
     code = lpc_ptr_->LpcSysRequest(pd);
     if (code != 0) {
-      INFO("Shutdown failed, function LpcRequest call faild");
+      INFO("[PowerConsumption]: Shutdown failed, function LpcRequest call faild");
     } else {
-      INFO("Shutdown successfully");
+      INFO("[PowerConsumption]: Shutdown successfully");
     }
     response->success = (code == 0 ? true : false);
   }

@@ -30,6 +30,10 @@
 #include "protocol/msg/state_switch_status.hpp"
 #include "protocol/srv/machine_state.hpp"
 
+using cyberdog::common::CyberdogJson;
+using rapidjson::Document;
+using rapidjson::kObjectType;
+
 namespace cyberdog
 {
 namespace manager
@@ -126,6 +130,7 @@ public:
   explicit MachineStateSwitchContext(rclcpp::Node::SharedPtr node_ptr)
   : mssc_node_(node_ptr)
   {
+    Config();
     machine_state_ptr_ = std::make_unique<cyberdog::manager::StateContext>("contex_machine");
     mssc_callback_group_ =
       mssc_node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
@@ -170,6 +175,13 @@ public:
         &MachineStateSwitchContext::LowPowerOnoff, this, std::placeholders::_1,
         std::placeholders::_2),
       rmw_qos_profile_services_default, mssc_callback_group_);
+    low_power_switch_state_srv_ =
+      mssc_node_->create_service<std_srvs::srv::Trigger>(
+      "low_power_switch_state",
+      std::bind(
+        &MachineStateSwitchContext::LowPowerSwitchState, this, std::placeholders::_1,
+        std::placeholders::_2),
+      rmw_qos_profile_services_default, mssc_callback_group_);
     power_off_client_ =
       mssc_node_->create_client<std_srvs::srv::Trigger>(
       "poweroff",
@@ -210,26 +222,6 @@ public:
       sub_options);
     mssc_machine_state = MsscMachineState::MSSC_ACTIVE;
   }
-  void SetActive(BSSC_CALLBACK callback)
-  {
-    active_handler = callback;
-  }
-  void SetProtect(BSSC_CALLBACK callback)
-  {
-    protect_handler = callback;
-  }
-  void SetLowpower(BSSC_CALLBACK callback)
-  {
-    lowpower_handler = callback;
-  }
-  void SetOta(BSSC_CALLBACK callback)
-  {
-    ota_handler = callback;
-  }
-  void SetShutdown(BSSC_CALLBACK callback)
-  {
-    shutdown_handler = callback;
-  }
   void SetStateHandler(const std::vector<std::string> & state_vec)
   {
     for (auto & elem : state_vec) {
@@ -253,7 +245,7 @@ public:
         std::lock_guard<std::mutex> lck(state_mtx_);
         machine_state_handler_map[MachineStateChild::MSC_PROTECTED] =
           std::bind(&MachineStateSwitchContext::OnProtected, this);
-      } else if (elem == "LowPower") {
+      } else if (elem == "LowPower" && !disable_lowpower_) {
         std::lock_guard<std::mutex> lck(state_mtx_);
         machine_state_handler_map[MachineStateChild::MSC_LOWPOWER] =
           std::bind(&MachineStateSwitchContext::OnLowPower, this);
@@ -282,8 +274,8 @@ public:
       return;
     }
     INFO("[MachineState-Switch]: dog wakeup...");
-    if (battery_charge_val < 5) {
-      INFO("rejected wakeup, battery soc less than 5");
+    if (battery_charge_val < 5 && !disable_lowpower_) {
+      INFO("[MachineState-Switch]: rejected switch, battery soc less than 5 and keep low-power");
     } else if (battery_charge_val < 20) {
       std::lock_guard<std::mutex> lck(state_mtx_);
       machine_state_handler_map[MachineStateChild::MSC_PROTECTED]();
@@ -342,6 +334,27 @@ public:
   }
 
 private:
+  void Config()
+  {
+    auto path = CONFIG_DIR + "/" + CONFIG_FILE;
+    Document json_document(kObjectType);
+    auto result = CyberdogJson::ReadJsonFromFile(path, json_document);
+    if (result) {
+      rapidjson::Value lowpower_val;
+      bool result = CyberdogJson::Get(json_document, "lowpower_info", lowpower_val);
+      if (result) {
+        if (lowpower_val.HasMember("switch")) {
+          disable_lowpower_ = !lowpower_val["switch"].GetBool();
+        } else {
+          disable_lowpower_ = true;
+        }
+      } else {
+        disable_lowpower_ = true;
+      }
+    } else {
+      disable_lowpower_ = true;
+    }
+  }
   void MachineStateSwitch(const std_msgs::msg::UInt8::SharedPtr msg)
   {
     SwitchState(static_cast<MsscMachineState>(msg->data));
@@ -366,7 +379,7 @@ private:
     if (request->data) {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
         lowpower(false);
-        INFO("[LowPower]: exit lowpower to ota");
+        INFO("[MachineState-LowPower]: exit lowpower to ota");
       } else if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
         response->success = true;
         return;
@@ -404,16 +417,53 @@ private:
     const std_srvs::srv::SetBool::Request::SharedPtr request,
     std_srvs::srv::SetBool::Response::SharedPtr response)
   {
-    if (disable_lowpower_ != request->data) {
-      disable_lowpower_ = request->data;
+    if (disable_lowpower_ == request->data) {
+      disable_lowpower_ = (!request->data);
       if (disable_lowpower_) {
         std::lock_guard<std::mutex> lck(state_mtx_);
         machine_state_handler_map[MachineStateChild::MSC_LOWPOWER] =
           []() {};
         machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
+      } else {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_LOWPOWER] =
+          std::bind(&MachineStateSwitchContext::OnLowPower, this);
       }
+      auto path = CONFIG_DIR + "/" + CONFIG_FILE;
+      if (access(CONFIG_DIR.c_str(), F_OK) != 0) {
+        std::string cmd = "mkdir -p " + CONFIG_DIR;
+        std::system(cmd.c_str());
+        cmd = "chmod 777 " + CONFIG_DIR;
+        std::system(cmd.c_str());
+      }
+      Document json_document(kObjectType);
+      Document::AllocatorType & allocator = json_document.GetAllocator();
+      auto result = CyberdogJson::ReadJsonFromFile(path, json_document);
+      rapidjson::Value lowpower_val(rapidjson::kObjectType);
+      if (result) {
+        result = CyberdogJson::Get(json_document, "lowpower_info", lowpower_val);
+        if (result) {
+          if (lowpower_val.HasMember("switch")) {
+            lowpower_val["switch"].SetBool(!disable_lowpower_);
+          } else {
+            lowpower_val.AddMember("switch", !disable_lowpower_, allocator);
+          }
+        }
+      } else {
+        INFO("[MachineState-LowPower]: no file:%s, create it!", path.c_str());
+        lowpower_val.AddMember("switch", request->data, allocator);
+      }
+      CyberdogJson::Add(json_document, "lowpower_info", lowpower_val);
+      CyberdogJson::WriteJsonToFile(path, json_document);
     }
     response->success = true;
+  }
+  void LowPowerSwitchState(
+    const std_srvs::srv::Trigger::Request::SharedPtr,
+    std_srvs::srv::Trigger::Response::SharedPtr response)
+  {
+    response->success = disable_lowpower_ ? false : true;
+    response->message = disable_lowpower_ ? "off" : "on";
   }
   void SwitchState(MsscMachineState mm)
   {
@@ -423,9 +473,9 @@ private:
     switch (mssc_machine_state) {
       case MsscMachineState::MSSC_ACTIVE:
         {
-          INFO("^^^ switch state:active ^^^");
+          INFO("[MachineState-Switch]: ^^^ switch state:active ^^^");
           machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
-          active_handler();
+          // active_handler();
           protocol::msg::StateSwitchStatus sss;
           sss.code = 0;
           sss.state = 0;
@@ -434,54 +484,54 @@ private:
         break;
       case MsscMachineState::MSSC_PROTECT:
         {
-          INFO("^^^ switch state:protected ^^^");
+          INFO("[MachineState-Switch]: ^^^ switch state:protected ^^^");
           protocol::msg::StateSwitchStatus sss;
           sss.code = 0;
           sss.state = 1;
           state_swith_status_pub_->publish(sss);
-          protect_handler();
+          // protect_handler();
           machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Protected);
         }
         break;
       case MsscMachineState::MSSC_LOWPOWER:
         {
-          INFO("^^^ switch state:low-power ^^^");
+          INFO("[MachineState-Switch]: ^^^ switch state:low-power ^^^");
           protocol::msg::StateSwitchStatus sss;
           sss.code = 0;
           sss.state = 2;
           state_swith_status_pub_->publish(sss);
-          lowpower_handler();
+          // lowpower_handler();
           machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_LowPower);
           lowpower(true);
         }
         break;
       case MsscMachineState::MSSC_OTA:
         {
-          INFO("^^^ switch state:ota ^^^");
+          INFO("[MachineState-Switch]: ^^^ switch state:ota ^^^");
           protocol::msg::StateSwitchStatus sss;
           sss.code = 0;
           sss.state = 3;
           state_swith_status_pub_->publish(sss);
-          ota_handler();
+          // ota_handler();
           machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_OTA);
         }
         break;
       case MsscMachineState::MSSC_SHUTDOWN:
         {
-          INFO("^^^ switch state:shutdown ^^^");
+          INFO("[MachineState-Switch]: ^^^ switch state:shutdown ^^^");
           // need modify
           protocol::msg::StateSwitchStatus sss;
           sss.code = 0;
           sss.state = 4;
           state_swith_status_pub_->publish(sss);
           poweroff();
-          shutdown_handler();
+          // shutdown_handler();
           machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_TearDown);
         }
         break;
       default:
         {
-          INFO("^^^ switch state:unkown ^^^");
+          INFO("[MachineState-Switch]: ^^^ switch state:unkown ^^^");
         }
         break;
     }
@@ -505,27 +555,6 @@ private:
       }
     }
   }
-
-  // bool lowpower(bool is_enter)
-  // {
-  //   INFO("[LowPower]: now dog %s low-power model.", (is_enter ? "enter" : "exit"));
-  //   if (!low_power_client_->wait_for_service(std::chrono::seconds(2))) {
-  //     ERROR("[LowPower]: call low-power service not avalible");
-  //   } else {
-  //     std::chrono::seconds timeout(10);
-  //     auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
-  //     req->data = is_enter;
-  //     auto future_result = low_power_client_->async_send_request(req);
-  //     std::future_status status = future_result.wait_for(timeout);
-  //     if (status == std::future_status::ready) {
-  //       INFO("[LowPower]: call low-power service success.");
-  //       return future_result.get()->success;
-  //     } else {
-  //       ERROR("[LowPower]: call low-power service failed!");
-  //     }
-  //   }
-  //   return false;
-  // }
 
   void OnSelfCheck()
   {
@@ -625,17 +654,18 @@ private:
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_enable_srv_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr low_power_exit_srv_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_onoff_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr low_power_switch_state_srv_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr power_off_client_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr low_power_client_;
   rclcpp::Publisher<protocol::msg::StateSwitchStatus>::SharedPtr state_swith_status_pub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
   MsscMachineState mssc_machine_state {MsscMachineState::MSSC_UNKOWN};
   std::mutex switch_mtx;
-  BSSC_CALLBACK active_handler {[](void) {}};
-  BSSC_CALLBACK protect_handler {[](void) {}};
-  BSSC_CALLBACK lowpower_handler {[](void) {}};
-  BSSC_CALLBACK ota_handler {[](void) {}};
-  BSSC_CALLBACK shutdown_handler {[](void) {}};
+  // BSSC_CALLBACK active_handler {[](void) {}};
+  // BSSC_CALLBACK protect_handler {[](void) {}};
+  // BSSC_CALLBACK lowpower_handler {[](void) {}};
+  // BSSC_CALLBACK ota_handler {[](void) {}};
+  // BSSC_CALLBACK shutdown_handler {[](void) {}};
   uint8_t battery_charge_val {100};
   bool is_charging_ {false};
   const std::map<MsscMachineState, std::string> mssc_machine_state_code_map = {
@@ -660,6 +690,8 @@ private:
   bool disable_lowpower_ {false};
   LOWPOWER_ENTERANDEXIT_CALLBACK lowpower {[](bool) {return true;}};
   std::unique_ptr<cyberdog::manager::StateContext> machine_state_ptr_ {nullptr};
+  const std::string CONFIG_DIR = "/home/mi/.cyberdog/manager";
+  const std::string CONFIG_FILE = "config.json";
 };
 }  // namespace manager
 }  // namespace cyberdog

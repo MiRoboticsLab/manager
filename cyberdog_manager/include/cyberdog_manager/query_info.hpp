@@ -94,6 +94,10 @@ public:
       query_node_ptr_->create_client<protocol::srv::Trigger>(
       "audio_active_state",
       rmw_qos_profile_services_default, qdev_callback_group_);
+    low_power_switch_state_client_ =
+      query_node_ptr_->create_client<std_srvs::srv::Trigger>(
+      "low_power_switch_state",
+      rmw_qos_profile_services_default, qdev_callback_group_);
   }
 
   ~QueryInfo()
@@ -208,8 +212,9 @@ public:
     if (is_sn) {
       if (sn_ == "") {
         if (!audio_sn_ger_srv_->wait_for_service(std::chrono::seconds(2))) {
-          ERROR("call sn server not avalible");
-          sn_ = "unaviable";
+          ERROR("call sn server wait for service not avalible[sn:unaviable]");
+          // sn_ = "unaviable";
+          sn_ = "";
         } else {
           std::chrono::seconds timeout(3);
           auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
@@ -218,8 +223,9 @@ public:
           if (status == std::future_status::ready) {
             sn_ = future_result.get()->message;
           } else {
-            ERROR("call get sn service failed!");
-            sn_ = "unkown";
+            ERROR("call get sn service overtime failed![sn:unkown]");
+            // sn_ = "unkown";
+            sn_ = "";
           }
         }
       }
@@ -485,7 +491,19 @@ public:
       CyberdogJson::Add(json_info, "stand", standed_);
     }
     if (is_lowpower_control) {
-      CyberdogJson::Add(json_info, "lowpower_control", false);
+      std::chrono::seconds timeout(3);
+      auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
+      auto future_result = low_power_switch_state_client_->async_send_request(req);
+      std::future_status status = future_result.wait_for(timeout);
+      if (status == std::future_status::ready) {
+        INFO(
+          "success to call get low power switch state services.");
+        CyberdogJson::Add(json_info, "lowpower_control", future_result.get()->success);
+      } else {
+        INFO(
+          "Failed to call get low power switch state services.");
+        CyberdogJson::Add(json_info, "lowpower_control", false);
+      }
     }
     if (!CyberdogJson::Document2String(json_info, info)) {
       ERROR("error while encoding to json");
@@ -526,6 +544,7 @@ private:
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_action_get_client_;
   rclcpp::Client<protocol::srv::MotorTemp>::SharedPtr motor_temper_client_;
   rclcpp::Client<protocol::srv::Trigger>::SharedPtr audio_active_state_client_;
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr low_power_switch_state_client_;
 };
 
 class QueryInfoNode final

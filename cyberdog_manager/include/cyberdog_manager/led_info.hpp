@@ -41,8 +41,6 @@ struct LedMode
 
 class LedInfoNode final
 {
-// using SHINE_CALLBACK = std::function<void (uint8_t id)>;
-
 public:
   // explicit LedInfoNode(rclcpp::Node::SharedPtr node_ptr, SHINE_CALLBACK callback)
   explicit LedInfoNode(rclcpp::Node::SharedPtr node_ptr)
@@ -57,10 +55,10 @@ public:
       rmw_qos_profile_services_default, led_callback_group_);
     rclcpp::SubscriptionOptions sub_options;
     sub_options.callback_group = led_callback_group_;
-    bms_status_sub_ = led_info_node_->create_subscription<protocol::msg::BmsStatus>(
-      "bms_status", rclcpp::SystemDefaultsQoS(),
-      std::bind(&LedInfoNode::BmsStatus, this, std::placeholders::_1),
-      sub_options);
+    // bms_status_sub_ = led_info_node_->create_subscription<protocol::msg::BmsStatus>(
+    //   "bms_status", rclcpp::SystemDefaultsQoS(),
+    //   std::bind(&LedInfoNode::BmsStatus, this, std::placeholders::_1),
+    //   sub_options);
 
     wake_up_sub_ = led_info_node_->create_subscription<std_msgs::msg::Bool>(
       "dog_wakeup", rclcpp::SystemDefaultsQoS(),
@@ -74,7 +72,6 @@ public:
       sub_options);
   }
 
-private:
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
   {
     battery_soc_ = msg->batt_soc;
@@ -126,6 +123,7 @@ private:
     }
   }
 
+private:
   void Motion_status(const protocol::msg::MotionStatus::SharedPtr msg)
   {
     int motion_id = msg->motion_id;
@@ -284,14 +282,12 @@ private:
 private:
   rclcpp::Node::SharedPtr led_info_node_{nullptr};
   rclcpp::CallbackGroup::SharedPtr led_callback_group_;
-  rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_ {nullptr};
+  // rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_ {nullptr};
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
   rclcpp::Client<protocol::srv::LedExecute>::SharedPtr led_excute_client_ {nullptr};
   uint8_t battery_soc_ {100};
   bool is_lowpower_ {false};
-
-  // SHINE_CALLBACK light_shine_handler {[](uint8_t) {}};
 };
 }  // namespace manager
 }  // namespace cyberdog
