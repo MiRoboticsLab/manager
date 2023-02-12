@@ -112,33 +112,6 @@ public:
   }
 
 private:
-  // void EnterLowPower(
-  //   const std_srvs::srv::SetBool::Request::SharedPtr request,
-  //   std_srvs::srv::SetBool::Response::SharedPtr response)
-  // {
-  //   static int r_count = 0;
-  //   INFO(
-  //     "[LowPower]: [%d]EnterLowPower %s:start", (r_count + 1),
-  //     (request->data ? "true" : "false"));
-  //   // PM_DEV pd = PM_CAM_ALL;
-  //   PM_DEV pd = PM_ALL_NO_TOF;
-  //   unsigned int err;
-  //   int code = -1;
-  //   if (request->data) {
-  //     code = lpc_ptr_->LpcRelease(pd, &err);
-  //     is_lowpower_ = true;
-  //     ++r_count;
-  //   } else {
-  //     code = lpc_ptr_->LpcRequest(pd, &err);
-  //     is_lowpower_ = false;
-  //     ++r_count;
-  //   }
-  //   response->success = (code == 0 ? true : false);
-  //   INFO(
-  //     "[LowPower]: [%d]EnterLowPower %s:stop", (r_count + 1),
-  //     (request->data ? "true" : "false"));
-  // }
-
   void sub_mostion_status_callback(const protocol::msg::MotionStatus::SharedPtr msg)
   {
     if (is_ota_) {
