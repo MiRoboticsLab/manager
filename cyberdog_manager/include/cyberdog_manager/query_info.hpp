@@ -212,8 +212,9 @@ public:
     if (is_sn) {
       if (sn_ == "") {
         if (!audio_sn_ger_srv_->wait_for_service(std::chrono::seconds(2))) {
-          ERROR("call sn server not avalible");
-          sn_ = "unaviable";
+          ERROR("call sn server wait for service not avalible[sn:unaviable]");
+          // sn_ = "unaviable";
+          sn_ = "";
         } else {
           std::chrono::seconds timeout(3);
           auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
@@ -222,8 +223,9 @@ public:
           if (status == std::future_status::ready) {
             sn_ = future_result.get()->message;
           } else {
-            ERROR("call get sn service failed!");
-            sn_ = "unkown";
+            ERROR("call get sn service overtime failed![sn:unkown]");
+            // sn_ = "unkown";
+            sn_ = "";
           }
         }
       }

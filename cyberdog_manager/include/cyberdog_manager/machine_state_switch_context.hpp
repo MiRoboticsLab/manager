@@ -344,7 +344,7 @@ private:
       bool result = CyberdogJson::Get(json_document, "lowpower_info", lowpower_val);
       if (result) {
         if (lowpower_val.HasMember("switch")) {
-          disable_lowpower_ = lowpower_val["switch"].GetBool();
+          disable_lowpower_ = !lowpower_val["switch"].GetBool();
         } else {
           disable_lowpower_ = true;
         }

@@ -71,7 +71,7 @@ private:
   std::unique_ptr<BatteryCapacityInfoNode> bcin_node_ptr {nullptr};
   std::unique_ptr<TouchInfoNode> touch_node_ptr {nullptr};
   std::unique_ptr<AudioInfoNode> audio_node_ptr {nullptr};
-  std::unique_ptr<LedInfoNode> led_node_ptr {nullptr};
+  std::shared_ptr<LedInfoNode> led_node_ptr {nullptr};
   std::unique_ptr<cyberdog::manager::HeartContext> heart_beat_ptr_ {nullptr};
   std::unique_ptr<cyberdog::manager::ErrorContext> error_context_ptr_ {nullptr};
   std::shared_ptr<cyberdog::manager::MachineStateSwitchContext> mssc_context_ptr_ {nullptr};

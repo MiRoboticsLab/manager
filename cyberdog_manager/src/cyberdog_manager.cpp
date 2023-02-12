@@ -48,15 +48,16 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     node_ptr_,
     std::bind(&CyberdogManager::SetState, this, std::placeholders::_1, std::placeholders::_2));
   error_context_ptr_ = std::make_unique<cyberdog::manager::ErrorContext>(name_ + "_error");
+  touch_node_ptr = std::make_unique<TouchInfoNode>(node_ptr_);
+  audio_node_ptr = std::make_unique<AudioInfoNode>(
+    node_ptr_);
+  led_node_ptr = std::make_shared<LedInfoNode>(node_ptr_);
   bcin_node_ptr = std::make_unique<BatteryCapacityInfoNode>(
     node_ptr_,
     std::bind(
       &MachineStateSwitchContext::BatteryChargeUpdate, mssc_context_ptr_,
-      std::placeholders::_1, std::placeholders::_2));
-  touch_node_ptr = std::make_unique<TouchInfoNode>(node_ptr_);
-  audio_node_ptr = std::make_unique<AudioInfoNode>(
-    node_ptr_);
-  led_node_ptr = std::make_unique<LedInfoNode>(node_ptr_);
+      std::placeholders::_1, std::placeholders::_2),
+    std::bind(&LedInfoNode::BmsStatus, led_node_ptr, std::placeholders::_1));
   executor_.add_node(node_ptr_);
 }
 
@@ -87,15 +88,11 @@ bool cyberdog::manager::CyberdogManager::Init()
     ready_node_ptr->SelfCheck(2);
     return false;
   }
-
+  OnActive();
   query_node_ptr_->Init();
   bcin_node_ptr->Init();
   mssc_context_ptr_->Init();
-
-  OnActive();
-
   heart_beat_ptr_->Init();
-
   return true;
 }
 
