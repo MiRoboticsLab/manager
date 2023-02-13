@@ -43,7 +43,7 @@ public:
   {
     account_info_node_ = node_ptr;
     account_callback_group_ =
-      account_info_node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+      account_info_node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
     account_add_srv_ =
       account_info_node_->create_service<protocol::srv::AccountAdd>(
       "account_add",
