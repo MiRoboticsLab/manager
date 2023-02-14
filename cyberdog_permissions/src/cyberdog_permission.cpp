@@ -75,4 +75,5 @@ void cyberdog::manager::CyberdogPermission::SnCallback(
 {
   response->success = true;
   response->message = cyberdog_sn;
+  INFO("reponse:get dog sn:--%s", response->message.c_str());
 }
