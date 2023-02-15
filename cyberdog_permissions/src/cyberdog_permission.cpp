@@ -26,6 +26,7 @@ using rapidjson::kObjectType;
 cyberdog::manager::CyberdogPermission::CyberdogPermission()
 : Node(NODE_NAME)
 {
+  INFO("start get sn");
   cyberdog_sn = BoardInfo::Get_Sn();
   INFO("sn:%s", cyberdog_sn.c_str());
   if (cyberdog_sn.length() > MAX_SN_SIZE) {
@@ -75,4 +76,5 @@ void cyberdog::manager::CyberdogPermission::SnCallback(
 {
   response->success = true;
   response->message = cyberdog_sn;
+  INFO("reponse:get dog sn:--%s", response->message.c_str());
 }
