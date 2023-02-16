@@ -24,6 +24,7 @@
 #include <chrono>
 #include <thread>
 #include <memory>
+#include <vector>
 #include "rclcpp/rclcpp.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 #include "motion_utils/motion_utils.hpp"
@@ -36,7 +37,8 @@
 #include "cyberdog_common/cyberdog_json.hpp"
 #include "protocol/srv/reboot_machine.hpp"
 #include "black_box/black_box.hpp"
-// using namespace std::chrono_literals;
+#include "protocol/msg/self_check_status.hpp"
+#include "protocol/srv/machine_state.hpp"
 namespace cyberdog
 {
 namespace manager
@@ -50,6 +52,8 @@ public:
     INFO("unlock request start");
     unlock_callback_group_ =
       this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+    client_cb_group_ =
+      this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
     unlock_requset_srv_ =
       this->create_service<protocol::srv::Unlock>(
       "unlock_develop_access",
@@ -61,20 +65,43 @@ public:
       this->create_service<protocol::srv::RebootMachine>(
       "reboot_machine",
       std::bind(
-        &UnlockRequestNode::RstartMachine,
+        &UnlockRequestNode::RestartMachine,
         this, std::placeholders::_1, std::placeholders::_2),
       rmw_qos_profile_services_default, unlock_callback_group_);
     motion_result_client_ =
       this->create_client<protocol::srv::MotionResultCmd>("motion_result_cmd");
+    machine_state_switch_keep_client_ =
+      this->create_client<protocol::srv::MachineState>(
+      "machine_state_switch_keep",
+      rmw_qos_profile_services_default, client_cb_group_);
     bes_http_client_ =
-      this->create_client<protocol::srv::BesHttp>("bes_http_srv");
+      this->create_client<protocol::srv::BesHttp>(
+      "bes_http_srv",
+      rmw_qos_profile_services_default, client_cb_group_);
     lpc_ptr_ = std::make_unique<cyberdog::manager::LowPowerConsumption>();
-    std::thread UpSendThread = std::thread(&UnlockRequestNode::SendUnlockStatus_, this);
-    UpSendThread.detach();
+    callback_group_subscriber1_ = this->create_callback_group(
+      rclcpp::CallbackGroupType::MutuallyExclusive);
+    auto sub1_opt = rclcpp::SubscriptionOptions();
+    sub1_opt.callback_group = callback_group_subscriber1_;
+    self_check_sub =
+      this->create_subscription<protocol::msg::SelfCheckStatus>(
+      "self_check_status", rclcpp::QoS(10),
+      std::bind(&UnlockRequestNode::SelfCheckTopicCallback, this, std::placeholders::_1),
+      sub1_opt);
     INFO("unlock request node init success");
   }
 
 private:
+  void SelfCheckTopicCallback(const protocol::msg::SelfCheckStatus::SharedPtr msg)
+  {
+    if (msg->code == 0 || msg->code == 2) {
+      if (upsend_counter < 3) {
+        INFO_MILLSECONDS(30000, "enter SelfCheckTopicCallback");
+        SendUnlockStatus();
+        upsend_counter++;
+      }
+    }
+  }
   std::string GetKeyFile()
   {
     std::string ShellCommand_ = "cd /SDCARD && tar -xf pub_key.tar";
@@ -84,84 +111,106 @@ private:
     }
     return "/SDCARD";
   }
-  void SendUnlockStatus_()
+  void SendUnlockStatus()
   {
-    INFO("enter SendUnlockStatus_");
+    INFO("enter SendUnlockStatus()");
     bool modify_flag = true;
-    while (flag) {
-      std::string filename_ = "/opt/ros2/cyberdog/share/params/toml_config/manager";
-      std::string filename = filename_ + "/UnlockStatus.db";
-      int result[2];
+    std::string filename_ = "/opt/ros2/cyberdog/share/params/toml_config/manager";
+    std::string filename = filename_ + "/UnlockStatus.db";
+    int result[2];
+    if (flag) {
       if (!black_box.readUnlockStatus(result)) {
-        flag = false;
         modify_flag = false;
-        break;
+        return;
       } else {
         if (result[0] == 0 && result[1] == 1) {
-          INFO("[SendUnlockStatus_]>>UpSend has successed and not reboot");
-          flag = false;
+          INFO("[SendUnlockStatus]>>UpSend has successed and not reboot");
           modify_flag = false;
-          break;
+          return;
         }
       }
       int unlockStatus_ = GetUnlockStatus();
-      INFO("[SendUnlockStatus_]>>the unlock status is %d", unlockStatus_);
+      INFO("[SendUnlockStatus]>>the unlock status is %d", unlockStatus_);
       if (SendUnlockStatusClient(unlockStatus_)) {              // 上报接收成功
         INFO("[SendUnlockStatus_]>>send success");
         black_box.ModifyUnlockStatus("UPSENDSTATUS", 1);
         flag = false;
-        break;
+        return;
       } else {
         INFO("[SendUnlockStatus_]>>send failed");
         black_box.ModifyUnlockStatus("UPSENDSTATUS", 0);
         flag = true;
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+      std::this_thread::sleep_for(std::chrono::seconds(10));
+      if (modify_flag) {
+        black_box.ModifyUnlockStatus("REBOOTSTATUS", 0);
+      }
     }
-    if (modify_flag) {
-      black_box.ModifyUnlockStatus("REBOOTSTATUS", 0);
+  }
+  std::vector<std::string> GetVector(
+    const std::string & _message, char _delim,
+    const std::string & _head)
+  {
+    std::vector<std::string> _vector;
+    std::stringstream message_str;
+    message_str.str(_message);
+    std::string elems;
+    while (std::getline(message_str, elems, _delim)) {
+      _vector.push_back(std::string(_head + elems));
     }
+    return _vector;
+  }
+  std::string RunShellCommand(const char * cmd, bool & success)
+  {
+    std::array<char, 128> buffer;
+    std::string result;
+    int exec_result = -1;
+    auto pipe = popen(cmd, "r");
+    INFO("RunCommand is [ %s ]", cmd);
+    if (!pipe) {
+      throw std::runtime_error("popen() failed!");
+      success = false;
+    }
+    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+      result += buffer.data();
+      INFO("%s", buffer.data());
+    }
+    exec_result = pclose(pipe);
+    INFO("exec_result = %d", exec_result);
+    success = exec_result == 0 ? true : false;
+    return result;
   }
   int GetUnlockStatus()
   {
-    std::string parament = " unlock-state";
-    std::string ShellCommand = "/usr/bin/cyberdog_get_info " + parament;
-    INFO("command is : %s", ShellCommand.c_str());
-    FILE * ShellResult = popen(ShellCommand.c_str(), "r");
-    char ShellResultBuffer_[256];
-    fread(ShellResultBuffer_, 1, sizeof(ShellResultBuffer_), ShellResult);
-    std::string result_str_ = ShellResultBuffer_;
-    pclose(ShellResult);
-    INFO("get unlock status return int is :%s", result_str_.c_str());
-    return GetUnlockCommand();
+    std::string parament = " unlock-state; echo $?";
+    std::string ShellCommand = "/usr/bin/cyberdog_get_info" + parament;
+    int result = GetShellCommandResult(ShellCommand);
+    INFO("GetUnlockStatus() will return : %d", result);
+    return result;
   }
-  int UnlockAccess(const std::string KeyPath)
+
+  int UnlockAccess()
   {
-    INFO("enter UnlockAccess function");
-    std::string parammentKey = KeyPath + "/cyberdog-key";
-    std::string parammentKey_ = KeyPath + "/cyber-pub.pem";
-    std::string ShellCommand = "/usr/bin/cyberdog_get_info " + parammentKey + " " + parammentKey_;
-    INFO("%s", ShellCommand.c_str());
-    FILE * ShellResult = popen(ShellCommand.c_str(), "r");
-    char ShellResultBuffer_[256];
-    fread(ShellResultBuffer_, 1, sizeof(ShellResultBuffer_), ShellResult);
-    std::string result_str_ = ShellResultBuffer_;
-    pclose(ShellResult);
-    INFO("unlock status return int is :%s", result_str_.c_str());
-    return GetUnlockCommand();
+    std::string parammentKey = "/SDCARD/cyberdog-key; echo $?";
+    std::string ShellCommand = "/usr/bin/cyberdog_get_info unlock-request " + parammentKey;
+    int result = GetShellCommandResult(ShellCommand);
+    INFO("UnlockAccess() will return : %d", result);
+    return result;
   }
-  int GetUnlockCommand()
+  int GetShellCommandResult(const std::string ShellCommand)
   {
-    int result = 10000;
-    std::string ShellCommand = "echo $?";
-    INFO("GetUnlockCommand() :%s", ShellCommand.c_str());
-    FILE * ShellResult_ = popen(ShellCommand.c_str(), "r");
-    char ShellResultBuffer[256];
-    fread(ShellResultBuffer, 1, sizeof(ShellResultBuffer), ShellResult_);
-    std::string result_str = ShellResultBuffer;
-    pclose(ShellResult_);
-    INFO("unlock status return int is :%s", result_str.c_str());
-    result = std::stoi(result_str);
+    bool success;
+    int result = 100;
+    std::string result_str_ = RunShellCommand(ShellCommand.c_str(), success);
+    INFO("RunShellCommand() return :%s", result_str_.c_str());
+    if (success) {
+      std::vector<std::string> result_vector = GetVector(result_str_, '\n', "");
+      std::string unlock_result = result_vector.back();
+      if (!unlock_result.empty()) {
+        INFO("result_vector.end(): %s", unlock_result.c_str());
+        result = std::stoi(unlock_result);
+      }
+    }
     return result;
   }
   bool SendUnlockStatusClient(const int Unlock_status)
@@ -205,7 +254,7 @@ private:
       return true;                // 后台返回字符串中包含true;
     }
   }
-  void RstartMachine(
+  void RestartMachine(
     const protocol::srv::RebootMachine::Request::SharedPtr request,
     protocol::srv::RebootMachine::Response::SharedPtr response)
   {
@@ -220,11 +269,8 @@ private:
       response->rebootresult = reboot_result;
     }
   }
-  void UnlockMachineRequest(
-    const protocol::srv::Unlock::Request::SharedPtr request,
-    protocol::srv::Unlock::Response::SharedPtr response)
+  void RequestMotion()
   {
-    INFO("enter unlock_request service");
     std::chrono::seconds timeout(5);
     auto req = std::make_shared<protocol::srv::MotionResultCmd::Request>();
     INFO("requestMotion init success");
@@ -235,17 +281,48 @@ private:
       INFO("success to call callMotionServoCmd services.");
     } else {
       INFO("Failed to call callMotionServoCmd services.");
-      response->unlock_result = 111;
+      return;
+    }
+  }
+  bool RequestStateKeep()
+  {
+    std::chrono::seconds timeout(5);
+    auto req = std::make_shared<protocol::srv::MachineState::Request>();
+    INFO("machine_state_switch_keep init success");
+    req->state = 0;
+    req->ticks = 30;
+    auto future_result = machine_state_switch_keep_client_->async_send_request(req);
+    std::future_status status = future_result.wait_for(timeout);
+    if (status == std::future_status::ready) {
+      state_keep_response = future_result.get()->success;
+      state_keep_code = future_result.get()->code;
+      INFO("success to call state_switch_keep services.Code:%d", state_keep_code);
+      return state_keep_response;
+    } else {
+      INFO("Failed to call machine_state_switch_keep services.");
+      return false;
+    }
+  }
+  void UnlockMachineRequest(
+    const protocol::srv::Unlock::Request::SharedPtr request,
+    protocol::srv::Unlock::Response::SharedPtr response)
+  {
+    INFO("enter unlock_request service");
+    RequestMotion();
+    if (RequestStateKeep()) {
+      INFO("machine_state_switch_keep success");
+    } else {
+      INFO("machine_state_switch_keep failed");
+      response->unlock_result = 100;
       return;
     }
     black_box.CreateUnlockStatusDB();              // 创建或复原上报状态记录文件
-    INFO("%s", request->httplink.c_str());
+    INFO("request httplink is %s", request->httplink.c_str());
     std::string httpCom = "https://cnbj2m.fds.api.xiaomi.com";
     std::string httpFilePath = request->httplink.substr(httpCom.length());
-    INFO("request httplink is %s", request->httplink.c_str());
     INFO("http link path is %s", httpFilePath.c_str());
     httplib::Client cli(httpCom);
-    cli.set_read_timeout(10, 0);
+    cli.set_read_timeout(5, 0);
     auto res = cli.Get(httpFilePath);
     if (res->status != 200) {
       INFO("Get key file error");
@@ -259,69 +336,37 @@ private:
     f.open("/SDCARD/pub_key.tar", std::ios::out);
     f << res->body << std::endl;
     f.close();
-    std::string keyPath = GetKeyFile();
-    INFO("key path is %s", keyPath.c_str());
-    switch (UnlockAccess(keyPath)) {
-      case 0:
-        {
-          INFO("unlock success!!!");
-          response->unlock_result = 0;
-        }
-        break;
-      case 1:
-        {
-          INFO("unlocked failed,parameter verification failes");
-          response->unlock_result = 1;
-        }
-        break;
-      case 2:
-        {
-          INFO("unlocked failed,the key information does not match the device information");
-          response->unlock_result = 2;
-        }
-        break;
-      case 3:
-        {
-          INFO("unlocked failed,operation control (MR813) failed to unlock Settings");
-          response->unlock_result = 3;
-        }
-        break;
-      case 4:
-        {
-          INFO("unlocked failed,voice control (R239) unlock Settings failed;");
-          response->unlock_result = 4;
-        }
-        break;
-      case 5:
-        {
-          INFO("unlocked failed,the device has not been unlocked;");
-          response->unlock_result = 5;
-        }
-        break;
-      case 100:
-        {
-          INFO("unlocked failed,unknow error!!");
-          response->unlock_result = 100;
-        }
-        break;
-      default:
-        {
-          INFO("shell return error: default!!");
-          response->unlock_result = 100;
-        }
-        break;
+    GetKeyFile();
+    // INFO("key path is %s", keyPath.c_str());
+    int unlock_access_result = UnlockAccess();
+    int unlock_status_result = GetUnlockStatus();
+    INFO("UnlockAccess() = %d", unlock_access_result);
+    INFO("GetUnlockStatus() = %d", unlock_access_result);
+    if ( (unlock_access_result == 0) && (unlock_status_result == 0) ) {
+      INFO("unlock success!!!");
+      response->unlock_result = 0;
+    } else {
+      INFO("unlock faild!!!");
+      response->unlock_result = 100;
     }
   }
 
 private:
+  rclcpp::Subscription<protocol::msg::SelfCheckStatus>::SharedPtr self_check_sub;
   rclcpp::Service<protocol::srv::Unlock>::SharedPtr unlock_requset_srv_;
   rclcpp::Service<protocol::srv::RebootMachine>::SharedPtr reboot_machine_srv_;
   rclcpp::Client<protocol::srv::MotionResultCmd>::SharedPtr motion_result_client_;
   rclcpp::Client<protocol::srv::BesHttp>::SharedPtr bes_http_client_;
+  rclcpp::Client<protocol::srv::MachineState>::SharedPtr machine_state_switch_keep_client_;
+  rclcpp::CallbackGroup::SharedPtr client_cb_group_;
+  rclcpp::CallbackGroup::SharedPtr callback_group_subscriber1_;
   rclcpp::CallbackGroup::SharedPtr unlock_callback_group_;
   std::unique_ptr<cyberdog::manager::LowPowerConsumption> lpc_ptr_{nullptr};
   cyberdog::manager::BlackBox black_box;
+  bool state_keep_response = false;
   bool flag = true;
+  int upsend_counter = 0;
+  int state_keep_code;
 };
 }  // namespace manager
 }  // namespace cyberdog

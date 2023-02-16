@@ -16,12 +16,16 @@
 
 #include <chrono>
 #include <cmath>
+#include <mutex>
+#include <memory>
 #include "rclcpp/rclcpp.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "protocol/msg/touch_status.hpp"
 #include "protocol/msg/bms_status.hpp"
 #include "protocol/msg/audio_play_extend.hpp"
+#include "protocol/msg/state_switch_status.hpp"
+#include "std_srvs/srv/trigger.hpp"
 
 namespace cyberdog
 {
@@ -44,14 +48,21 @@ public:
 
     bms_status_sub_ = touch_info_node_->create_subscription<protocol::msg::BmsStatus>(
       "bms_status", rclcpp::SystemDefaultsQoS(),
-      std::bind(&TouchInfoNode::BmsStatus, this, std::placeholders::_1),
-      sub_options);
+      std::bind(&TouchInfoNode::BmsStatus, this, std::placeholders::_1), sub_options);
+
+    StateSwitch_sub = touch_info_node_->create_subscription<protocol::msg::StateSwitchStatus>(
+      "state_switch_status", rclcpp::SystemDefaultsQoS(),
+      std::bind(&TouchInfoNode::SelfCheckCallback, this, std::placeholders::_1), sub_options);
 
     rclcpp::PublisherOptions pub_options;
     pub_options.callback_group = touch_callback_group_;
     audio_play_extend_pub =
       touch_info_node_->create_publisher<protocol::msg::AudioPlayExtend>(
       "speech_play_extend", rclcpp::SystemDefaultsQoS(), pub_options);
+    low_power_exit_client_ = touch_info_node_->create_client<std_srvs::srv::Trigger>(
+      "low_power_exit");
+    std::thread ExitLowPowerThread = std::thread(&TouchInfoNode::ExitLowPower, this);
+    ExitLowPowerThread.detach();
   }
 
 private:
@@ -65,18 +76,17 @@ private:
     if (msg->touch_state == 3 && report_flag &&
       abs(reporting_time.count() - report_previous_time.count()) >= 2000)
     {
-      INFO(
-        "reporting_time - report_previous_time is %d",
-        abs(reporting_time.count() - report_previous_time.count()));
       reporting_time = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch());
-      INFO("[cyberdog_manager:] touch_info-->> the batt_soc is %d", battery_percent);
       protocol::msg::AudioPlayExtend msg;
       msg.is_online = true;
       msg.module_name = touch_info_node_->get_name();
       msg.text = "剩余电量为百分之" + std::to_string(battery_percent);
       INFO("语言播报的电量为：%s", msg.text.c_str());
       audio_play_extend_pub->publish(msg);
+      if (is_low_power) {  // 通知消费者
+        lowPower_cv_.notify_all();
+      }
     }
   }
 
@@ -89,10 +99,43 @@ private:
       "[cyberdog_manager:] touch_info-->> Enter BMS callback.the batt_soc is %d.",
       battery_percent);
   }
+  void SelfCheckCallback(const protocol::msg::StateSwitchStatus::SharedPtr msg)
+  {
+    if (msg->state == 2) {
+      is_low_power = true;
+      INFO("state_switch_status state is %d", msg->state);
+    } else {
+      is_low_power = false;
+    }
+  }
+  void ExitLowPower()
+  {
+    while (rclcpp::ok()) {
+      std::unique_lock<std::mutex> lck(exitLowPower_mtx_);
+      while (!is_low_power) {  // 消费者得到通知，跳出循环执行退出低功耗指令
+        lowPower_cv_.wait(lck);
+      }
+      // 退出低功耗请求
+      if (!low_power_exit_client_->wait_for_service(std::chrono::seconds(3))) {
+        INFO("low_power_exit service is not avaiable");
+      }
+      std::chrono::seconds timeout(13);  // wait for completely exiting
+      auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
+      auto future_result = low_power_exit_client_->async_send_request(req);
+      std::future_status status = future_result.wait_for(timeout);
+      if (status == std::future_status::ready) {
+        INFO("call low_power_exit success.");
+        is_low_power = false;
+      } else {
+        ERROR("call low_power_exit timeout.");
+      }
+    }
+  }
 
 private:
   rclcpp::Node::SharedPtr touch_info_node_{nullptr};
   rclcpp::CallbackGroup::SharedPtr touch_callback_group_;
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr low_power_exit_client_;
   rclcpp::Subscription<protocol::msg::TouchStatus>::SharedPtr touch_status_sub_;
   rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_;
   rclcpp::Publisher<protocol::msg::AudioPlayExtend>::SharedPtr audio_play_extend_pub;
@@ -100,6 +143,13 @@ private:
   std::chrono::milliseconds reporting_time = std::chrono::duration_cast<std::chrono::milliseconds>(
     std::chrono::system_clock::now().time_since_epoch());
   bool report_flag = false;
+
+  rclcpp::Subscription<protocol::msg::StateSwitchStatus>::SharedPtr StateSwitch_sub;
+  // rclcpp::CallbackGroup::SharedPtr callback_group_subscriber1_;
+  bool low_power_status = false;
+  std::mutex exitLowPower_mtx_;
+  bool is_low_power{false};
+  std::condition_variable lowPower_cv_;
 };
 }  // namespace manager
 }  // namespace cyberdog
