@@ -50,13 +50,13 @@ enum class MsscMachineState : uint8_t
 };
 enum class MachineStateChild : uint8_t
 {
-  MSC_SELFCHECK   = 0,
-  MSC_ACTIVE      = 1,
-  MSC_DEACTIVE    = 2,
-  MSC_PROTECTED   = 3,
-  MSC_LOWPOWER    = 4,
-  MSC_OTA         = 5,
-  MSC_TEARDOWN    = 6,
+  MSC_ACTIVE      = 0,
+  MSC_PROTECTED   = 1,
+  MSC_LOWPOWER    = 2,
+  MSC_OTA         = 3,
+  MSC_TEARDOWN    = 4,
+  MSC_SELFCHECK   = 5,
+  MSC_DEACTIVE    = 6,
   MSC_ERROR       = 7,
 };
 
@@ -140,6 +140,13 @@ public:
       "machine_state_switch", rclcpp::SystemDefaultsQoS(),
       std::bind(&MachineStateSwitchContext::MachineStateSwitch, this, std::placeholders::_1),
       sub_options);
+    machine_state_switch_keep_srv_ =
+      mssc_node_->create_service<protocol::srv::MachineState>(
+      "machine_state_switch_keep",
+      std::bind(
+        &MachineStateSwitchContext::MachineStateSwitchKeep, this, std::placeholders::_1,
+        std::placeholders::_2),
+      rmw_qos_profile_services_default, mssc_callback_group_);
     state_valget_srv_ =
       mssc_node_->create_service<std_srvs::srv::Trigger>(
       "machine_state_valget",
@@ -195,6 +202,8 @@ public:
     state_swith_status_pub_ =
       mssc_node_->create_publisher<protocol::msg::StateSwitchStatus>(
       "state_switch_status", rclcpp::SystemDefaultsQoS(), pub_options);
+    timer_callback_group_ =
+      mssc_node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   }
   void ExecuteSetUp()
   {
@@ -266,6 +275,9 @@ public:
   }
   void DogWakeup(const std_msgs::msg::Bool::SharedPtr msg)
   {
+    if (machine_state_keep) {
+      return;
+    }
     if (msg->data && mssc_machine_state != MsscMachineState::MSSC_LOWPOWER) {
       return;
     }
@@ -286,6 +298,9 @@ public:
   }
   void BatteryChargeUpdate(uint8_t bc, bool is_charging)
   {
+    if (machine_state_keep) {
+      return;
+    }
     battery_charge_val = bc;
     is_charging_ = is_charging;
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
@@ -329,6 +344,9 @@ public:
   }
   void KeepDownOverTime()
   {
+    if (machine_state_keep) {
+      return;
+    }
     std::lock_guard<std::mutex> lck(state_mtx_);
     machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
   }
@@ -358,6 +376,38 @@ private:
   void MachineStateSwitch(const std_msgs::msg::UInt8::SharedPtr msg)
   {
     SwitchState(static_cast<MsscMachineState>(msg->data));
+  }
+  void MachineStateSwitchKeep(
+    const protocol::srv::MachineState::Request::SharedPtr request,
+    protocol::srv::MachineState::Response::SharedPtr response)
+  {
+    if (!machine_state_keep) {
+      if (request->ticks > 0) {
+        {
+          std::lock_guard<std::mutex> lck(state_mtx_);
+          machine_state_handler_map[static_cast<MachineStateChild>(request->state)]();
+        }
+        machine_state_keep = true;
+        INFO("[MachineState-Switch]: keep machine state to start");
+        keep_timer_ = mssc_node_->create_wall_timer(
+          std::chrono::seconds(request->ticks),
+          std::bind(&MachineStateSwitchContext::KeepTimerCallback, this), timer_callback_group_);
+      } else {
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[static_cast<MachineStateChild>(request->state)]();
+      }
+      response->success = true;
+      response->code = 0;
+    } else {
+      response->success = false;
+      response->code = -1;
+    }
+  }
+  void KeepTimerCallback()
+  {
+    keep_timer_->cancel();
+    machine_state_keep = false;
+    INFO("[MachineState-Switch]: keep machine state to stop");
   }
   void MachineStateGet(
     const std_srvs::srv::Trigger::Request::SharedPtr,
@@ -564,6 +614,8 @@ private:
     }
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
+    } else if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+      lowpower(false);
     }
     SwitchState(MsscMachineState::MSSC_SELFCHECK);
   }
@@ -576,8 +628,7 @@ private:
     }
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
-    }
-    if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+    } else if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
       return;
     }
     SwitchState(MsscMachineState::MSSC_LOWPOWER);
@@ -591,8 +642,7 @@ private:
     }
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
-    }
-    if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+    } else if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
       lowpower(false);
     }
     SwitchState(MsscMachineState::MSSC_PROTECT);
@@ -606,8 +656,7 @@ private:
     }
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
-    }
-    if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+    } else if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
       lowpower(false);
     }
     SwitchState(MsscMachineState::MSSC_ACTIVE);
@@ -655,24 +704,22 @@ private:
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr low_power_exit_srv_;
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_onoff_srv_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr low_power_switch_state_srv_;
+  rclcpp::Service<protocol::srv::MachineState>::SharedPtr machine_state_switch_keep_srv_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr power_off_client_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr low_power_client_;
   rclcpp::Publisher<protocol::msg::StateSwitchStatus>::SharedPtr state_swith_status_pub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
   MsscMachineState mssc_machine_state {MsscMachineState::MSSC_UNKOWN};
   std::mutex switch_mtx;
-  // BSSC_CALLBACK active_handler {[](void) {}};
-  // BSSC_CALLBACK protect_handler {[](void) {}};
-  // BSSC_CALLBACK lowpower_handler {[](void) {}};
-  // BSSC_CALLBACK ota_handler {[](void) {}};
-  // BSSC_CALLBACK shutdown_handler {[](void) {}};
   uint8_t battery_charge_val {100};
   bool is_charging_ {false};
   const std::map<MsscMachineState, std::string> mssc_machine_state_code_map = {
     {MsscMachineState::MSSC_ACTIVE, "active"},
     {MsscMachineState::MSSC_PROTECT, "protected"},
-    {MsscMachineState::MSSC_LOWPOWER, "low-power"},
+    {MsscMachineState::MSSC_LOWPOWER, "lowpower"},
+    {MsscMachineState::MSSC_OTA, "ota"},
     {MsscMachineState::MSSC_SHUTDOWN, "shutdown"},
+    {MsscMachineState::MSSC_SELFCHECK, "selfcheck"},
     {MsscMachineState::MSSC_UNKOWN, "unkown"}
   };
   bool is_switching_ms_ {false};
@@ -690,6 +737,9 @@ private:
   bool disable_lowpower_ {false};
   LOWPOWER_ENTERANDEXIT_CALLBACK lowpower {[](bool) {return true;}};
   std::unique_ptr<cyberdog::manager::StateContext> machine_state_ptr_ {nullptr};
+  bool machine_state_keep {false};
+  rclcpp::TimerBase::SharedPtr keep_timer_;
+  rclcpp::CallbackGroup::SharedPtr timer_callback_group_;
   const std::string CONFIG_DIR = "/home/mi/.cyberdog/manager";
   const std::string CONFIG_FILE = "config.json";
 };
