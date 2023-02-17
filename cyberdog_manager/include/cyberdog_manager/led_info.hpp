@@ -59,17 +59,6 @@ public:
     //   "bms_status", rclcpp::SystemDefaultsQoS(),
     //   std::bind(&LedInfoNode::BmsStatus, this, std::placeholders::_1),
     //   sub_options);
-
-    wake_up_sub_ = led_info_node_->create_subscription<std_msgs::msg::Bool>(
-      "dog_wakeup", rclcpp::SystemDefaultsQoS(),
-      std::bind(&LedInfoNode::WakeUp, this, std::placeholders::_1),
-      sub_options);
-
-    // motion_status sub
-    motion_status_sub_ = led_info_node_->create_subscription<protocol::msg::MotionStatus>(
-      "motion_status", rclcpp::SystemDefaultsQoS(),
-      std::bind(&LedInfoNode::Motion_status, this, std::placeholders::_1),
-      sub_options);
   }
 
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
@@ -120,78 +109,6 @@ public:
         bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
         INFO("%s release led when the soc more than 20", result ? "successed" : "failed");
       }
-    }
-  }
-
-private:
-  void Motion_status(const protocol::msg::MotionStatus::SharedPtr msg)
-  {
-    int motion_id = msg->motion_id;
-    static int lay_count = 0;
-    static int times = 0;
-
-    if (!is_lowpower_) {
-      if (motion_id == 0) {
-        ++lay_count;
-        // 进入低功耗后切换状态机会让motion_id变为101,因此提前0.3s关灯。
-        if (lay_count == 1197) {
-          INFO("[LowPower]: start to trun off tail led when dog lies down for 2min");
-          LedMode low_power_tail{true, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
-          bool result = ReqLedService(low_power_tail);
-          INFO(
-            "[LowPower]: %s trun off tail led when enter low power ",
-            result ? "successed" : "failed");
-          ++times;
-          is_lowpower_ = true;
-        }
-      } else if (motion_id == 101) {
-        ++lay_count;
-        if (times == 0) {
-          if (lay_count == 300) {
-            INFO("[LowPower]: start to trun off tail led when dog lies down for 30s");
-            LedMode low_power_tail{true, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
-            bool result = ReqLedService(low_power_tail);
-            INFO(
-              "[LowPower]: %s trun off tail led when enter low power ",
-              result ? "successed" : "failed");
-            ++times;
-            is_lowpower_ = true;
-          }
-        } else {
-          // 低功耗的退出耗时5~8s，因此为同步两者的时间暂定led多计时6s
-          if (lay_count == 1260) {
-            INFO("[LowPower]: start to trun off tail led when dog lies down for 2min");
-            LedMode low_power_tail{true, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
-            bool result = ReqLedService(low_power_tail);
-            INFO(
-              "[LowPower]: %s trun off tail led when enter low power ",
-              result ? "successed" : "failed");
-            is_lowpower_ = true;
-          }
-        }
-      } else {
-        times = 0;
-        lay_count = 0;
-      }
-    } else {
-      lay_count = 0;
-    }
-  }
-
-  void WakeUp(const std_msgs::msg::Bool msg)
-  {
-    (void)msg;
-    // 刷新灯效
-    if (is_lowpower_) {
-      if (battery_soc_ < 5) {
-        INFO("[LowPower]:turn on tail led rejected, batter soc less than 5");
-        return;
-      }
-
-      LedMode low_power_tail{false, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
-      bool result = ReqLedService(low_power_tail);
-      INFO("[LowPower]: %s turn on tail led when wakeup", result ? "successed" : "failed");
-      is_lowpower_ = false;
     }
   }
 
@@ -283,7 +200,7 @@ private:
   rclcpp::Node::SharedPtr led_info_node_{nullptr};
   rclcpp::CallbackGroup::SharedPtr led_callback_group_;
   // rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_ {nullptr};
-  rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
+  // rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
   rclcpp::Client<protocol::srv::LedExecute>::SharedPtr led_excute_client_ {nullptr};
   uint8_t battery_soc_ {100};
