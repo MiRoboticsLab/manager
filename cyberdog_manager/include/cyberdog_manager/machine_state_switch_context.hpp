@@ -46,6 +46,8 @@ enum class MsscMachineState : uint8_t
   MSSC_OTA       = 3,    // OTA
   MSSC_SHUTDOWN  = 4,    // 关机
   MSSC_SELFCHECK = 5,    // 自检
+  MSSC_DEACTIVE  = 6,    // 待机
+  MSSC_ERROR     = 7,    // 错误
   MSSC_UNKOWN    = 255,  // 未知
 };
 enum class MachineStateChild : uint8_t
@@ -86,25 +88,26 @@ public:
     if (!machine_controller_ptr_->MachineControllerInit(
         path, node_ptr_))
     {
-      ERROR("Machine State Init failed!");
+      ERROR("[MachineState-Context]: Machine State Init failed!");
       return false;
     } else if (!machine_controller_ptr_->WaitActuatorsSetUp()) {
-      ERROR("Machine State Init failed, actuators setup failed!");
+      ERROR("[MachineState-Context]: Machine State Init failed, actuators setup failed!");
       return false;
     } else {
-      INFO("Machine State Init OK.");
+      INFO("[MachineState-Context]: Machine State Init OK.");
       return true;
     }
   }
 
-  bool SetState(cyberdog::machine::MachineState ms)
+  int32_t SetState(cyberdog::machine::MachineState ms)
   {
+    int32_t result = 0;
     current_state_ = machine_context_ptr_->Context(ms);
-    if (!machine_controller_ptr_->SetState(current_state_)) {
-      ERROR("set state:%s failed, cannot running!", current_state_.c_str());
-      return false;
+    result = machine_controller_ptr_->SetState(current_state_);
+    if (result != 0) {
+      ERROR("[MachineState-Context]: set state:%s failed, cannot running!", current_state_.c_str());
     }
-    return true;
+    return result;
   }
 
   const std::vector<std::string> & GetAchieveStates()
@@ -125,6 +128,7 @@ class MachineStateSwitchContext final
   using BSSC_CALLBACK = std::function<void ()>;
   using MACHINE_STATE_CALLBACK = std::function<void ()>;
   using LOWPOWER_ENTERANDEXIT_CALLBACK = std::function<bool (bool )>;
+  using EXCEPTION_PLAYSOUND_CALLBACK = std::function<void (int32_t )>;
 
 public:
   explicit MachineStateSwitchContext(rclcpp::Node::SharedPtr node_ptr)
@@ -208,17 +212,17 @@ public:
   void ExecuteSetUp()
   {
     if (!machine_state_ptr_->Init()) {
-      ERROR(">>>XXXXX---machine state init error!");
+      ERROR("[MachineState-Switch]: >>>XXXXX---machine state init error!");
     }
     SetStateHandler(machine_state_ptr_->GetAchieveStates());
   }
   bool ExecuteSelfCheck()
   {
-    return machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_SelfCheck);
+    return SetState(cyberdog::machine::MachineState::MS_SelfCheck);
   }
   bool ExecuteActive()
   {
-    return machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
+    return SetState(cyberdog::machine::MachineState::MS_Active);
   }
   void Init()
   {
@@ -272,6 +276,10 @@ public:
   void SetLowpowerEnterAndExitCallback(LOWPOWER_ENTERANDEXIT_CALLBACK callback)
   {
     lowpower = callback;
+  }
+  void SetExceptionPlaySoundCallback(EXCEPTION_PLAYSOUND_CALLBACK callback)
+  {
+    play_sound = callback;
   }
   void DogWakeup(const std_msgs::msg::Bool::SharedPtr msg)
   {
@@ -515,16 +523,16 @@ private:
     response->success = disable_lowpower_ ? false : true;
     response->message = disable_lowpower_ ? "off" : "on";
   }
-  void SwitchState(MsscMachineState mm)
+  bool SwitchState(MsscMachineState mm)
   {
     std::lock_guard<std::mutex> lck(switch_mtx);
-    mssc_machine_state = mm;
     is_switching_ms_ = true;
-    switch (mssc_machine_state) {
+    bool result = false;
+    switch (mm) {
       case MsscMachineState::MSSC_ACTIVE:
         {
           INFO("[MachineState-Switch]: ^^^ switch state:active ^^^");
-          machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Active);
+          result = SetState(cyberdog::machine::MachineState::MS_Active);
           // active_handler();
           protocol::msg::StateSwitchStatus sss;
           sss.code = 0;
@@ -540,7 +548,7 @@ private:
           sss.state = 1;
           state_swith_status_pub_->publish(sss);
           // protect_handler();
-          machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_Protected);
+          result = SetState(cyberdog::machine::MachineState::MS_Protected);
         }
         break;
       case MsscMachineState::MSSC_LOWPOWER:
@@ -551,8 +559,10 @@ private:
           sss.state = 2;
           state_swith_status_pub_->publish(sss);
           // lowpower_handler();
-          machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_LowPower);
-          lowpower(true);
+          result = SetState(cyberdog::machine::MachineState::MS_LowPower);
+          if (result) {
+            result = lowpower(true);
+          }
         }
         break;
       case MsscMachineState::MSSC_OTA:
@@ -563,7 +573,7 @@ private:
           sss.state = 3;
           state_swith_status_pub_->publish(sss);
           // ota_handler();
-          machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_OTA);
+          result = SetState(cyberdog::machine::MachineState::MS_OTA);
         }
         break;
       case MsscMachineState::MSSC_SHUTDOWN:
@@ -574,9 +584,11 @@ private:
           sss.code = 0;
           sss.state = 4;
           state_swith_status_pub_->publish(sss);
-          poweroff();
+          result = SetState(cyberdog::machine::MachineState::MS_TearDown);
+          if (result) {
+            poweroff();
+          }
           // shutdown_handler();
-          machine_state_ptr_->SetState(cyberdog::machine::MachineState::MS_TearDown);
         }
         break;
       default:
@@ -585,7 +597,11 @@ private:
         }
         break;
     }
+    if (result) {
+      mssc_machine_state = mm;
+    }
     is_switching_ms_ = false;
+    return result;
   }
 
   void poweroff()
@@ -606,92 +622,122 @@ private:
     }
   }
 
-  void OnSelfCheck()
+  bool OnSelfCheck()
   {
+    bool result = true;
     if (is_switching_ms_) {
       INFO("[MachineState-SelfCheck]: rejected, now in switching machine state");
-      return;
+      return false;
     }
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
-      return;
+      return false;
     } else if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
-      lowpower(false);
+      result = lowpower(false);
     }
-    SwitchState(MsscMachineState::MSSC_SELFCHECK);
+    return result ? SwitchState(MsscMachineState::MSSC_SELFCHECK) : result;
   }
 
-  void OnLowPower()
+  bool OnLowPower()
   {
     if (is_switching_ms_) {
       INFO("[MachineState-LowPower]: rejected, now in switching machine state");
-      return;
+      return false;
     }
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
-      return;
+      return false;
     } else if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
-      return;
+      return true;
     }
-    SwitchState(MsscMachineState::MSSC_LOWPOWER);
+    return SwitchState(MsscMachineState::MSSC_LOWPOWER);
   }
 
-  void OnProtected()
+  bool OnProtected()
   {
+    bool result = true;
     if (is_switching_ms_) {
       INFO("[MachineState-Protected]: rejected, now in switching machine state");
-      return;
+      return false;
     }
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
-      return;
+      return false;
     } else if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
-      lowpower(false);
+      result = lowpower(false);
     }
-    SwitchState(MsscMachineState::MSSC_PROTECT);
+    return result ? SwitchState(MsscMachineState::MSSC_PROTECT) : result;
   }
 
-  void OnActive()
+  bool OnActive()
   {
+    bool result = true;
     if (is_switching_ms_) {
       INFO("[MachineState-Active]: rejected, now in switching machine state");
-      return;
+      return false;
     }
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
-      return;
+      return false;
     } else if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
-      lowpower(false);
+      result = lowpower(false);
     }
-    SwitchState(MsscMachineState::MSSC_ACTIVE);
+    return result ? SwitchState(MsscMachineState::MSSC_ACTIVE) : result;
   }
 
-  void OnDeactive()
+  bool OnDeactive()
   {
+    bool result = true;
+    if (is_switching_ms_) {
+      INFO("[MachineState-Active]: rejected, now in switching machine state");
+      return false;
+    }
+    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+      return false;
+    } else if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+      result = lowpower(false);
+    }
+    return result ? SwitchState(MsscMachineState::MSSC_DEACTIVE) : result;
   }
 
-  void OnTearDown()
+  bool OnTearDown()
   {
+    bool result = true;
     if (is_switching_ms_) {
       INFO("[MachineState-ShutDown]: rejected, now in switching machine state");
-      return;
+      return false;
     }
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
-      return;
+      return false;
     } else if (battery_charge_val <= 0 && (!is_charging_)) {
       // 关机
-      SwitchState(MsscMachineState::MSSC_SHUTDOWN);
+      result = SwitchState(MsscMachineState::MSSC_SHUTDOWN);
     }
-    SwitchState(MsscMachineState::MSSC_SHUTDOWN);
+    result = SwitchState(MsscMachineState::MSSC_SHUTDOWN);
+    return result;
   }
 
-  void OnOta()
+  bool OnOta()
   {
+    bool result = true;
     if (is_switching_ms_) {
       INFO("[MachineState-Ota]: rejected, now switching machine state");
-      return;
+      return false;
     }
-    SwitchState(MsscMachineState::MSSC_OTA);
+    if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
+      result = lowpower(false);
+    }
+    return result ? SwitchState(MsscMachineState::MSSC_OTA) : result;
   }
 
-  void OnError()
+  bool OnError()
   {
+    return SwitchState(MsscMachineState::MSSC_ERROR);
+  }
+
+  bool SetState(cyberdog::machine::MachineState ms)
+  {
+    int32_t code = machine_state_ptr_->SetState(ms);
+    if (code != 0) {
+      play_sound(code);
+    }
+    return code == 0;
   }
 
 private:
@@ -736,6 +782,7 @@ private:
   };
   bool disable_lowpower_ {false};
   LOWPOWER_ENTERANDEXIT_CALLBACK lowpower {[](bool) {return true;}};
+  EXCEPTION_PLAYSOUND_CALLBACK play_sound {[](int32_t) {}};
   std::unique_ptr<cyberdog::manager::StateContext> machine_state_ptr_ {nullptr};
   bool machine_state_keep {false};
   rclcpp::TimerBase::SharedPtr keep_timer_;

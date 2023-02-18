@@ -83,6 +83,22 @@ public:
     audio_play_pub_->publish(text_msg);
   }
 
+  void SpeechNotify(int32_t play_id)
+  {
+    std::chrono::seconds timeout(6);
+    auto req = std::make_shared<protocol::srv::AudioTextPlay::Request>();
+    req->module_name = audio_info_node_->get_name();
+    req->is_online = false;
+    req->speech.play_id = play_id;
+    auto future_result = audio_text_play_client_->async_send_request(req);
+    std::future_status status = future_result.wait_for(timeout);
+    if (status == std::future_status::ready) {
+      ERROR("call play sound service success. play id:%d", play_id);
+    } else {
+      ERROR("call play sound service failed! play id:%d", play_id);
+    }
+  }
+
 private:
   rclcpp::Node::SharedPtr audio_info_node_{nullptr};
   rclcpp::CallbackGroup::SharedPtr audio_callback_group_;
