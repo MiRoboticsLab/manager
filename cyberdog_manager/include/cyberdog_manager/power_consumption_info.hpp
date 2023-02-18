@@ -14,10 +14,13 @@
 #ifndef CYBERDOG_MANAGER__POWER_CONSUMPTION_INFO_HPP_
 #define CYBERDOG_MANAGER__POWER_CONSUMPTION_INFO_HPP_
 
+#include <string>
 #include <memory>
+#include <chrono>
 #include "rclcpp/rclcpp.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 #include "std_srvs/srv/trigger.hpp"
+#include "protocol/srv/led_execute.hpp"
 #include "protocol/msg/motion_status.hpp"
 #include "low_power_consumption/low_power_consumption.hpp"
 #include "protocol/msg/state_switch_status.hpp"
@@ -63,6 +66,11 @@ public:
         std::placeholders::_1, std::placeholders::_2),
       rmw_qos_profile_services_default, power_consumption_callback_group_);
 
+    led_excute_client_ =
+      power_consumption_info_node_->create_client<protocol::srv::LedExecute>(
+      "led_execute",
+      rmw_qos_profile_services_default, power_consumption_callback_group_);
+
     // sub motion init
     rclcpp::SubscriptionOptions options;
     options.callback_group = power_consumption_callback_group_;
@@ -87,13 +95,16 @@ public:
     bool result = false;
     if (is_enter) {
       INFO("[LowPower]: [%d]LowPower enter inner-call:start", (r_count + 1));
+      TailLedControl(true);
       code = lpc_ptr_->LpcRelease(pd, &err);
       if (code == 0) {
         is_lowpower_ = true;
         INFO("[LowPower]: [%d]LowPower enter inner-call:success", (r_count + 1));
         result = true;
       } else {
-        INFO("[LowPower]: [%d]LowPower enter inner-call:failed!", (r_count + 1));
+        INFO(
+          "[LowPower]: [%d]LowPower enter inner-call:failed! error code is %d",
+          (r_count + 1), code);
       }
       ++r_count;
     } else {
@@ -101,10 +112,13 @@ public:
       code = lpc_ptr_->LpcRequest(pd, &err);
       if (code == 0) {
         is_lowpower_ = false;
+        TailLedControl(false);
         INFO("[LowPower]: [%d]LowPower exit inner-call:success", (r_count + 1));
         result = true;
       } else {
-        INFO("[LowPower]: [%d]LowPower exit inner-call:failed!", (r_count + 1));
+        INFO(
+          "[LowPower]: [%d]LowPower exit inner-call:failed! error code is %d",
+          (r_count + 1), code);
       }
       ++r_count;
     }
@@ -114,43 +128,28 @@ public:
 private:
   void sub_mostion_status_callback(const protocol::msg::MotionStatus::SharedPtr msg)
   {
+    // 状态机切换也有判断
     if (is_ota_) {
       INFO_MILLSECONDS(10000, "[LowPower]: in ota state return.");
       return;
     }
     // motion_id: 趴下(101)、站立(111)
     int motion_id = msg->motion_id;
-    static int lay_count = 0;
-    static int times = 0;
+    if (is_lowpower_) {
+      return;
+    }
 
-    if (!is_lowpower_) {
-      if (motion_id == 0) {
-        ++lay_count;
-        if (lay_count == 1200) {
-          INFO("[LowPower]: enter lowpower, start up time is greater than 2min");
-          enter_lowpower_handler();
-          ++times;
-        }
-      } else if (motion_id == 101) {
-        ++lay_count;
-        if (times == 0) {
-          if (lay_count == 300) {
-            INFO("[LowPower]: call low power consumption when the dog lies down for 30s");
-            enter_lowpower_handler();
-            ++times;
-          }
-        } else {
-          if (lay_count == 1200) {
-            INFO("[LowPower]: call low power consumption when the dog lies down for 2min");
-            enter_lowpower_handler();
-          }
-        }
-      } else {
-        times = 0;
-        lay_count = 0;
+    static auto start = std::chrono::steady_clock::now();
+    if (motion_id == 0 || motion_id == 101) {
+      auto end = std::chrono::steady_clock::now();
+      auto diff = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+      if (diff.count() >= enter_lowpower_time_) {
+        INFO("[LowPower]: enter lowpower, get down time is greater than 2min");
+        enter_lowpower_handler();
+        start = std::chrono::steady_clock::now();
       }
     } else {
-      lay_count = 0;
+      start = std::chrono::steady_clock::now();
     }
   }
 
@@ -195,12 +194,39 @@ private:
     response->success = (code == 0 ? true : false);
   }
 
+  void TailLedControl(bool is_light_off)
+  {
+    if (!led_excute_client_->wait_for_service(std::chrono::seconds(2))) {
+      ERROR("call led_excute server not avalible");
+      return;
+    }
+    auto request_led = std::make_shared<protocol::srv::LedExecute::Request>();
+    request_led->occupation = is_light_off;
+    request_led->client = "lowpower";
+    request_led->target = 2;
+    request_led->mode = 0x01;
+    request_led->effect = 0xA0;
+    auto future_result_tail = led_excute_client_->async_send_request(request_led);
+    std::future_status status_tail = future_result_tail.wait_for(std::chrono::seconds(2));
+    if (status_tail != std::future_status::ready) {
+      ERROR("call led_execute service failed");
+      return;
+    }
+    if (future_result_tail.get()->code == 0) {
+      INFO("call led service successed");
+    } else {
+      ERROR(
+        "control tail led fialed, error code is:%d", future_result_tail.get()->code);
+    }
+  }
+
 private:
   rclcpp::Node::SharedPtr power_consumption_info_node_ {nullptr};
   rclcpp::CallbackGroup::SharedPtr power_consumption_callback_group_;
   // rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_consumption_srv_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reboot_srv_ {nullptr};
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr power_off_srv_ {nullptr};
+  rclcpp::Client<protocol::srv::LedExecute>::SharedPtr led_excute_client_;
   std::unique_ptr<cyberdog::manager::LowPowerConsumption> lpc_ptr_ {nullptr};
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
   rclcpp::Subscription<protocol::msg::StateSwitchStatus>::SharedPtr \
@@ -211,6 +237,7 @@ private:
   PCIN_CALLBACK enter_lowpower_handler;
   bool is_lowpower_ {false};
   bool is_ota_ {false};
+  int enter_lowpower_time_ {30};
 };
 }  // namespace manager
 }  // namespace cyberdog
