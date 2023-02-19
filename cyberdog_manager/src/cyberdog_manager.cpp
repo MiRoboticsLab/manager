@@ -88,7 +88,7 @@ bool cyberdog::manager::CyberdogManager::Init()
   Config();
   if (!mssc_context_ptr_->ExecuteSelfCheck()) {
     ERROR(">>>XXXXX---machine state self check error!");
-    audio_node_ptr->Error("自检失败!自检失败!自检失败!");
+    // audio_node_ptr->Error("自检失败!自检失败!自检失败!");
     ready_node_ptr->SelfCheck(2);
     return false;
   } else {
