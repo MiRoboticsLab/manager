@@ -49,7 +49,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     std::bind(&CyberdogManager::SetState, this, std::placeholders::_1, std::placeholders::_2));
   error_context_ptr_ = std::make_unique<cyberdog::manager::ErrorContext>(name_ + "_error");
   touch_node_ptr = std::make_unique<TouchInfoNode>(node_ptr_);
-  audio_node_ptr = std::make_unique<AudioInfoNode>(
+  audio_node_ptr = std::make_shared<AudioInfoNode>(
     node_ptr_);
   led_node_ptr = std::make_shared<LedInfoNode>(node_ptr_);
   bcin_node_ptr = std::make_unique<BatteryCapacityInfoNode>(
@@ -80,13 +80,20 @@ bool cyberdog::manager::CyberdogManager::Init()
     std::bind(
       &PowerConsumptionInfoNode::EnterLowPower, power_consumption_node_ptr,
       std::placeholders::_1));
+  mssc_context_ptr_->SetExceptionPlaySoundCallback(
+    std::bind(
+      &AudioInfoNode::SpeechNotify, audio_node_ptr,
+      std::placeholders::_1));
   error_context_ptr_->ClearError();
   Config();
   if (!mssc_context_ptr_->ExecuteSelfCheck()) {
     ERROR(">>>XXXXX---machine state self check error!");
-    audio_node_ptr->Error("自检失败!自检失败!自检失败!");
+    // audio_node_ptr->Error("自检失败!自检失败!自检失败!");
     ready_node_ptr->SelfCheck(2);
     return false;
+  } else {
+    audio_node_ptr->Init();
+    ready_node_ptr->SelfCheck(0);
   }
   OnActive();
   query_node_ptr_->Init();
@@ -116,15 +123,12 @@ void cyberdog::manager::CyberdogManager::OnActive()
   query_node_ptr_->Report(true);
   if (result) {
     INFO("!!! All node in detectedc machine state is acitve ok !!!");
-    audio_node_ptr->Init();
     ready_node_ptr->Ready(true);
     ready_node_ptr->MachineState(0);
-    ready_node_ptr->SelfCheck(0);
   } else {
-    audio_node_ptr->Error("自检失败!自检失败!自检失败!");
+    // audio_node_ptr->Error("自检失败!自检失败!自检失败!");
     ready_node_ptr->Ready(false);
     ready_node_ptr->MachineState(-2);
-    ready_node_ptr->SelfCheck(2);
   }
   // bcin_node_ptr->SetBms(BatteryMachineState::BMS_NORMAL);
 }
