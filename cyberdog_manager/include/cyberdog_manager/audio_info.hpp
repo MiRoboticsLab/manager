@@ -94,7 +94,7 @@ public:
     auto mcpim_iter = module_code_play_id_map.find(code);
     if (mcpim_iter != module_code_play_id_map.end()) {
       uint16_t play_id = mcpim_iter->second;
-      bool is_self_check = ((play_id & 0x0F) == 9) ? true : false;
+      bool is_self_check = ((code % 10) == 9) ? true : false;
       if (is_self_check) {
         std::chrono::seconds timeout(2);
         auto req = std::make_shared<protocol::srv::SdcardPlayIdQuery::Request>();

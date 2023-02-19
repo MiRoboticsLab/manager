@@ -96,6 +96,7 @@ bool cyberdog::manager::CyberdogManager::Init()
     ready_node_ptr->SelfCheck(0);
   }
   OnActive();
+  power_consumption_node_ptr->Init();
   query_node_ptr_->Init();
   bcin_node_ptr->Init();
   mssc_context_ptr_->Init();
