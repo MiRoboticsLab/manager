@@ -91,6 +91,7 @@ public:
       "motion_status", rclcpp::SystemDefaultsQoS(), std::bind(
         &PowerConsumptionInfoNode::sub_mostion_status_callback,
         this, std::placeholders::_1), options);
+    start = std::chrono::steady_clock::now();
   }
 
   bool EnterLowPower(bool is_enter)
@@ -118,6 +119,7 @@ public:
       INFO("[LowPower]: [%d]LowPower exit inner-call:start", (r_count + 1));
       code = lpc_ptr_->LpcRequest(pd, &err);
       if (code == 0) {
+        start = std::chrono::steady_clock::now();
         is_lowpower_ = false;
         TailLedControl(false);
         INFO("[LowPower]: [%d]LowPower exit inner-call:success", (r_count + 1));
@@ -146,7 +148,7 @@ private:
       return;
     }
 
-    static auto start = std::chrono::steady_clock::now();
+    // static auto start = std::chrono::steady_clock::now();
     if (motion_id == 0 || motion_id == 101) {
       auto end = std::chrono::steady_clock::now();
       auto diff = std::chrono::duration_cast<std::chrono::seconds>(end - start);
@@ -245,6 +247,7 @@ private:
   bool is_lowpower_ {false};
   bool is_ota_ {false};
   int enter_lowpower_time_ {30};
+  std::chrono::steady_clock::time_point start;
 };
 }  // namespace manager
 }  // namespace cyberdog
