@@ -74,15 +74,22 @@ public:
     // sub motion init
     rclcpp::SubscriptionOptions options;
     options.callback_group = power_consumption_callback_group_;
-    motion_status_sub_ = power_consumption_info_node_->
-      create_subscription<protocol::msg::MotionStatus>(
-      "motion_status", rclcpp::SystemDefaultsQoS(), std::bind(
-        &PowerConsumptionInfoNode::sub_mostion_status_callback,
-        this, std::placeholders::_1), options);
     state_swith_status_sub_ = power_consumption_info_node_->
       create_subscription<protocol::msg::StateSwitchStatus>(
       "state_switch_status", rclcpp::SystemDefaultsQoS(), std::bind(
         &PowerConsumptionInfoNode::sub_state_switch_status_callback,
+        this, std::placeholders::_1), options);
+  }
+
+  void Init()
+  {
+    // sub motion init
+    rclcpp::SubscriptionOptions options;
+    options.callback_group = power_consumption_callback_group_;
+    motion_status_sub_ = power_consumption_info_node_->
+      create_subscription<protocol::msg::MotionStatus>(
+      "motion_status", rclcpp::SystemDefaultsQoS(), std::bind(
+        &PowerConsumptionInfoNode::sub_mostion_status_callback,
         this, std::placeholders::_1), options);
   }
 
