@@ -60,141 +60,141 @@ public:
     //   std::bind(&LedInfoNode::BmsStatus, this, std::placeholders::_1),
     //   sub_options);
   }
+//   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
+//   {
+//     battery_soc_ = msg->batt_soc;
+//     bool power_wired_charging = msg->power_wired_charging;
+//     static bool is_set_led_zero = false;
+//     static bool is_set_led_five = false;
+//     static bool is_set_led_twenty = false;
+//     static bool is_set_led_more_twenty = false;
 
-  void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
-  {
-    battery_soc_ = msg->batt_soc;
-    bool power_wired_charging = msg->power_wired_charging;
-    static bool is_set_led_zero = false;
-    static bool is_set_led_five = false;
-    static bool is_set_led_twenty = false;
-    static bool is_set_led_more_twenty = false;
+//     if (battery_soc_ <= 0) {
+//       if (!power_wired_charging && !is_set_led_zero) {
+//         is_set_led_zero = true;
+//         LedMode poweroff_head{true, "bms", 1, 0x01, 0xA3, 0x00, 0x00, 0x00};
+//         LedMode poweroff_tail{true, "bms", 2, 0x01, 0xA3, 0x00, 0x00, 0x00};
+//         LedMode poweroff_mini{true, "bms", 3, 0x01, 0x31, 0xFF, 0x32, 0x32};
+//         bool result = ReqLedService(poweroff_head, poweroff_tail, poweroff_mini);
+//         INFO("%s set led when the soc is 0", result ? "successed" : "failed");
+//       }
+//     } else if (battery_soc_ < 5) {
+//       if (!power_wired_charging && !is_set_led_five) {
+//         is_lowpower_ = true;
+//         is_set_led_five = true;
+//         is_set_led_twenty = false;
+//         LedMode low_power_tail{true, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
+//         bool result = ReqLedService(low_power_tail);
+//         INFO("[LowPower]: %s set led when the soc is less than 5",
+//              result ? "successed" : "failed");
+//       }
+//     } else if (battery_soc_ <= 20) {
+//       if (!is_set_led_twenty) {
+//         is_set_led_five = false;
+//         is_set_led_twenty = true;
+//         is_set_led_more_twenty = false;
+//         LedMode bringup_head{true, "bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
+//         LedMode bringup_tail{true, "bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
+//         LedMode bringup_mini{true, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
+//         bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
+//         INFO("%s set led when the soc less than 20", result ? "successed" : "failed");
+//       }
+//     } else {
+//       if (!is_set_led_more_twenty) {
+//         is_set_led_twenty = false;
+//         is_set_led_more_twenty = true;
+//         LedMode bringup_head{false, "bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
+//         LedMode bringup_tail{false, "bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
+//         LedMode bringup_mini{false, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
+//         bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
+//         INFO("%s release led when the soc more than 20", result ? "successed" : "failed");
+//       }
+//     }
+//   }
 
-    if (battery_soc_ <= 0) {
-      if (!power_wired_charging && !is_set_led_zero) {
-        is_set_led_zero = true;
-        LedMode poweroff_head{true, "bms", 1, 0x01, 0xA3, 0x00, 0x00, 0x00};
-        LedMode poweroff_tail{true, "bms", 2, 0x01, 0xA3, 0x00, 0x00, 0x00};
-        LedMode poweroff_mini{true, "bms", 3, 0x01, 0x31, 0xFF, 0x32, 0x32};
-        bool result = ReqLedService(poweroff_head, poweroff_tail, poweroff_mini);
-        INFO("%s set led when the soc is 0", result ? "successed" : "failed");
-      }
-    } else if (battery_soc_ < 5) {
-      if (!power_wired_charging && !is_set_led_five) {
-        is_lowpower_ = true;
-        is_set_led_five = true;
-        is_set_led_twenty = false;
-        LedMode low_power_tail{true, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
-        bool result = ReqLedService(low_power_tail);
-        INFO("[LowPower]: %s set led when the soc is less than 5", result ? "successed" : "failed");
-      }
-    } else if (battery_soc_ <= 20) {
-      if (!is_set_led_twenty) {
-        is_set_led_five = false;
-        is_set_led_twenty = true;
-        is_set_led_more_twenty = false;
-        LedMode bringup_head{true, "bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
-        LedMode bringup_tail{true, "bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
-        LedMode bringup_mini{true, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
-        bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
-        INFO("%s set led when the soc less than 20", result ? "successed" : "failed");
-      }
-    } else {
-      if (!is_set_led_more_twenty) {
-        is_set_led_twenty = false;
-        is_set_led_more_twenty = true;
-        LedMode bringup_head{false, "bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
-        LedMode bringup_tail{false, "bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
-        LedMode bringup_mini{false, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
-        bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
-        INFO("%s release led when the soc more than 20", result ? "successed" : "failed");
-      }
-    }
-  }
+// private:
+//   void ReqAssignment(std::shared_ptr<protocol::srv::LedExecute::Request> req, LedMode & data)
+//   {
+//     req->occupation = data.occupation;
+//     req->client = data.client;
+//     req->target = data.target;
+//     req->mode = data.mode;
+//     req->effect = data.effect;
+//     req->r_value = data.r_value;
+//     req->g_value = data.g_value;
+//     req->b_value = data.b_value;
+//   }
 
-private:
-  void ReqAssignment(std::shared_ptr<protocol::srv::LedExecute::Request> req, LedMode & data)
-  {
-    req->occupation = data.occupation;
-    req->client = data.client;
-    req->target = data.target;
-    req->mode = data.mode;
-    req->effect = data.effect;
-    req->r_value = data.r_value;
-    req->g_value = data.g_value;
-    req->b_value = data.b_value;
-  }
+//   bool ReqLedService(LedMode & head, LedMode & tail, LedMode & mini)
+//   {
+//     if (!led_excute_client_->wait_for_service(std::chrono::seconds(2))) {
+//       ERROR("call led_excute server not avalible");
+//       return false;
+//     }
 
-  bool ReqLedService(LedMode & head, LedMode & tail, LedMode & mini)
-  {
-    if (!led_excute_client_->wait_for_service(std::chrono::seconds(2))) {
-      ERROR("call led_excute server not avalible");
-      return false;
-    }
+//     auto request_led = std::make_shared<protocol::srv::LedExecute::Request>();
+//     ReqAssignment(request_led, head);
+//     auto future_result_head = led_excute_client_->async_send_request(request_led);
+//     std::future_status status_head = future_result_head.wait_for(std::chrono::seconds(2));
 
-    auto request_led = std::make_shared<protocol::srv::LedExecute::Request>();
-    ReqAssignment(request_led, head);
-    auto future_result_head = led_excute_client_->async_send_request(request_led);
-    std::future_status status_head = future_result_head.wait_for(std::chrono::seconds(2));
+//     ReqAssignment(request_led, tail);
+//     auto future_result_tail = led_excute_client_->async_send_request(request_led);
+//     std::future_status status_tail = future_result_head.wait_for(std::chrono::seconds(2));
 
-    ReqAssignment(request_led, tail);
-    auto future_result_tail = led_excute_client_->async_send_request(request_led);
-    std::future_status status_tail = future_result_head.wait_for(std::chrono::seconds(2));
+//     ReqAssignment(request_led, mini);
+//     auto future_result_mini = led_excute_client_->async_send_request(request_led);
+//     std::future_status status_mini = future_result_mini.wait_for(std::chrono::seconds(2));
 
-    ReqAssignment(request_led, mini);
-    auto future_result_mini = led_excute_client_->async_send_request(request_led);
-    std::future_status status_mini = future_result_mini.wait_for(std::chrono::seconds(2));
+//     if (status_head != std::future_status::ready ||
+//       status_tail != std::future_status::ready ||
+//       status_mini != std::future_status::ready)
+//     {
+//       INFO("call led_execute service failed");
+//       return false;
+//     }
 
-    if (status_head != std::future_status::ready ||
-      status_tail != std::future_status::ready ||
-      status_mini != std::future_status::ready)
-    {
-      INFO("call led_execute service failed");
-      return false;
-    }
+//     if (future_result_head.get()->code == 0 &&
+//       future_result_tail.get()->code == 0 &&
+//       future_result_mini.get()->code == 0)
+//     {
+//       INFO("call led service successed");
+//       return true;
+//     } else {
+//       INFO(
+//         "call led service fialed, error code[head, tail, mini] is:%d %d %d",
+//         future_result_head.get()->code,
+//         future_result_tail.get()->code,
+//         future_result_mini.get()->code);
+//       return false;
+//     }
+//   }
 
-    if (future_result_head.get()->code == 0 &&
-      future_result_tail.get()->code == 0 &&
-      future_result_mini.get()->code == 0)
-    {
-      INFO("call led service successed");
-      return true;
-    } else {
-      INFO(
-        "call led service fialed, error code[head, tail, mini] is:%d %d %d",
-        future_result_head.get()->code,
-        future_result_tail.get()->code,
-        future_result_mini.get()->code);
-      return false;
-    }
-  }
+//   bool ReqLedService(LedMode & tail)
+//   {
+//     if (!led_excute_client_->wait_for_service(std::chrono::seconds(2))) {
+//       ERROR("call led_excute server not avalible");
+//       return false;
+//     }
+//     auto request_led = std::make_shared<protocol::srv::LedExecute::Request>();
+//     ReqAssignment(request_led, tail);
+//     auto future_result_tail = led_excute_client_->async_send_request(request_led);
+//     std::future_status status_tail = future_result_tail.wait_for(std::chrono::seconds(2));
 
-  bool ReqLedService(LedMode & tail)
-  {
-    if (!led_excute_client_->wait_for_service(std::chrono::seconds(2))) {
-      ERROR("call led_excute server not avalible");
-      return false;
-    }
-    auto request_led = std::make_shared<protocol::srv::LedExecute::Request>();
-    ReqAssignment(request_led, tail);
-    auto future_result_tail = led_excute_client_->async_send_request(request_led);
-    std::future_status status_tail = future_result_tail.wait_for(std::chrono::seconds(2));
+//     if (status_tail != std::future_status::ready) {/ypeng/dds-test/edit
+//       INFO("call led_execute service failed");
+//       return false;
+//     }
 
-    if (status_tail != std::future_status::ready) {
-      INFO("call led_execute service failed");
-      return false;
-    }
-
-    if (future_result_tail.get()->code == 0) {
-      INFO("call led service successed");
-      return true;
-    } else {
-      INFO(
-        "call led service fialed, error code[tail] is: %d",
-        future_result_tail.get()->code);
-      return false;
-    }
-  }
+//     if (future_result_tail.get()->code == 0) {
+//       INFO("call led service successed");
+//       return true;
+//     } else {
+//       INFO(
+//         "call led service fialed, error code[tail] is: %d",
+//         future_result_tail.get()->code);
+//       return false;
+//     }
+//   }
 
 private:
   rclcpp::Node::SharedPtr led_info_node_{nullptr};

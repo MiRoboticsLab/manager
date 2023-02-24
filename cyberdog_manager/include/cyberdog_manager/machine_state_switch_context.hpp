@@ -309,12 +309,14 @@ public:
     if (machine_state_keep) {
       return;
     }
+    INFO("77777777777777");
     battery_charge_val = bc;
     is_charging_ = is_charging;
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
     } else if (battery_charge_val <= 0 && (!is_charging)) {
       // 关机
+      INFO("888888888888888");
       std::lock_guard<std::mutex> lck(state_mtx_);
       machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
     } else if (battery_charge_val < 5 && !disable_lowpower_) {
@@ -349,6 +351,7 @@ public:
         return;
       }
     }
+    INFO("999999999999999999999");
   }
   void KeepDownOverTime()
   {

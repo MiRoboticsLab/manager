@@ -56,8 +56,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
     node_ptr_,
     std::bind(
       &MachineStateSwitchContext::BatteryChargeUpdate, mssc_context_ptr_,
-      std::placeholders::_1, std::placeholders::_2),
-    std::bind(&LedInfoNode::BmsStatus, led_node_ptr, std::placeholders::_1));
+      std::placeholders::_1, std::placeholders::_2));
   executor_.add_node(node_ptr_);
 }
 
