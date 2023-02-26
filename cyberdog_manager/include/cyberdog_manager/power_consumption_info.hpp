@@ -134,6 +134,13 @@ public:
     return result;
   }
 
+  bool QueryLowPower()
+  {
+    PM_DEV pd = PM_CAM_REALSNS;
+    int code = lpc_ptr_->LpcQuery(pd);
+    return (code == 0) ? true : false;
+  }
+
 private:
   void sub_mostion_status_callback(const protocol::msg::MotionStatus::SharedPtr msg)
   {

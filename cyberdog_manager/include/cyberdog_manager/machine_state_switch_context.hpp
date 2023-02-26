@@ -407,7 +407,7 @@ private:
       response->success = true;
       response->code = 0;
     } else {
-      response->success = false;
+      response->success = true;
       response->code = -1;
     }
   }

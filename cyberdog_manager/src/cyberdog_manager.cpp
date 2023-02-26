@@ -73,6 +73,18 @@ void cyberdog::manager::CyberdogManager::Config()
 
 bool cyberdog::manager::CyberdogManager::Init()
 {
+  bool exit_lowpower = false;
+  int exit_times = 0;
+  while (!exit_lowpower && exit_times < 3) {
+    if (power_consumption_node_ptr->QueryLowPower()) {
+      exit_lowpower = power_consumption_node_ptr->EnterLowPower(false);
+      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    } else {
+      exit_lowpower = true;
+    }
+    INFO("exit lowpower:%s", (exit_lowpower ? "true" : "false"));
+    ++exit_times;
+  }
   ready_node_ptr->SelfCheck(1);
   error_context_ptr_->Init();
   mssc_context_ptr_->ExecuteSetUp();
