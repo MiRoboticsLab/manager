@@ -14,10 +14,13 @@
 #ifndef CYBERDOG_MANAGER__BATTERY_CAPACITY_INFO_HPP_
 #define CYBERDOG_MANAGER__BATTERY_CAPACITY_INFO_HPP_
 
+#include <string>
+#include <memory>
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "protocol/msg/bms_status.hpp"
 #include "protocol/msg/audio_play_extend.hpp"
+#include "protocol/srv/audio_text_play.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 
 namespace cyberdog
@@ -46,7 +49,7 @@ public:
   : battery_capacity_info_node_(node_ptr),
     batsoc_notify_handler(bcin_soc),
     bms_notify_handler(bcin_bms),
-    is_protected(false), is_reported_charging(false)
+    is_soc_zero_(false), is_soc_five_(false), is_soc_twenty_(false), is_soc_thirty_(false)
   {
   }
 
@@ -67,102 +70,74 @@ public:
     audio_play_extend_pub =
       battery_capacity_info_node_->create_publisher<protocol::msg::AudioPlayExtend>(
       "speech_play_extend",
-      rclcpp::SystemDefaultsQoS(),
-      pub_options
-      );
+      rclcpp::SystemDefaultsQoS(), pub_options);
+    audio_play_client_ = battery_capacity_info_node_->create_client<protocol::srv::AudioTextPlay>(
+      "speech_text_play",
+      rmw_qos_profile_services_default, bc_callback_group_);
   }
 
 private:
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
   {
-    static bool is_battary_zero = false;
-    static bool is_set_count = false;
     bms_status_ = *msg;
-    if (bms_status_.batt_soc < 5) {
-      bms_notify_handler(msg);
-      batsoc_notify_handler(bms_status_.batt_soc, bms_status_.power_wired_charging);
-    } else {
-      batsoc_notify_handler(bms_status_.batt_soc, bms_status_.power_wired_charging);
-      bms_notify_handler(msg);
-    }
-    if (bms_status_.power_wired_charging) {
-      is_set_count = false;
-      is_reported_charging = false;
-      return;
-    }
     INFO_MILLSECONDS(
       30000, "Battery Capacity Info:%d",
       bms_status_.batt_soc);
-    if (!is_battary_zero && bms_status_.batt_soc <= 0) {
-      is_battary_zero = true;
-      protocol::msg::AudioPlayExtend msg;
-      msg.is_online = true;
-      msg.module_name = battery_capacity_info_node_->get_name();
-      // msg.text = "电量低于5%,进入低电保护模式!请尽快充电";
-      msg.text = "电量为0,关机中!";
-      audio_play_extend_pub->publish(msg);
-      // shutdown_handler();
-    } else if (bms_status_.batt_soc <= 5) {
-      if (!is_protected) {
-        is_protected = true;
-        // protect_handler();
-        INFO(
-          "Battery Capacity Info capacity:%d, %s lowpower mode.",
-          bms_status_.batt_soc,
-          (is_protected ? "enter" : "exit"));
-        protocol::msg::AudioPlayExtend msg;
-        msg.is_online = true;
-        msg.module_name = battery_capacity_info_node_->get_name();
-        // msg.text = "电量低于5%,进入低电保护模式!请尽快充电";
-        msg.text = "电量低于5%，电池即将耗尽，请尽快充电!";
-        audio_play_extend_pub->publish(msg);
-      }
-    } else if (bms_status_.batt_soc > 20) {
-      if (is_protected) {
-        is_protected = false;
-        // active_handler();
-        INFO(
-          "Battery Capacity Info capacity:%d, %s protect mode.",
-          bms_status_.batt_soc,
-          (is_protected ? "enter" : "exit"));
-        // protocol::msg::AudioPlayExtend msg;
-        // msg.is_online = true;
-        // msg.module_name = battery_capacity_info_node_->get_name();
-        // msg.text = "电量高于20%,退出低电保护模式";
-        // audio_play_extend_pub->publish(msg);
+    if (!bms_status_.power_wired_charging) {
+      if (bms_status_.batt_soc <= 0) {
+        if (!is_soc_zero_) {
+          is_soc_zero_ = true;
+          // is_soc_five_ = false;
+          PlayAudioService("电量为0,关机中!");
+        }
+      } else if (bms_status_.batt_soc <= 5) {
+        if (!is_soc_five_) {
+          is_soc_five_ = true;
+          is_soc_twenty_ = false;
+          PlayAudio("电量低于5%，电池即将耗尽，请尽快充电!");
+        }
+      } else if (bms_status_.batt_soc <= 20) {
+        if (!is_soc_twenty_) {
+          is_soc_twenty_ = true;
+          is_soc_five_ = false;
+          is_soc_thirty_ = false;
+          PlayAudio("电量低于20%，部分功能受限!");
+        }
+      } else if (bms_status_.batt_soc <= 30) {
+        if (!is_soc_thirty_) {
+          is_soc_thirty_ = true;
+          is_soc_twenty_ = false;
+          PlayAudio("电量低于30%，请尽快充电!");
+        }
+      } else {
+        is_soc_thirty_ = false;
       }
     }
-    if (!is_protected) {
-      if (!is_reported_charging && (bms_status_.batt_soc < 20)) {
-        is_reported_charging = true;
-        protocol::msg::AudioPlayExtend msg;
-        msg.is_online = true;
-        msg.module_name = battery_capacity_info_node_->get_name();
-        msg.text = "电量低于20%，部分功能受限";
-        audio_play_extend_pub->publish(msg);
-      } else if (bms_status_.batt_soc < 30) {
-        if (!is_reported_charging) {
-          is_reported_charging = true;
-          protocol::msg::AudioPlayExtend msg;
-          msg.is_online = true;
-          msg.module_name = battery_capacity_info_node_->get_name();
-          msg.text = "电量低于30%，请尽快充电";
-          audio_play_extend_pub->publish(msg);
-        }
-        if (bms_status_.batt_soc < 20) {
-          if (!is_set_count && is_reported_charging) {
-            is_set_count = true;
-            protocol::msg::AudioPlayExtend msg;
-            msg.is_online = true;
-            msg.module_name = battery_capacity_info_node_->get_name();
-            msg.text = "电量低于20%，部分功能受限";
-            audio_play_extend_pub->publish(msg);
-          }
-        }
-      } else if (bms_status_.batt_soc > 35) {
-        is_reported_charging = false;
-        is_set_count = false;
-      }
+    batsoc_notify_handler(bms_status_.batt_soc, bms_status_.power_wired_charging);
+  }
+
+  void PlayAudio(const std::string & text)
+  {
+    protocol::msg::AudioPlayExtend msg;
+    msg.is_online = true;
+    msg.module_name = battery_capacity_info_node_->get_name();
+    msg.text = text;
+    audio_play_extend_pub->publish(msg);
+  }
+
+  void PlayAudioService(const std::string & text)
+  {
+    auto request_audio = std::make_shared<protocol::srv::AudioTextPlay::Request>();
+    request_audio->module_name = battery_capacity_info_node_->get_name();
+    request_audio->is_online = true;
+    request_audio->text = text;
+    auto future_result_audio = audio_play_client_->async_send_request(request_audio);
+    std::future_status status_audio = future_result_audio.wait_for(std::chrono::seconds(2));
+    if (status_audio != std::future_status::ready) {
+      INFO("call audio service failed");
+    }
+    if (future_result_audio.get()->status != 0) {
+      INFO("audio play failed");
     }
   }
 
@@ -171,11 +146,14 @@ private:
   rclcpp::CallbackGroup::SharedPtr bc_callback_group_;
   rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_;
   rclcpp::Publisher<protocol::msg::AudioPlayExtend>::SharedPtr audio_play_extend_pub;
+  rclcpp::Client<protocol::srv::AudioTextPlay>::SharedPtr audio_play_client_ {nullptr};
   protocol::msg::BmsStatus bms_status_;
   BCINSOC_CALLBACK batsoc_notify_handler;
   BCINBMS_CALLBACK bms_notify_handler;
-  bool is_protected;
-  bool is_reported_charging;
+  bool is_soc_zero_;
+  bool is_soc_five_;
+  bool is_soc_twenty_;
+  bool is_soc_thirty_;
 };
 }  // namespace manager
 }  // namespace cyberdog
