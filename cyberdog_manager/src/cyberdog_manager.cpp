@@ -96,6 +96,10 @@ bool cyberdog::manager::CyberdogManager::Init()
     std::bind(
       &AudioInfoNode::SpeechNotify, audio_node_ptr,
       std::placeholders::_1));
+  mssc_context_ptr_->SetShutdownRebootCallback(
+    std::bind(
+      &PowerConsumptionInfoNode::ShutdownOrReboot, power_consumption_node_ptr,
+      std::placeholders::_1));
   error_context_ptr_->ClearError();
   Config();
   if (!mssc_context_ptr_->ExecuteSelfCheck()) {
