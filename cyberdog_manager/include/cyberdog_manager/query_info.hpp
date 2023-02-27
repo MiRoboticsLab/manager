@@ -367,7 +367,7 @@ public:
       bat_val.AddMember("voltage", bms_status_.batt_volt, allocator);
       bat_val.AddMember("temperature", bms_status_.batt_temp, allocator);
       bat_val.AddMember(
-        "is_charging", ((bms_status_.batt_st & 2) >> 1) == 1 ? true : false,
+        "is_charging", (bms_status_.power_wired_charging || bms_status_.power_wp_charging),
         allocator);
       bat_val.AddMember("discharge_time", 120, allocator);
       CyberdogJson::Add(json_info, "bat_info", bat_val);
