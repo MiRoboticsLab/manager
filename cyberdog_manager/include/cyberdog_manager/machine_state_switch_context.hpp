@@ -128,6 +128,7 @@ class MachineStateSwitchContext final
   using BSSC_CALLBACK = std::function<void ()>;
   using MACHINE_STATE_CALLBACK = std::function<void ()>;
   using LOWPOWER_ENTERANDEXIT_CALLBACK = std::function<bool (bool )>;
+  using SHUTDOWN_REBOOT_CALLBACK = std::function<int (bool)>;
   using EXCEPTION_PLAYSOUND_CALLBACK = std::function<void (int32_t )>;
 
 public:
@@ -193,9 +194,19 @@ public:
         &MachineStateSwitchContext::LowPowerSwitchState, this, std::placeholders::_1,
         std::placeholders::_2),
       rmw_qos_profile_services_default, mssc_callback_group_);
-    power_off_client_ =
-      mssc_node_->create_client<std_srvs::srv::Trigger>(
+    power_off_srv_ =
+      mssc_node_->create_service<std_srvs::srv::Trigger>(
       "poweroff",
+      std::bind(
+        &MachineStateSwitchContext::ShutdownCallback, this,
+        std::placeholders::_1, std::placeholders::_2),
+      rmw_qos_profile_services_default, mssc_callback_group_);
+    reboot_srv_ =
+      mssc_node_->create_service<std_srvs::srv::Trigger>(
+      "reboot",
+      std::bind(
+        &MachineStateSwitchContext::RebootCallback, this,
+        std::placeholders::_1, std::placeholders::_2),
       rmw_qos_profile_services_default, mssc_callback_group_);
     low_power_client_ =
       mssc_node_->create_client<std_srvs::srv::SetBool>(
@@ -281,6 +292,10 @@ public:
   {
     play_sound = callback;
   }
+  void SetShutdownRebootCallback(SHUTDOWN_REBOOT_CALLBACK callback)
+  {
+    shutdown_or_reboot = callback;
+  }
   void DogWakeup(const std_msgs::msg::Bool::SharedPtr msg)
   {
     if (machine_state_keep) {
@@ -317,6 +332,7 @@ public:
       // 关机
       std::lock_guard<std::mutex> lck(state_mtx_);
       machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
+      shutdown_or_reboot(false);
     } else if (battery_charge_val < 5 && !disable_lowpower_) {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER || is_charging) {
         return;
@@ -585,9 +601,9 @@ private:
           sss.state = 4;
           state_swith_status_pub_->publish(sss);
           result = SetState(cyberdog::machine::MachineState::MS_TearDown);
-          if (result) {
-            poweroff();
-          }
+          // if (result) {
+          //   poweroff();
+          // }
           // shutdown_handler();
         }
         break;
@@ -604,21 +620,45 @@ private:
     return result;
   }
 
-  void poweroff()
+  void ShutdownCallback(
+    const std_srvs::srv::Trigger::Request::SharedPtr,
+    std_srvs::srv::Trigger::Response::SharedPtr response)
   {
-    INFO("cyberdog start poweroff when the battery soc is 0.");
-    if (!power_off_client_->wait_for_service(std::chrono::seconds(2))) {
-      ERROR("call poweroff service not avalible");
+    if (machine_state_keep) {
+      return;
+    }
+    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+      return;
+    }
+    // 关机
+    std::lock_guard<std::mutex> lck(state_mtx_);
+    machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
+    int code = shutdown_or_reboot(false);
+    if (code == 0) {
+      response->success = true;
     } else {
-      std::chrono::seconds timeout(3);
-      auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
-      auto future_result = power_off_client_->async_send_request(req);
-      std::future_status status = future_result.wait_for(timeout);
-      if (status == std::future_status::ready) {
-        INFO("call poweroff service success.");
-      } else {
-        ERROR("call poweroff service failed!");
-      }
+      response->success = false;
+    }
+  }
+
+  void RebootCallback(
+    const std_srvs::srv::Trigger::Request::SharedPtr,
+    std_srvs::srv::Trigger::Response::SharedPtr response)
+  {
+    if (machine_state_keep) {
+      return;
+    }
+    if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
+      return;
+    }
+    // 重启
+    std::lock_guard<std::mutex> lck(state_mtx_);
+    machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
+    int code = shutdown_or_reboot(true);
+    if (code == 0) {
+      response->success = true;
+    } else {
+      response->success = false;
     }
   }
 
@@ -751,7 +791,8 @@ private:
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_onoff_srv_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr low_power_switch_state_srv_;
   rclcpp::Service<protocol::srv::MachineState>::SharedPtr machine_state_switch_keep_srv_;
-  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr power_off_client_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr power_off_srv_ {nullptr};
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reboot_srv_ {nullptr};
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr low_power_client_;
   rclcpp::Publisher<protocol::msg::StateSwitchStatus>::SharedPtr state_swith_status_pub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
@@ -783,6 +824,7 @@ private:
   bool disable_lowpower_ {false};
   LOWPOWER_ENTERANDEXIT_CALLBACK lowpower {[](bool) {return true;}};
   EXCEPTION_PLAYSOUND_CALLBACK play_sound {[](int32_t) {}};
+  SHUTDOWN_REBOOT_CALLBACK shutdown_or_reboot {[](bool) {return 0;}};
   std::unique_ptr<cyberdog::manager::StateContext> machine_state_ptr_ {nullptr};
   bool machine_state_keep {false};
   rclcpp::TimerBase::SharedPtr keep_timer_;

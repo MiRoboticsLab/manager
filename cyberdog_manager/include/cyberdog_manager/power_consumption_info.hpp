@@ -49,23 +49,6 @@ public:
     lpc_ptr_ = std::make_unique<cyberdog::manager::LowPowerConsumption>();
     power_consumption_callback_group_ =
       power_consumption_info_node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-
-    power_off_srv_ =
-      power_consumption_info_node_->create_service<std_srvs::srv::Trigger>(
-      "poweroff",
-      std::bind(
-        &PowerConsumptionInfoNode::ShutdownCallback, this,
-        std::placeholders::_1, std::placeholders::_2),
-      rmw_qos_profile_services_default, power_consumption_callback_group_);
-
-    reboot_srv_ =
-      power_consumption_info_node_->create_service<std_srvs::srv::Trigger>(
-      "reboot",
-      std::bind(
-        &PowerConsumptionInfoNode::RebootCallback, this,
-        std::placeholders::_1, std::placeholders::_2),
-      rmw_qos_profile_services_default, power_consumption_callback_group_);
-
     led_excute_client_ =
       power_consumption_info_node_->create_client<protocol::srv::LedExecute>(
       "led_execute",
@@ -141,6 +124,23 @@ public:
     return (code == 0) ? true : false;
   }
 
+  int ShutdownOrReboot(bool trigger)
+  {
+    // trigger == true --> reboot, trigger == false --> shutdown
+    PM_SYS pd = (trigger ? PM_SYS_REBOOT : PM_SYS_SHUTDOWN);
+    INFO("[PowerConsumption]: %s", (trigger ? "reboot..." : "poweroff..."));
+    int code = -1;
+    code = lpc_ptr_->LpcSysRequest(pd);
+    if (code != 0) {
+      INFO(
+        "[PowerConsumption]: %s failed, function LpcRequest error code is %d",
+        (trigger ? "reboot..." : "poweroff..."), code);
+    } else {
+      INFO("[PowerConsumption]: %s successfully", (trigger ? "reboot..." : "poweroff..."));
+    }
+    return code;
+  }
+
 private:
   void sub_mostion_status_callback(const protocol::msg::MotionStatus::SharedPtr msg)
   {
@@ -178,38 +178,6 @@ private:
     }
   }
 
-  void RebootCallback(
-    const std_srvs::srv::Trigger::Request::SharedPtr,
-    std_srvs::srv::Trigger::Response::SharedPtr response)
-  {
-    INFO("[PowerConsumption]: reboot......");
-    PM_SYS pd = PM_SYS_REBOOT;
-    int code = -1;
-    code = lpc_ptr_->LpcSysRequest(pd);
-    if (code != 0) {
-      INFO("[PowerConsumption]: reboot failed, function LpcRequest call faild");
-    } else {
-      INFO("[PowerConsumption]: reboot successfully");
-    }
-    response->success = (code == 0 ? true : false);
-  }
-
-  void ShutdownCallback(
-    const std_srvs::srv::Trigger::Request::SharedPtr,
-    std_srvs::srv::Trigger::Response::SharedPtr response)
-  {
-    INFO("[PowerConsumption]: poweroff......");
-    PM_SYS pd = PM_SYS_SHUTDOWN;
-    int code = -1;
-    code = lpc_ptr_->LpcSysRequest(pd);
-    if (code != 0) {
-      INFO("[PowerConsumption]: Shutdown failed, function LpcRequest call faild");
-    } else {
-      INFO("[PowerConsumption]: Shutdown successfully");
-    }
-    response->success = (code == 0 ? true : false);
-  }
-
   void TailLedControl(bool is_light_off)
   {
     if (!led_excute_client_->wait_for_service(std::chrono::seconds(2))) {
@@ -240,8 +208,6 @@ private:
   rclcpp::Node::SharedPtr power_consumption_info_node_ {nullptr};
   rclcpp::CallbackGroup::SharedPtr power_consumption_callback_group_;
   // rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_consumption_srv_;
-  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reboot_srv_ {nullptr};
-  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr power_off_srv_ {nullptr};
   rclcpp::Client<protocol::srv::LedExecute>::SharedPtr led_excute_client_;
   std::unique_ptr<cyberdog::manager::LowPowerConsumption> lpc_ptr_ {nullptr};
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
