@@ -314,6 +314,7 @@ private:
     } else {
       INFO("machine_state_switch_keep failed");
       response->unlock_result = 100;
+      response->code = 9100;
       return;
     }
     black_box.CreateUnlockStatusDB();              // 创建或复原上报状态记录文件
@@ -326,10 +327,14 @@ private:
     auto res = cli.Get(httpFilePath);
     if (res->status != 200) {
       INFO("Get key file error");
+      response->unlock_result = 100;
+      response->code = 9100;
       return;
     }
     if (res->body.length() == 0) {
       INFO("the key file is empty");
+      response->unlock_result = 100;
+      response->code = 9100;
       return;
     }
     std::fstream f;
@@ -345,9 +350,11 @@ private:
     if ( (unlock_access_result == 0) && (unlock_status_result == 0) ) {
       INFO("unlock success!!!");
       response->unlock_result = 0;
+      response->code = 9000;
     } else {
       INFO("unlock faild!!!");
       response->unlock_result = 100;
+      response->code = 9100;
     }
   }
 
