@@ -80,6 +80,7 @@ private:
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
   {
     bms_status_ = *msg;
+    bms_notify_handler(msg);
     INFO_MILLSECONDS(
       30000, "Battery Capacity Info:%d",
       bms_status_.batt_soc);
@@ -109,9 +110,11 @@ private:
           is_soc_twenty_ = false;
           PlayAudio("电量低于30%，请尽快充电!");
         }
-      } else {
-        is_soc_thirty_ = false;
       }
+    } else {
+      is_soc_twenty_ = false;
+      is_soc_thirty_ = false;
+      is_soc_five_ = false;
     }
     batsoc_notify_handler(bms_status_.batt_soc, bms_status_.power_wired_charging);
   }
