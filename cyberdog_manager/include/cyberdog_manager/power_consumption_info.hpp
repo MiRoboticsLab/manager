@@ -160,7 +160,8 @@ private:
       auto end = std::chrono::steady_clock::now();
       auto diff = std::chrono::duration_cast<std::chrono::seconds>(end - start);
       if (diff.count() >= enter_lowpower_time_) {
-        // INFO("[LowPower]: enter lowpower, get down time is greater than 2min");
+        INFO("[LowPower]: enter lowpower, get down for more than 30s");
+        start = std::chrono::steady_clock::now();
         enter_lowpower_handler();
         start = std::chrono::steady_clock::now();
       }
