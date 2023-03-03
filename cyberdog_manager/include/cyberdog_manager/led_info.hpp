@@ -66,9 +66,9 @@ public:
     battery_soc_ = msg->batt_soc;
     bool power_wired_charging = msg->power_wired_charging;
     static bool is_set_led_zero = false;
-    static bool is_set_led_five = false;
     static bool is_set_led_twenty = false;
-    static bool is_set_led_more_twenty = false;
+    static bool is_set_led_eigthy = false;
+    static bool is_set_led_more_eigthy = false;
 
     if (battery_soc_ <= 0) {
       if (!power_wired_charging && !is_set_led_zero) {
@@ -79,35 +79,47 @@ public:
         bool result = ReqLedService(poweroff_head, poweroff_tail, poweroff_mini);
         INFO("%s set led when the soc is 0", result ? "successed" : "failed");
       }
-    } else if (battery_soc_ < 5) {
-      if (!power_wired_charging && !is_set_led_five) {
-        is_lowpower_ = true;
-        is_set_led_five = true;
-        is_set_led_twenty = false;
-        LedMode low_power_tail{true, "lowpower", 2, 0x01, 0xA0, 0x00, 0x00, 0x00};
-        bool result = ReqLedService(low_power_tail);
-        INFO("[LowPower]: %s set led when the soc is less than 5", result ? "successed" : "failed");
-      }
     } else if (battery_soc_ <= 20) {
       if (!is_set_led_twenty) {
-        is_set_led_five = false;
         is_set_led_twenty = true;
-        is_set_led_more_twenty = false;
+        is_set_led_eigthy = false;
         LedMode bringup_head{true, "bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
         LedMode bringup_tail{true, "bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
         LedMode bringup_mini{true, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
         bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
         INFO("%s set led when the soc less than 20", result ? "successed" : "failed");
       }
-    } else {
-      if (!is_set_led_more_twenty) {
+    } else if (battery_soc_ <= 80) {
+      if (!is_set_led_eigthy) {
+        is_set_led_eigthy = true;
         is_set_led_twenty = false;
-        is_set_led_more_twenty = true;
+        is_set_led_more_eigthy = false;
+        // 释放Bms灯效
         LedMode bringup_head{false, "bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
         LedMode bringup_tail{false, "bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
         LedMode bringup_mini{false, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
         bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
-        INFO("%s release led when the soc more than 20", result ? "successed" : "failed");
+        INFO("%s set led when the soc less than 20", result ? "successed" : "failed");
+
+        // 更改系统灯效
+        LedMode sys_bringup_head{true, "system", 1, 0x02, 0x09, 0x75, 0xFC, 0xF6};
+        LedMode sys_bringup_tail{true, "system", 2, 0x02, 0x09, 0x75, 0xFC, 0xF6};
+        LedMode sys_bringup_mini{true, "system", 3, 0x02, 0x30, 0x75, 0xFC, 0xF6};
+        bool result2 = ReqLedService(sys_bringup_head, sys_bringup_tail, sys_bringup_mini);
+        INFO(
+          "%s set sys led, the soc more than 20 an less than 80",
+          result2 ? "successed" : "failed");
+      }
+    } else {
+      if (!is_set_led_more_eigthy) {
+        is_set_led_more_eigthy = true;
+        is_set_led_eigthy = false;
+        // 更改系统灯效
+        LedMode bringup_head{true, "system", 1, 0x02, 0x09, 0x06, 0x21, 0xE2};
+        LedMode bringup_tail{true, "system", 2, 0x02, 0x09, 0x06, 0x21, 0xE2};
+        LedMode bringup_mini{true, "system", 3, 0x02, 0x30, 0x06, 0x21, 0xE2};
+        bool result = ReqLedService(bringup_head, bringup_tail, bringup_mini);
+        INFO("%s set sys led, the soc more than 80", result ? "successed" : "failed");
       }
     }
   }
