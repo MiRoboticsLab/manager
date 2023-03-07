@@ -81,12 +81,13 @@ public:
   {
     static int r_count = 0;
     PM_DEV pd = PM_ALL_NO_TOF;
+    PM_DEV turn_on_led = PM_TOF;
     unsigned int err;
     int code = -1;
     bool result = false;
     if (is_enter) {
       INFO("[LowPower]: [%d]LowPower enter inner-call:start", (r_count + 1));
-      TailLedControl(true);
+      TailLedControl(true, false);
       code = lpc_ptr_->LpcRelease(pd, &err);
       if (code == 0) {
         is_lowpower_ = true;
@@ -100,11 +101,13 @@ public:
       ++r_count;
     } else {
       INFO("[LowPower]: [%d]LowPower exit inner-call:start", (r_count + 1));
+      code = lpc_ptr_->LpcRequest(turn_on_led, &err);
+      TailLedControl(true, true);
       code = lpc_ptr_->LpcRequest(pd, &err);
       if (code == 0) {
         start = std::chrono::steady_clock::now();
         is_lowpower_ = false;
-        TailLedControl(false);
+        TailLedControl(false, false);
         INFO("[LowPower]: [%d]LowPower exit inner-call:success", (r_count + 1));
         result = true;
       } else {
@@ -179,7 +182,7 @@ private:
     }
   }
 
-  void TailLedControl(bool is_light_off)
+  void TailLedControl(bool is_light_off, bool is_exiting)
   {
     if (!led_excute_client_->wait_for_service(std::chrono::seconds(2))) {
       ERROR("call led_excute server not avalible");
@@ -191,6 +194,13 @@ private:
     request_led->target = 2;
     request_led->mode = 0x01;
     request_led->effect = 0xA0;
+    if (is_exiting) {
+      request_led->mode = 0x02;
+      request_led->effect = 0x04;
+      request_led->r_value = 0x06;
+      request_led->g_value = 0x21;
+      request_led->b_value = 0xE2;
+    }
     auto future_result_tail = led_excute_client_->async_send_request(request_led);
     std::future_status status_tail = future_result_tail.wait_for(std::chrono::seconds(2));
     if (status_tail != std::future_status::ready) {
