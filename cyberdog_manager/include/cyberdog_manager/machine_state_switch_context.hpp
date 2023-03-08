@@ -553,18 +553,22 @@ private:
           protocol::msg::StateSwitchStatus sss;
           sss.code = 0;
           sss.state = 0;
-          state_swith_status_pub_->publish(sss);
+          if (result) {
+            state_swith_status_pub_->publish(sss);
+          }
         }
         break;
       case MsscMachineState::MSSC_PROTECT:
         {
           INFO("[MachineState-Switch]: ^^^ switch state:protected ^^^");
+          result = SetState(cyberdog::machine::MachineState::MS_Protected);
           protocol::msg::StateSwitchStatus sss;
           sss.code = 0;
           sss.state = 1;
-          state_swith_status_pub_->publish(sss);
+          if (result) {
+            state_swith_status_pub_->publish(sss);
+          }
           // protect_handler();
-          result = SetState(cyberdog::machine::MachineState::MS_Protected);
         }
         break;
       case MsscMachineState::MSSC_LOWPOWER:
