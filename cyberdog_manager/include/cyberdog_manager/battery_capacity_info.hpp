@@ -134,13 +134,14 @@ private:
     request_audio->module_name = battery_capacity_info_node_->get_name();
     request_audio->is_online = true;
     request_audio->text = text;
-    auto future_result_audio = audio_play_client_->async_send_request(request_audio);
-    std::future_status status_audio = future_result_audio.wait_for(std::chrono::seconds(2));
-    if (status_audio != std::future_status::ready) {
-      INFO("call audio service failed");
-    }
-    if (future_result_audio.get()->status != 0) {
-      INFO("audio play failed");
+    auto callback = [](rclcpp::Client<protocol::srv::AudioTextPlay>::SharedFuture future) {
+        INFO("Audio play result: %s", future.get()->status == 0 ? "success" : "failed");
+      };
+    auto future_result_audio = audio_play_client_->async_send_request(request_audio, callback);
+    if (future_result_audio.wait_for(std::chrono::milliseconds(3000)) ==
+      std::future_status::timeout)
+    {
+      ERROR("Cannot get response from AudioPlay");
     }
   }
 

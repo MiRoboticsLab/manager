@@ -75,7 +75,7 @@ public:
         is_set_led_zero = true;
         LedMode poweroff_head{true, "bms", 1, 0x01, 0xA3, 0x00, 0x00, 0x00};
         LedMode poweroff_tail{true, "bms", 2, 0x01, 0xA3, 0x00, 0x00, 0x00};
-        LedMode poweroff_mini{true, "bms", 3, 0x01, 0x31, 0xFF, 0x32, 0x32};
+        LedMode poweroff_mini{true, "bms", 3, 0x02, 0x31, 0xFF, 0x32, 0x32};
         bool result = ReqLedService(poweroff_head, poweroff_tail, poweroff_mini);
         INFO("%s set led when the soc is 0", result ? "successed" : "failed");
       }
