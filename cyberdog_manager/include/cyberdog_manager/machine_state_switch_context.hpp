@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
+// Copyright (c) 2023 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -99,11 +99,11 @@ public:
     }
   }
 
-  int32_t SetState(cyberdog::machine::MachineState ms)
+  int32_t SetState(cyberdog::machine::MachineState ms, std::map<std::string, int32_t> & state_map)
   {
     int32_t result = 0;
     current_state_ = machine_context_ptr_->Context(ms);
-    result = machine_controller_ptr_->SetState(current_state_);
+    result = machine_controller_ptr_->SetState(current_state_, state_map);
     if (result != 0) {
       ERROR("[MachineState-Context]: set state:%s failed, cannot running!", current_state_.c_str());
     }
@@ -227,13 +227,13 @@ public:
     }
     SetStateHandler(machine_state_ptr_->GetAchieveStates());
   }
-  bool ExecuteSelfCheck()
+  bool ExecuteSelfCheck(std::map<std::string, int32_t> & state_map)
   {
-    return SetState(cyberdog::machine::MachineState::MS_SelfCheck);
+    return SetState(cyberdog::machine::MachineState::MS_SelfCheck, state_map);
   }
   bool ExecuteActive()
   {
-    return SetState(cyberdog::machine::MachineState::MS_Active);
+    return SetState(cyberdog::machine::MachineState::MS_Active, stmap_);
   }
   void Init()
   {
@@ -548,7 +548,7 @@ private:
       case MsscMachineState::MSSC_ACTIVE:
         {
           INFO("[MachineState-Switch]: ^^^ switch state:active ^^^");
-          result = SetState(cyberdog::machine::MachineState::MS_Active);
+          result = SetState(cyberdog::machine::MachineState::MS_Active, stmap_);
           // active_handler();
           protocol::msg::StateSwitchStatus sss;
           sss.code = 0;
@@ -561,7 +561,7 @@ private:
       case MsscMachineState::MSSC_PROTECT:
         {
           INFO("[MachineState-Switch]: ^^^ switch state:protected ^^^");
-          result = SetState(cyberdog::machine::MachineState::MS_Protected);
+          result = SetState(cyberdog::machine::MachineState::MS_Protected, stmap_);
           protocol::msg::StateSwitchStatus sss;
           sss.code = 0;
           sss.state = 1;
@@ -579,7 +579,7 @@ private:
           sss.state = 2;
           state_swith_status_pub_->publish(sss);
           // lowpower_handler();
-          result = SetState(cyberdog::machine::MachineState::MS_LowPower);
+          result = SetState(cyberdog::machine::MachineState::MS_LowPower, stmap_);
           if (result) {
             result = lowpower(true);
           }
@@ -593,7 +593,7 @@ private:
           sss.state = 3;
           state_swith_status_pub_->publish(sss);
           // ota_handler();
-          result = SetState(cyberdog::machine::MachineState::MS_OTA);
+          result = SetState(cyberdog::machine::MachineState::MS_OTA, stmap_);
         }
         break;
       case MsscMachineState::MSSC_SHUTDOWN:
@@ -604,7 +604,7 @@ private:
           sss.code = 0;
           sss.state = 4;
           state_swith_status_pub_->publish(sss);
-          result = SetState(cyberdog::machine::MachineState::MS_TearDown);
+          result = SetState(cyberdog::machine::MachineState::MS_TearDown, stmap_);
           // if (result) {
           //   poweroff();
           // }
@@ -775,9 +775,9 @@ private:
     return SwitchState(MsscMachineState::MSSC_ERROR);
   }
 
-  bool SetState(cyberdog::machine::MachineState ms)
+  bool SetState(cyberdog::machine::MachineState ms, std::map<std::string, int32_t> & stmap)
   {
-    int32_t code = machine_state_ptr_->SetState(ms);
+    int32_t code = machine_state_ptr_->SetState(ms, stmap);
     if (code != 0) {
       play_sound(code);
     }
@@ -786,6 +786,7 @@ private:
 
 private:
   rclcpp::Node::SharedPtr mssc_node_ {nullptr};
+  std::map<std::string, int32_t> stmap_;
   rclcpp::CallbackGroup::SharedPtr mssc_callback_group_;
   rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr state_set_sub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr state_valget_srv_;

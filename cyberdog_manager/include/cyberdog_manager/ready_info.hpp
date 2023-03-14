@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
+// Copyright (c) 2023 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,11 +15,18 @@
 #define CYBERDOG_MANAGER__READY_INFO_HPP_
 
 #include <string>
+#include <map>
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "cyberdog_common/cyberdog_json.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 #include "protocol/msg/self_check_status.hpp"
 #include "protocol/msg/state_switch_status.hpp"
+
+using cyberdog::common::CyberdogJson;
+using rapidjson::Document;
+using rapidjson::Value;
+using rapidjson::kObjectType;
 
 namespace cyberdog
 {
@@ -73,25 +80,22 @@ public:
     }
   }
 
-  void SelfCheck(int32_t state)
+  void SelfCheck(int32_t state, const std::map<std::string, int32_t> & stmap)
   {
     selfcheck_state_ = state;
     if (!notify_selfcheck_thread.joinable()) {
       notify_selfcheck_thread = std::thread(
-        [this]() {
+        [this, &stmap]() {
           static int32_t scs = -1;
           while (!exit_ && rclcpp::ok()) {
             protocol::msg::SelfCheckStatus msg;
-            if (selfcheck_state_ == 0) {
-              msg.code = 0;
-              msg.description = "ok";
-            } else if (selfcheck_state_ == 1) {
-              msg.code = 1;
-              msg.description = "checking";
-            } else if (selfcheck_state_ == 2) {
-              msg.code = 2;
-              msg.description = "failed";
+            if (0 == selfcheck_state_) {
+              static std::string describ = UpSelfCheckState(selfcheck_state_, stmap);
+              msg.description = describ;
+            } else {
+              msg.description = UpSelfCheckState(selfcheck_state_, stmap);
             }
+            msg.code = selfcheck_state_;
             self_check_status_pub_->publish(msg);
             INFO_EXPRESSION(
               (selfcheck_state_ != scs), "self check status:%s",
@@ -101,6 +105,76 @@ public:
           }
         });
     }
+  }
+
+  std::string UpSelfCheckState(const int32_t state, const std::map<std::string, int32_t> & stmap)
+  {
+    int32_t value {0};
+    std::string state_str {};
+    Document self_check_state(kObjectType);
+    Document device(kObjectType);
+    Document sensor(kObjectType);
+    Document::AllocatorType & allocator = self_check_state.GetAllocator();
+    if (1 == state) {
+      value = -1;
+    }
+    CyberdogJson::Add(device, "bms", value);
+    CyberdogJson::Add(device, "led", value);
+    CyberdogJson::Add(device, "touch", value);
+    CyberdogJson::Add(device, "uwb", value);
+    CyberdogJson::Add(sensor, "lidar", value);
+    CyberdogJson::Add(sensor, "gps", value);
+    CyberdogJson::Add(sensor, "ultrasonic", value);
+    CyberdogJson::Add(sensor, "tof", value);
+    CyberdogJson::Add(self_check_state, "audio", value);
+    CyberdogJson::Add(self_check_state, "motion_manager", value);
+    CyberdogJson::Add(self_check_state, "algorithm_manager", value);
+
+    if (2 == state) {
+      for (const auto & n : stmap) {
+        if (n.first == "algorithm_manager") {
+          Value & tmp = self_check_state["algorithm_manager"];
+          tmp.SetInt(n.second);
+          continue;
+        }
+        if (n.first == "device_manager") {
+          Value & tmp = device["bms"];
+          tmp.SetInt(n.second);
+          Value & tmp2 = device["led"];
+          tmp2.SetInt(n.second);
+          Value & tmp3 = device["touch"];
+          tmp3.SetInt(n.second);
+          Value & tmp4 = device["uwb"];
+          tmp4.SetInt(n.second);
+          continue;
+        }
+        if (n.first == "motion_manager") {
+          Value & tmp = self_check_state["motion_manager"];
+          tmp.SetInt(n.second);
+          continue;
+        }
+        if (n.first == "sensor_manager") {
+          Value & tmp = sensor["lidar"];
+          tmp.SetInt(n.second);
+          Value & tmp2 = sensor["gps"];
+          tmp2.SetInt(n.second);
+          Value & tmp3 = sensor["ultrasonic"];
+          tmp3.SetInt(n.second);
+          Value & tmp4 = sensor["tof"];
+          tmp4.SetInt(n.second);
+          continue;
+        }
+        if (n.first == "vp_engine") {
+          Value & tmp = self_check_state["vp_engine"];
+          tmp.SetInt(n.second);
+          continue;
+        }
+      }
+    }
+    self_check_state.AddMember("device", device, allocator);
+    self_check_state.AddMember("sensor", sensor, allocator);
+    CyberdogJson::Document2String(self_check_state, state_str);
+    return state_str;
   }
 
   void MachineState(int32_t state)

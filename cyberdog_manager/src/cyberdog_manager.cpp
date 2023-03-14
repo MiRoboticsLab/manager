@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
+// Copyright (c) 2023 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -85,7 +85,7 @@ bool cyberdog::manager::CyberdogManager::Init()
     INFO("exit lowpower:%s", (exit_lowpower ? "true" : "false"));
     ++exit_times;
   }
-  ready_node_ptr->SelfCheck(1);
+  ready_node_ptr->SelfCheck(1, selfcheck_status_);
   error_context_ptr_->Init();
   mssc_context_ptr_->ExecuteSetUp();
   mssc_context_ptr_->SetLowpowerEnterAndExitCallback(
@@ -102,14 +102,14 @@ bool cyberdog::manager::CyberdogManager::Init()
       std::placeholders::_1));
   error_context_ptr_->ClearError();
   Config();
-  if (!mssc_context_ptr_->ExecuteSelfCheck()) {
+  if (!mssc_context_ptr_->ExecuteSelfCheck(selfcheck_status_)) {
     ERROR(">>>XXXXX---machine state self check error!");
     // audio_node_ptr->Error("自检失败!自检失败!自检失败!");
-    ready_node_ptr->SelfCheck(2);
+    ready_node_ptr->SelfCheck(2, selfcheck_status_);
     return false;
   } else {
     audio_node_ptr->Init();
-    ready_node_ptr->SelfCheck(0);
+    ready_node_ptr->SelfCheck(0, selfcheck_status_);
   }
   OnActive();
   power_consumption_node_ptr->Init();
