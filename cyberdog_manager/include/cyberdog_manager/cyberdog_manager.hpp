@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
+// Copyright (c) 2023 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -62,6 +62,7 @@ private:
 
 private:
   std::string name_;
+  std::map<std::string, int32_t> selfcheck_status_;
   rclcpp::Node::SharedPtr node_ptr_ {nullptr};
   rclcpp::executors::MultiThreadedExecutor executor_;
   std::unique_ptr<QueryInfoNode> query_node_ptr_ {nullptr};
