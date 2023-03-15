@@ -127,6 +127,7 @@ public:
     CyberdogJson::Add(sensor, "ultrasonic", value);
     CyberdogJson::Add(sensor, "tof", value);
     CyberdogJson::Add(self_check_state, "audio", value);
+    CyberdogJson::Add(self_check_state, "bluetooth", value);
     CyberdogJson::Add(self_check_state, "motion_manager", value);
     CyberdogJson::Add(self_check_state, "algorithm_manager", value);
 
