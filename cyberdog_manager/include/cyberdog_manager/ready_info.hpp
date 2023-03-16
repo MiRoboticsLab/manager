@@ -122,6 +122,7 @@ public:
     CyberdogJson::Add(device, "led", value);
     CyberdogJson::Add(device, "touch", value);
     CyberdogJson::Add(device, "uwb", value);
+    CyberdogJson::Add(device, "bluetooth", value);
     CyberdogJson::Add(sensor, "lidar", value);
     CyberdogJson::Add(sensor, "gps", value);
     CyberdogJson::Add(sensor, "ultrasonic", value);
