@@ -18,6 +18,7 @@
 #include "ament_index_cpp/get_package_share_directory.hpp"
 
 #define MAX_SN_SIZE  50
+#define LINE_MAX_SIZE 1024
 
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
@@ -68,6 +69,13 @@ cyberdog::manager::CyberdogPermission::CyberdogPermission()
     std::bind(&CyberdogPermission::SnCallback, this, std::placeholders::_1, std::placeholders::_2),
     rmw_qos_profile_services_default,
     callback_group_);
+  realsense_recovery_srv_ =
+    this->create_service<std_srvs::srv::Trigger>(
+    "realsense_recovery",
+    std::bind(
+      &CyberdogPermission::RealsenseRecovery,
+      this, std::placeholders::_1, std::placeholders::_2),
+    rmw_qos_profile_services_default);
 }
 
 void cyberdog::manager::CyberdogPermission::SnCallback(
@@ -77,4 +85,66 @@ void cyberdog::manager::CyberdogPermission::SnCallback(
   response->success = true;
   response->message = cyberdog_sn;
   INFO("reponse:get dog sn:--%s", response->message.c_str());
+}
+
+void cyberdog::manager::CyberdogPermission::RealsenseRecovery(
+  const std_srvs::srv::Trigger::Request::SharedPtr request,
+  std_srvs::srv::Trigger::Response::SharedPtr response)
+{
+  std::string cmd = "realsense_recovery.sh";
+  int32_t code;
+  std::string message;
+  bool ok = Shell(cmd, code, message);
+  INFO("shell message:%s", message.c_str());
+  if (code == 0) {
+    response->success = true;
+    response->message = "ok";
+  } else {
+    response->success = false;
+    response->message = "fail";
+  }
+}
+
+bool cyberdog::manager::CyberdogPermission::Shell(
+  const std::string & _command, int & _code, std::string & _message)
+{
+  try {
+    INFO("Shell: %s", _command.c_str());
+    _message = "";
+    if (!_command.empty()) {
+      std::string _code_cmd = _command + "; echo $?";  //  | xargs echo
+      std::string _code_str = "";
+      FILE * fstream_ptr = nullptr;
+      fstream_ptr = popen(_code_cmd.c_str(), "r");
+      if (fstream_ptr != nullptr) {
+        char buffer[LINE_MAX_SIZE];
+        while (fgets(buffer, LINE_MAX_SIZE, fstream_ptr) != nullptr) {
+          _code_str = buffer;
+          memset(buffer, '\0', sizeof(buffer));
+          _message += _code_str;
+        }
+        pclose(fstream_ptr);
+        fstream_ptr = nullptr;
+        _code = std::atoi(_code_str.c_str());
+        if (_code == static_cast<int>(0)) {
+          return true;
+        } else {
+          return false;
+        }
+      } else {
+        _code = -1;
+        _message = "Canot shell command popen.\n - command : " + _command +
+          "\n - error : " + strerror(errno);
+      }
+    } else {
+      _code = -2;
+      _message = "Shell command is empty.\n - command : " + _command;
+    }
+  } catch (const std::exception & e) {
+    _code = -3;
+    _message = "Shell command is error.\n - command : " + _command +
+      "\n - error : " + e.what();
+  }
+  ERROR("Shell: %s, %s", _command.c_str(), _message.c_str());
+  return false;
 }
