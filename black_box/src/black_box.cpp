@@ -244,6 +244,36 @@ bool cyberdog::manager::BlackBox::write(const std::string & name)
     return false;
   }
 }
+bool cyberdog::manager::BlackBox::ModifyUserName(
+  const std::string name,
+  const std::string new_name)
+{
+  std::string filename = filename_ + "/userInformation.db";
+  if (!DataBaseExit(filename)) {
+    return false;
+  }
+  INFO("[black_box]: enter ModifyUserName()");
+  std::string query_update;
+  sqlite3 * db;
+  char * zErrMsg = 0;
+  query_update = std::string("UPDATE USER SET NAME = ") + "\'" + new_name + "\'" +
+    std::string(" WHERE NAME =") + "\'" + name + "\'";
+  INFO("[black_box]: %s", query_update.c_str());
+  int rc = sqlite3_open(filename.c_str(), &db);
+  INFO("[black_box]: modify sqlite_open() return Code is :%d ", rc);
+  if (rc == SQLITE_OK) {
+    if (!HasUser(name)) {
+      return false;
+    }
+    int hc = sqlite3_exec(db, query_update.c_str(), 0, 0, &zErrMsg);
+    INFO("[black_box]: modify sqlite_exec() return Code is : %d", hc);
+    if (hc == SQLITE_OK) {
+      INFO("[black_box]: modify success!!!");
+      sqlite3_close(db);
+      return true;
+    }
+  }
+}
 /**
  * @brief add a user into database
  *
@@ -268,7 +298,8 @@ bool cyberdog::manager::BlackBox::AddUser(const std::string & name)
       return false;
     }
     sql = "CREATE TABLE USER("
-      "NAME           TEXT PRIMARY KEY    NOT NULL,"
+      "ID             INTEGER PRIMARY KEY autoincrement,"
+      "NAME           TEXT    NOT NULL,"
       "VOICE          INT     NOT NULL,"
       "FACE           INT     NOT NULL );";
     int hc = sqlite3_exec(db, sql, 0, 0, &zErrMsg);
@@ -369,8 +400,8 @@ bool cyberdog::manager::BlackBox::SearchUser(
   if (rc == SQLITE_OK) {
     for (int i = 1; i <= nRow; i++) {
       memberInformation_.name = dbResult[i * nColumn];
-      memberInformation_.voiceStatus = std::atoi(dbResult[i * nColumn + 1]);
-      memberInformation_.faceStatus = std::atoi(dbResult[i * nColumn + 2]);
+      memberInformation_.voiceStatus = std::atoi(dbResult[i * nColumn + 2]);
+      memberInformation_.faceStatus = std::atoi(dbResult[i * nColumn + 3]);
       UserVector.push_back(memberInformation_);
       INFO(
         "[black_box]: Search all:%s:%d %d", memberInformation_.name.c_str(),
@@ -444,8 +475,8 @@ bool cyberdog::manager::BlackBox::SearchSingleUser(const std::string & name, int
   rc = sqlite3_get_table(db, sql.c_str(), &dbResult, &nRow, &nColumn, 0);
   INFO("[black_box]: nRow:%d, nColumn:%d", nRow, nColumn);
   if (rc == SQLITE_OK & nRow > 0) {
-    result[0] = std::atoi(dbResult[nColumn + 1]);
-    result[1] = std::atoi(dbResult[nColumn + 2]);
+    result[0] = std::atoi(dbResult[nColumn + 2]);
+    result[1] = std::atoi(dbResult[nColumn + 3]);
     sqlite3_free_table(dbResult);
     sqlite3_close(db);
     INFO(

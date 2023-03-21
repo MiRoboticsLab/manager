@@ -207,6 +207,17 @@ public:
       return false;
     }
   }
+  bool ModifyUserName(const std::string & name, const std::string & new_name)
+  {
+    cyberdog::manager::BlackBox black_box;
+    if (black_box.ModifyUserName(name, new_name)) {
+      INFO("ModifyUserName success\n");
+      return true;
+    } else {
+      INFO("ModifyUserName failed\n");
+      return false;
+    }
+  }
 };
 }  // namespace common
 }  // namespace cyberdog
