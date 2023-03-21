@@ -309,7 +309,7 @@ public:
       return;
     }
     INFO("[MachineState-Switch]: dog wakeup...");
-    if (battery_charge_val < 5 && !disable_lowpower_) {
+    if (battery_charge_val < 5) {
       INFO("[MachineState-Switch]: rejected switch, battery soc less than 5 and keep low-power");
     } else if (battery_charge_val < 20) {
       std::lock_guard<std::mutex> lck(state_mtx_);
@@ -333,18 +333,14 @@ public:
       std::lock_guard<std::mutex> lck(state_mtx_);
       machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
       shutdown_or_reboot(false);
-    } else if (battery_charge_val < 5 && !disable_lowpower_) {
+    } else if (battery_charge_val < 5) {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER || is_charging) {
         return;
-      } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
-        // 切换到低功耗模式
-        std::lock_guard<std::mutex> lck(state_mtx_);
-        machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
-      } else if (mssc_machine_state == MsscMachineState::MSSC_ACTIVE) {
-        // 切换到低功耗模式
-        std::lock_guard<std::mutex> lck(state_mtx_);
-        machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
       }
+      // 只切状态机到低功耗
+      std::lock_guard<std::mutex> lck(state_mtx_);
+      SetState(cyberdog::machine::MachineState::MS_LowPower, stmap_);
+      mssc_machine_state = MsscMachineState::MSSC_LOWPOWER;
     } else if (battery_charge_val < 20) {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
         return;
