@@ -640,8 +640,7 @@ public:
     aiconnect_state_sub_ =
       query_info_node_->create_subscription<std_msgs::msg::Bool>(
       "ai_connect_state", rclcpp::SystemDefaultsQoS(),
-      std::bind(&QueryInfoNode::AiStateCallback, this, std::placeholders::_1),
-      sub_options);
+      std::bind(&QueryInfoNode::AiStateCallback, this, std::placeholders::_1));
   }
 
   void Init()
@@ -837,7 +836,7 @@ private:
         if (status == std::future_status::ready) {
           INFO(
             "success to call setnickname request services.");
-          dog_info_notify_ = true;
+          dog_info_notify_ = false;
         } else {
           INFO(
             "Failed to call setnickname request  services.");

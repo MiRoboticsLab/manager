@@ -36,11 +36,19 @@ private:
     const std_srvs::srv::Trigger::Request::SharedPtr request,
     std_srvs::srv::Trigger::Response::SharedPtr response);
 
+  void RealsenseRecovery(
+    const std_srvs::srv::Trigger::Request::SharedPtr request,
+    std_srvs::srv::Trigger::Response::SharedPtr response);
+
+private:
+  bool Shell(const std::string & _command, int & _code, std::string & _message);
+
 private:
   std::string cyberdog_sn;
   // std::thread sn_thread;
   rclcpp::CallbackGroup::SharedPtr callback_group_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr sn_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr realsense_recovery_srv_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr sn_pub_;
 };  // class CyberdogPermission
 }  // namespace manager
