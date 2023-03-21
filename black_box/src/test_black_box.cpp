@@ -23,6 +23,10 @@ int main(int argc, char * argv[])
   rclcpp::init(argc, argv);
   LOGGER_MAIN_INSTANCE("Global_Name");
   auto node = rclcpp::Node::make_shared("test");
+  cyberdog::manager::BlackBox test_data;
+  test_data.AddUser("xiaomi");
+  test_data.AddUser("xiaoxiao");
+  test_data.ModifyUserName("xiaomi", "mimi");
   auto black_box_ptr = std::make_shared<cyberdog::manager::BlackBox>(node);
   auto result = black_box_ptr->Init();
   INFO("init: %d", result);
