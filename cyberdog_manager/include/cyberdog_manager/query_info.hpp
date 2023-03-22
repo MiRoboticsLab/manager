@@ -387,10 +387,19 @@ public:
           INFO(
             "success to call motor temper services.");
           rapidjson::Value hip_temper_array(rapidjson::kArrayType);
-          float & hip_left_front = future_result.get()->motor_temp[1];
+          // 髋部-hip;大腿-thigh;小腿-crus
+          float & hip_left_front = future_result.get()->motor_temp[3];
           float & hip_right_front = future_result.get()->motor_temp[0];
-          float & hip_left_back = future_result.get()->motor_temp[3];
-          float & hip_right_back = future_result.get()->motor_temp[2];
+          float & hip_left_back = future_result.get()->motor_temp[9];
+          float & hip_right_back = future_result.get()->motor_temp[6];
+          float & thigh_left_front = future_result.get()->motor_temp[4];
+          float & thigh_right_front = future_result.get()->motor_temp[1];
+          float & thigh_left_back = future_result.get()->motor_temp[10];
+          float & thigh_right_back = future_result.get()->motor_temp[7];
+          float & crus_left_front = future_result.get()->motor_temp[5];
+          float & crus_right_front = future_result.get()->motor_temp[2];
+          float & crus_left_back = future_result.get()->motor_temp[11];
+          float & crus_right_back = future_result.get()->motor_temp[8];
           rapidjson::Value val(rapidjson::kStringType);
           std::string ss = float_to_string(hip_left_front);
           val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
@@ -410,10 +419,6 @@ public:
             val, json_info.GetAllocator());
           motor_temper_val.AddMember("hip", hip_temper_array, json_info.GetAllocator());
           rapidjson::Value thigh_temper_array(rapidjson::kArrayType);
-          float & thigh_left_front = future_result.get()->motor_temp[5];
-          float & thigh_right_front = future_result.get()->motor_temp[4];
-          float & thigh_left_back = future_result.get()->motor_temp[7];
-          float & thigh_right_back = future_result.get()->motor_temp[6];
           ss = float_to_string(thigh_left_front);
           val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
           thigh_temper_array.PushBack(
@@ -432,10 +437,6 @@ public:
             val, json_info.GetAllocator());
           motor_temper_val.AddMember("thigh", thigh_temper_array, json_info.GetAllocator());
           rapidjson::Value crus_temper_array(rapidjson::kArrayType);
-          float & crus_left_front = future_result.get()->motor_temp[9];
-          float & crus_right_front = future_result.get()->motor_temp[8];
-          float & crus_left_back = future_result.get()->motor_temp[11];
-          float & crus_right_back = future_result.get()->motor_temp[10];
           ss = float_to_string(crus_left_front);
           val.SetString(ss.c_str(), ss.length(), json_info.GetAllocator());
           crus_temper_array.PushBack(
