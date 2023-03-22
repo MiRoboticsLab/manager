@@ -22,10 +22,11 @@
 #include "protocol/srv/account_add.hpp"
 #include "protocol/srv/account_search.hpp"
 #include "protocol/srv/account_delete.hpp"
+#include "protocol/srv/account_change.hpp"
+#include "protocol/srv/all_user_search.hpp"
 #include "protocol/srv/audio_voiceprint_entry.hpp"
 #include "protocol/srv/face_entry.hpp"
 #include "user_info_manager/UserAccountManager.hpp"
-#include "protocol/srv/all_user_search.hpp"
 
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
@@ -65,13 +66,18 @@ public:
         &AccountInfoNode::QueryAccountDelete, this, std::placeholders::_1,
         std::placeholders::_2),
       rmw_qos_profile_services_default, account_callback_group_);
-
-    // 查找服务
-    all_user_serach_srv_ =
+    account_search_all_ =
       account_info_node_->create_service<protocol::srv::AllUserSearch>(
       "all_user_search",
       std::bind(
         &AccountInfoNode::AllUserSearch, this, std::placeholders::_1,
+        std::placeholders::_2),
+      rmw_qos_profile_services_default, account_callback_group_);
+    account_change_srv_ =
+      account_info_node_->create_service<protocol::srv::AccountChange>(
+      "account_change",
+      std::bind(
+        &AccountInfoNode::ChangeUserName, this, std::placeholders::_1,
         std::placeholders::_2),
       rmw_qos_profile_services_default, account_callback_group_);
   }
@@ -88,9 +94,10 @@ private:
     if (request->command == "") {
       INFO("service---search all user");
       if (obj.SearAllUser(member_data)) {
-        response->success = true;
+        response->code = 0;
       } else {
-        response->success = false;
+        response->code = 121;
+        return;
       }
       int len = member_data.size();
       INFO("%d", len);
@@ -114,9 +121,9 @@ private:
         response->result[0].username = username;
         response->result[0].voicestatus = result[0];
         response->result[0].facestatus = result[1];
-        response->success = true;
+        response->code = 0;
       } else {
-        response->success = false;
+        response->code = 121;
         return;
       }
     }
@@ -130,10 +137,10 @@ private:
     INFO("add_account_name is: %s", name.c_str());
     cyberdog::common::CyberdogAccountManager obj;
     if (obj.AddMember(name)) {
-      response->status = true;
+      response->code = 0;
       INFO("add_account_success");
     } else {
-      response->status = false;
+      response->code = 122;
       INFO("add_account_fail");
     }
   }
@@ -162,10 +169,10 @@ private:
           arr.PushBack(js_obj, json_info.GetAllocator());
         }
         json_info.AddMember("accounts", arr, json_info.GetAllocator());
-        response->status = true;
+        response->code = 0;
       } else {
         INFO("Search ALL Account faile!");
-        response->status = false;
+        response->code = 121;
         response->data = "{\"code\":121}";
       }
     } else {
@@ -174,7 +181,7 @@ private:
       rapidjson::Value js_obj(rapidjson::kObjectType);
       if (!obj.SearchUser(account_name, result)) {
         INFO("search %s faild, SearchUser() return 0", account_name.c_str());
-        response->status = false;
+        response->code = 121;
         response->data = "{\"code\":121}";
         return;
       }
@@ -190,7 +197,7 @@ private:
       js_obj.AddMember("voice_state", voice_state, json_info.GetAllocator());
       arr.PushBack(js_obj, json_info.GetAllocator());
       json_info.AddMember("accounts", arr, json_info.GetAllocator());
-      response->status = true;
+      response->code = 0;
     }
 
     if (!CyberdogJson::Document2String(json_info, data)) {
@@ -213,6 +220,7 @@ private:
       "audio_voiceprint_entry");
     if (!voice_delete_client_->wait_for_service(std::chrono::seconds(2))) {
       ERROR("call voice service server not avalible");
+      response->code = 123;
       return;
     }
     auto request_voice = std::make_shared<protocol::srv::AudioVoiceprintEntry::Request>();
@@ -226,6 +234,7 @@ private:
     } else {
       INFO(
         "Failed to call voice delete response services.");
+      response->code = 123;
       return;
     }
 
@@ -235,6 +244,7 @@ private:
       account_info_node_->create_client<protocol::srv::FaceEntry>("cyberdog_face_entry_srv");
     if (!face_delete_client_->wait_for_service(std::chrono::seconds(2))) {
       ERROR("call face service server not avalible");
+      response->code = 124;
       return;
     }
     auto request_face = std::make_shared<protocol::srv::FaceEntry::Request>();
@@ -248,6 +258,7 @@ private:
     } else {
       INFO(
         "Failed to call face delete response services.");
+      response->code = 124;
       return;
     }
     // delete account
@@ -258,18 +269,74 @@ private:
         cyberdog::common::CyberdogAccountManager obj;
         if (obj.DeleteUserInformation(name)) {
           INFO("delete_account_success");
-          response->status = true;
+          response->code = 0;
         } else {
-          INFO("delete_account_fail");
-          response->status = false;
+          INFO("delete account fail");
+          response->code = 122;
         }
       } else {
         INFO("delete face faile");
-        response->status = false;
+        response->code = 124;
       }
     } else {
       INFO("delete voice faile");
-      response->status = false;
+      response->code = 123;
+    }
+  }
+  void ChangeUserName(
+    const protocol::srv::AccountChange::Request::SharedPtr request,
+    protocol::srv::AccountChange::Response::SharedPtr response)
+  {
+    INFO("enter change account callback");
+    std::string pre_name = request->pre_name;
+    std::string new_name = request->new_name;
+    std::chrono::seconds timeout(3);
+
+    int result[2]{-1, -1};
+    cyberdog::common::CyberdogAccountManager obj;
+    rapidjson::Value js_obj(rapidjson::kObjectType);
+    if (!obj.SearchUser(pre_name, result)) {
+      response->code = 121;
+      return;
+    }
+    // face state is equal to result[1]
+    if (result[1]) {
+      rclcpp::Client<protocol::srv::FaceEntry>::SharedPtr face_delete_client_;
+      face_delete_client_ =
+        account_info_node_->create_client<protocol::srv::FaceEntry>("cyberdog_face_entry_srv");
+      if (!face_delete_client_->wait_for_service(std::chrono::seconds(2))) {
+        ERROR("call face service server not avalible");
+        response->code = 124;
+        return;
+      }
+      auto request_face = std::make_shared<protocol::srv::FaceEntry::Request>();
+      request_face->command = 3;
+      request_face->username = new_name;
+      request_face->oriname = pre_name;
+      auto future_result_face = face_delete_client_->async_send_request(request_face);
+      std::future_status status_face = future_result_face.wait_for(timeout);
+      if (status_face == std::future_status::ready) {
+        INFO("success to call face services.");
+        if (!future_result_face.get()->result == 0) {
+          INFO("change user face name failed.");
+          response->code = 124;
+          return;
+        }
+      } else {
+        INFO("failed to call face services.");
+        response->code = 124;
+        return;
+      }
+    }
+    // change account
+    INFO("change account name from %s to %s", pre_name.c_str(), new_name.c_str());
+    INFO("++++++++++++++++++");
+    if (obj.ModifyUserName(pre_name, new_name)) {
+      INFO("change account nickname successed");
+      response->code = 0;
+    } else {
+      INFO("change account nickname failed");
+      response->code = 122;
     }
   }
 
@@ -279,8 +346,8 @@ private:
   rclcpp::Service<protocol::srv::AccountAdd>::SharedPtr account_add_srv_;
   rclcpp::Service<protocol::srv::AccountSearch>::SharedPtr account_search_srv_;
   rclcpp::Service<protocol::srv::AccountDelete>::SharedPtr account_delete_srv_;
-
-  rclcpp::Service<protocol::srv::AllUserSearch>::SharedPtr all_user_serach_srv_;
+  rclcpp::Service<protocol::srv::AllUserSearch>::SharedPtr account_search_all_;
+  rclcpp::Service<protocol::srv::AccountChange>::SharedPtr account_change_srv_;
 };
 
 }  // namespace manager

@@ -94,6 +94,7 @@ public:
   bool SearchUser(std::vector<cyberdog::manager::MemberInformaion> & UserVector);
   bool SearchSingleUser(const std::string & name, int * result);
   bool ModifyUser(const std::string & name, int status, int newStatus);
+  bool ModifyUserName(const std::string name, const std::string new_name);
   bool HasUser(const std::string & name);
   bool DataBaseExit(const std::string DB_path);
 
