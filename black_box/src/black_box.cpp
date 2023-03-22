@@ -399,7 +399,7 @@ bool cyberdog::manager::BlackBox::SearchUser(
 
   if (rc == SQLITE_OK) {
     for (int i = 1; i <= nRow; i++) {
-      memberInformation_.name = dbResult[i * nColumn];
+      memberInformation_.name = dbResult[i * nColumn + 1];
       memberInformation_.voiceStatus = std::atoi(dbResult[i * nColumn + 2]);
       memberInformation_.faceStatus = std::atoi(dbResult[i * nColumn + 3]);
       UserVector.push_back(memberInformation_);
