@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
+// Copyright (c) 2023-2023 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,11 +37,21 @@ namespace cyberdog
 namespace manager
 {
 
+enum class AccountErrorCode : int32_t
+{
+  kAccountSearchError = 21,
+  kAccountDatabaseError = 22,
+  kAccounVoiceprintError = 23,
+  kAccountFaceError = 24,
+};
+
 class AccountInfoNode final
 {
 public:
   explicit AccountInfoNode(rclcpp::Node::SharedPtr node_ptr)
   {
+    code_ptr_ = std::make_shared<cyberdog::system::CyberdogCode<AccountErrorCode>>(
+      cyberdog::system::ModuleCode::kRobot);
     account_info_node_ = node_ptr;
     account_callback_group_ =
       account_info_node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -92,11 +102,11 @@ private:
     std::vector<cyberdog::manager::MemberInformaion> member_data;
     int result[2];
     if (request->command == "") {
-      INFO("service---search all user");
+      INFO("search all user");
       if (obj.SearAllUser(member_data)) {
-        response->code = 0;
+        response->code = code_ptr_->GetKeyCode(cyberdog::system::KeyCode::kOK);
       } else {
-        response->code = 121;
+        response->code = code_ptr_->GetCode(AccountErrorCode::kAccountSearchError);
         return;
       }
       int len = member_data.size();
@@ -110,20 +120,19 @@ private:
       }
       INFO("response->result length is %d", response->result.size());
     } else {
-      INFO("service---search single user");
+      INFO("search one user");
       std::string username = request->command;
       response->result.resize(1);
       if (obj.SearchUser(username, result)) {
-        INFO(
-          "search all service (serach single user : name:%s, %d, %d)",
-          username.c_str(), result[0], result[1]);
-
+        // INFO(
+        //   "search all service (serach one user : name:%s, %d, %d)",
+        //   username.c_str(), result[0], result[1]);
         response->result[0].username = username;
         response->result[0].voicestatus = result[0];
         response->result[0].facestatus = result[1];
-        response->code = 0;
+        response->code = code_ptr_->GetKeyCode(cyberdog::system::KeyCode::kOK);
       } else {
-        response->code = 121;
+        response->code = code_ptr_->GetCode(AccountErrorCode::kAccountSearchError);
         return;
       }
     }
@@ -137,10 +146,10 @@ private:
     INFO("add_account_name is: %s", name.c_str());
     cyberdog::common::CyberdogAccountManager obj;
     if (obj.AddMember(name)) {
-      response->code = 0;
+      response->code = code_ptr_->GetKeyCode(cyberdog::system::KeyCode::kOK);
       INFO("add_account_success");
     } else {
-      response->code = 122;
+      response->code = code_ptr_->GetCode(AccountErrorCode::kAccountDatabaseError);
       INFO("add_account_fail");
     }
   }
@@ -169,10 +178,10 @@ private:
           arr.PushBack(js_obj, json_info.GetAllocator());
         }
         json_info.AddMember("accounts", arr, json_info.GetAllocator());
-        response->code = 0;
+        response->code = code_ptr_->GetKeyCode(cyberdog::system::KeyCode::kOK);
       } else {
         INFO("Search ALL Account faile!");
-        response->code = 121;
+        response->code = code_ptr_->GetCode(AccountErrorCode::kAccountSearchError);
         response->data = "{\"code\":121}";
       }
     } else {
@@ -181,7 +190,7 @@ private:
       rapidjson::Value js_obj(rapidjson::kObjectType);
       if (!obj.SearchUser(account_name, result)) {
         INFO("search %s faild, SearchUser() return 0", account_name.c_str());
-        response->code = 121;
+        response->code = code_ptr_->GetCode(AccountErrorCode::kAccountSearchError);
         response->data = "{\"code\":121}";
         return;
       }
@@ -197,7 +206,7 @@ private:
       js_obj.AddMember("voice_state", voice_state, json_info.GetAllocator());
       arr.PushBack(js_obj, json_info.GetAllocator());
       json_info.AddMember("accounts", arr, json_info.GetAllocator());
-      response->code = 0;
+      response->code = code_ptr_->GetKeyCode(cyberdog::system::KeyCode::kOK);
     }
 
     if (!CyberdogJson::Document2String(json_info, data)) {
@@ -219,8 +228,8 @@ private:
       account_info_node_->create_client<protocol::srv::AudioVoiceprintEntry>(
       "audio_voiceprint_entry");
     if (!voice_delete_client_->wait_for_service(std::chrono::seconds(2))) {
-      ERROR("call voice service server not avalible");
-      response->code = 123;
+      WARN("call voice service server not avalible");
+      response->code = code_ptr_->GetCode(AccountErrorCode::kAccounVoiceprintError);
       return;
     }
     auto request_voice = std::make_shared<protocol::srv::AudioVoiceprintEntry::Request>();
@@ -234,7 +243,7 @@ private:
     } else {
       INFO(
         "Failed to call voice delete response services.");
-      response->code = 123;
+      response->code = code_ptr_->GetCode(AccountErrorCode::kAccounVoiceprintError);
       return;
     }
 
@@ -244,7 +253,7 @@ private:
       account_info_node_->create_client<protocol::srv::FaceEntry>("cyberdog_face_entry_srv");
     if (!face_delete_client_->wait_for_service(std::chrono::seconds(2))) {
       ERROR("call face service server not avalible");
-      response->code = 124;
+      response->code = code_ptr_->GetCode(AccountErrorCode::kAccountFaceError);
       return;
     }
     auto request_face = std::make_shared<protocol::srv::FaceEntry::Request>();
@@ -252,13 +261,9 @@ private:
     request_face->username = request->member;
     auto future_result_face = face_delete_client_->async_send_request(request_face);
     std::future_status status_face = future_result_face.wait_for(timeout);
-    if (status_face == std::future_status::ready) {
-      INFO(
-        "success to call face delete response services.");
-    } else {
-      INFO(
-        "Failed to call face delete response services.");
-      response->code = 124;
+    if (status_face != std::future_status::ready) {
+      WARN("Failed to call face delete response services.");
+      response->code = code_ptr_->GetCode(AccountErrorCode::kAccountFaceError);
       return;
     }
     // delete account
@@ -268,19 +273,18 @@ private:
       if (future_result_face.get()->result == 0) {
         cyberdog::common::CyberdogAccountManager obj;
         if (obj.DeleteUserInformation(name)) {
-          INFO("delete_account_success");
-          response->code = 0;
+          response->code = code_ptr_->GetKeyCode(cyberdog::system::KeyCode::kOK);
         } else {
-          INFO("delete account fail");
-          response->code = 122;
+          WARN("delete account failed");
+          response->code = code_ptr_->GetCode(AccountErrorCode::kAccountDatabaseError);
         }
       } else {
-        INFO("delete face faile");
-        response->code = 124;
+        WARN("delete face failed");
+        response->code = code_ptr_->GetCode(AccountErrorCode::kAccountFaceError);
       }
     } else {
-      INFO("delete voice faile");
-      response->code = 123;
+      WARN("delete voice failed");
+      response->code = code_ptr_->GetCode(AccountErrorCode::kAccounVoiceprintError);
     }
   }
   void ChangeUserName(
@@ -296,7 +300,7 @@ private:
     cyberdog::common::CyberdogAccountManager obj;
     rapidjson::Value js_obj(rapidjson::kObjectType);
     if (!obj.SearchUser(pre_name, result)) {
-      response->code = 121;
+      response->code = code_ptr_->GetCode(AccountErrorCode::kAccountSearchError);
       return;
     }
     // face state is equal to result[1]
@@ -305,8 +309,8 @@ private:
       face_delete_client_ =
         account_info_node_->create_client<protocol::srv::FaceEntry>("cyberdog_face_entry_srv");
       if (!face_delete_client_->wait_for_service(std::chrono::seconds(2))) {
-        ERROR("call face service server not avalible");
-        response->code = 124;
+        WARN("call face service server not avalible");
+        response->code = code_ptr_->GetCode(AccountErrorCode::kAccountFaceError);
         return;
       }
       auto request_face = std::make_shared<protocol::srv::FaceEntry::Request>();
@@ -316,32 +320,30 @@ private:
       auto future_result_face = face_delete_client_->async_send_request(request_face);
       std::future_status status_face = future_result_face.wait_for(timeout);
       if (status_face == std::future_status::ready) {
-        INFO("success to call face services.");
-        if (!future_result_face.get()->result == 0) {
-          INFO("change user face name failed.");
-          response->code = 124;
+        if (future_result_face.get()->result != 0) {
+          WARN("change user face name failed.");
+          response->code = code_ptr_->GetCode(AccountErrorCode::kAccountFaceError);
           return;
         }
       } else {
-        INFO("failed to call face services.");
-        response->code = 124;
+        WARN("failed to call face services.");
+        response->code = code_ptr_->GetCode(AccountErrorCode::kAccountFaceError);
         return;
       }
     }
     // change account
     INFO("change account name from %s to %s", pre_name.c_str(), new_name.c_str());
-    INFO("++++++++++++++++++");
     if (obj.ModifyUserName(pre_name, new_name)) {
-      INFO("change account nickname successed");
-      response->code = 0;
+      response->code = code_ptr_->GetKeyCode(cyberdog::system::KeyCode::kOK);
     } else {
-      INFO("change account nickname failed");
-      response->code = 122;
+      WARN("change account nickname failed");
+      response->code = code_ptr_->GetCode(AccountErrorCode::kAccountDatabaseError);
     }
   }
 
 private:
   rclcpp::Node::SharedPtr account_info_node_{nullptr};
+  std::shared_ptr<cyberdog::system::CyberdogCode<AccountErrorCode>> code_ptr_ {nullptr};
   rclcpp::CallbackGroup::SharedPtr account_callback_group_;
   rclcpp::Service<protocol::srv::AccountAdd>::SharedPtr account_add_srv_;
   rclcpp::Service<protocol::srv::AccountSearch>::SharedPtr account_search_srv_;
