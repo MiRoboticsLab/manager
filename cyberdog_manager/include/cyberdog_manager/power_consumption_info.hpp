@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
+// Copyright (c) 2023-2023 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -158,7 +158,6 @@ private:
       return;
     }
 
-    // static auto start = std::chrono::steady_clock::now();
     if (motion_id == 0 || motion_id == 101) {
       auto end = std::chrono::steady_clock::now();
       auto diff = std::chrono::duration_cast<std::chrono::seconds>(end - start);
@@ -218,7 +217,6 @@ private:
 private:
   rclcpp::Node::SharedPtr power_consumption_info_node_ {nullptr};
   rclcpp::CallbackGroup::SharedPtr power_consumption_callback_group_;
-  // rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr low_power_consumption_srv_;
   rclcpp::Client<protocol::srv::LedExecute>::SharedPtr led_excute_client_;
   std::unique_ptr<cyberdog::manager::LowPowerConsumption> lpc_ptr_ {nullptr};
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};

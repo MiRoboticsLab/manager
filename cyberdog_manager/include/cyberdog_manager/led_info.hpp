@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
+// Copyright (c) 2023-2023 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -42,10 +42,8 @@ struct LedMode
 class LedInfoNode final
 {
 public:
-  // explicit LedInfoNode(rclcpp::Node::SharedPtr node_ptr, SHINE_CALLBACK callback)
   explicit LedInfoNode(rclcpp::Node::SharedPtr node_ptr)
   : led_info_node_(node_ptr)
-    // ,light_shine_handler(callback)
   {
     led_callback_group_ =
       led_info_node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
@@ -55,10 +53,6 @@ public:
       rmw_qos_profile_services_default, led_callback_group_);
     rclcpp::SubscriptionOptions sub_options;
     sub_options.callback_group = led_callback_group_;
-    // bms_status_sub_ = led_info_node_->create_subscription<protocol::msg::BmsStatus>(
-    //   "bms_status", rclcpp::SystemDefaultsQoS(),
-    //   std::bind(&LedInfoNode::BmsStatus, this, std::placeholders::_1),
-    //   sub_options);
   }
 
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
@@ -211,8 +205,6 @@ private:
 private:
   rclcpp::Node::SharedPtr led_info_node_{nullptr};
   rclcpp::CallbackGroup::SharedPtr led_callback_group_;
-  // rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_ {nullptr};
-  // rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
   rclcpp::Client<protocol::srv::LedExecute>::SharedPtr led_excute_client_ {nullptr};
   uint8_t battery_soc_ {100};
