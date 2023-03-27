@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
+// Copyright (c) 2023 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -86,29 +86,6 @@ public:
       return false;
     }
   }
-  // bool SearAllUser(
-  //   std::vector<cyberdog::common::CyberdogAccountManager::UserInformation> & vectorUser)
-  // {
-  //   INFO("[UserAccountManager]: enter serachAllUser()");
-  //   cyberdog::manager::BlackBox black_box;
-  //   std::vector<cyberdog::manager::MemberInformaion> vectorUser_;
-  //   if (black_box.SearchUser(vectorUser_) ) {
-  //     INFO("[UserAccountManager]: enter serachAllUser [if]");
-  //     for (int i = 0; i < vectorUser.size(); i++) {
-  //       INFO("[UserAccountManager]: enter serachAllUser [for] cycle");
-  //       INFO(
-  //         "[UserAccountManager]: %s:%d %d", vectorUser_[i].name.c_str(),
-  //         vectorUser_[i].voiceStatus, vectorUser_[i].faceStatus);
-  //       vectorUser[i].username = vectorUser_[i].name;
-  //       vectorUser[i].voiceStatus = vectorUser_[i].voiceStatus;
-  //       vectorUser[i].faceStatus = vectorUser_[i].faceStatus;
-  //     }
-  //     return true;
-  //   } else {
-  //     INFO("[UserAccountManager]: search all user failed");
-  //     return false;
-  //   }
-  // }
 /**
  * @brief  search a user information by username
  * param： username (the user's name), result (the array of user's information)
