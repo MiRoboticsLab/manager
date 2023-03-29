@@ -130,6 +130,7 @@ class MachineStateSwitchContext final
   using LOWPOWER_ENTERANDEXIT_CALLBACK = std::function<bool (bool )>;
   using SHUTDOWN_REBOOT_CALLBACK = std::function<int (bool)>;
   using EXCEPTION_PLAYSOUND_CALLBACK = std::function<void (int32_t )>;
+  using CONTROL_TAIL_LED_CALLBACK = std::function<void (bool, bool)>;
 
 public:
   explicit MachineStateSwitchContext(rclcpp::Node::SharedPtr node_ptr)
@@ -296,6 +297,10 @@ public:
   {
     shutdown_or_reboot = callback;
   }
+  void SetControlTailLedCallback(CONTROL_TAIL_LED_CALLBACK callback)
+  {
+    control_tail_led = callback;
+  }
   void DogWakeup(const std_msgs::msg::Bool::SharedPtr msg)
   {
     if (machine_state_keep) {
@@ -318,6 +323,7 @@ public:
       std::lock_guard<std::mutex> lck(state_mtx_);
       machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
     }
+    control_tail_led(false, false);
   }
   void BatteryChargeUpdate(uint8_t bc, bool is_charging)
   {
@@ -488,6 +494,7 @@ private:
   {
     std::lock_guard<std::mutex> lck(state_mtx_);
     machine_state_handler_map[MachineStateChild::MSC_ACTIVE]();
+    control_tail_led(false, false);
     response->success = true;
   }
   void LowPowerOnoff(
@@ -695,6 +702,7 @@ private:
     } else if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
       return true;
     }
+    control_tail_led(true, false);
     return SwitchState(MsscMachineState::MSSC_LOWPOWER);
   }
 
@@ -833,6 +841,7 @@ private:
   LOWPOWER_ENTERANDEXIT_CALLBACK lowpower {[](bool) {return true;}};
   EXCEPTION_PLAYSOUND_CALLBACK play_sound {[](int32_t) {}};
   SHUTDOWN_REBOOT_CALLBACK shutdown_or_reboot {[](bool) {return 0;}};
+  CONTROL_TAIL_LED_CALLBACK control_tail_led {[](bool, bool) {}};
   std::unique_ptr<cyberdog::manager::StateContext> machine_state_ptr_ {nullptr};
   bool machine_state_keep {false};
   bool ms_lowpower_only {false};

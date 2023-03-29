@@ -100,6 +100,10 @@ bool cyberdog::manager::CyberdogManager::Init()
     std::bind(
       &PowerConsumptionInfoNode::ShutdownOrReboot, power_consumption_node_ptr,
       std::placeholders::_1));
+  mssc_context_ptr_->SetControlTailLedCallback(
+    std::bind(
+      &PowerConsumptionInfoNode::TailLedControl, power_consumption_node_ptr,
+      std::placeholders::_1, std::placeholders::_2));
   error_context_ptr_->ClearError();
   Config();
   if (!mssc_context_ptr_->ExecuteSelfCheck(selfcheck_status_)) {
