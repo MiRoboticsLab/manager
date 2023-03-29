@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2023 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
+// Copyright (c) 2023 Beijing Xiaomi Mobile Software Co., Ltd. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -341,7 +341,14 @@ public:
       std::lock_guard<std::mutex> lck(state_mtx_);
       SetState(cyberdog::machine::MachineState::MS_LowPower, stmap_);
       mssc_machine_state = MsscMachineState::MSSC_LOWPOWER;
+      ms_lowpower_only = true;
     } else if (battery_charge_val < 20) {
+      if (ms_lowpower_only) {
+        ms_lowpower_only = false;
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        SetState(cyberdog::machine::MachineState::MS_Protected, stmap_);
+        mssc_machine_state = MsscMachineState::MSSC_PROTECT;
+      }
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
         return;
       } else if (mssc_machine_state == MsscMachineState::MSSC_PROTECT) {
@@ -828,6 +835,7 @@ private:
   SHUTDOWN_REBOOT_CALLBACK shutdown_or_reboot {[](bool) {return 0;}};
   std::unique_ptr<cyberdog::manager::StateContext> machine_state_ptr_ {nullptr};
   bool machine_state_keep {false};
+  bool ms_lowpower_only {false};
   rclcpp::TimerBase::SharedPtr keep_timer_;
   rclcpp::CallbackGroup::SharedPtr timer_callback_group_;
   const std::string CONFIG_DIR = "/home/mi/.cyberdog/manager";
