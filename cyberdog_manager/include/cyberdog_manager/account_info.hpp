@@ -110,10 +110,9 @@ private:
         return;
       }
       int len = member_data.size();
-      INFO("%d", len);
       response->result.resize(len);
       for (int i = 0; i < len; i++) {
-        INFO("enter for");
+        response->result[i].id = member_data[i].id;
         response->result[i].username = member_data[i].name;
         response->result[i].voicestatus = member_data[i].voiceStatus;
         response->result[i].facestatus = member_data[i].faceStatus;
@@ -164,14 +163,14 @@ private:
     rapidjson::Value arr(rapidjson::kArrayType);
     std::string data;
     cyberdog::common::CyberdogAccountManager obj;
-    if (request->member == "") {
+    if (account_name.empty()) {
       INFO("search_all_user");
-      // std::vector<cyberdog::common::CyberdogAccountManager::UserInformation> member_data;
       std::vector<cyberdog::manager::MemberInformaion> member_data;
       if (obj.SearAllUser(member_data)) {
         for (unsigned int i = 0; i < member_data.size(); ++i) {
           rapidjson::Value js_obj(rapidjson::kObjectType);
           rapidjson::Value value(member_data[i].name.c_str(), json_info.GetAllocator());
+          js_obj.AddMember("id", member_data[i].id, json_info.GetAllocator());
           js_obj.AddMember("name", value, json_info.GetAllocator());
           js_obj.AddMember("face_state", member_data[i].faceStatus, json_info.GetAllocator());
           js_obj.AddMember("voice_state", member_data[i].voiceStatus, json_info.GetAllocator());
