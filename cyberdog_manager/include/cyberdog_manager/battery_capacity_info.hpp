@@ -156,7 +156,6 @@ private:
   {
     response->msg = bms_status_;
     response->code = 0;
-    return;
   }
 
 private:
