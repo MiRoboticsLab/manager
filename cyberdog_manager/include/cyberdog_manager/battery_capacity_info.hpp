@@ -21,6 +21,7 @@
 #include "protocol/msg/bms_status.hpp"
 #include "protocol/msg/audio_play_extend.hpp"
 #include "protocol/srv/audio_text_play.hpp"
+#include "protocol/srv/bms_info.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 
 namespace cyberdog
@@ -65,6 +66,10 @@ public:
       "bms_status", rclcpp::SystemDefaultsQoS(),
       std::bind(&BatteryCapacityInfoNode::BmsStatus, this, std::placeholders::_1),
       sub_options);
+    bms_info_srv_ = battery_capacity_info_node_->create_service<protocol::srv::BmsInfo>(
+      "bms_info", std::bind(
+        &BatteryCapacityInfoNode::BmsInfo, this, std::placeholders::_1,
+        std::placeholders::_2), rmw_qos_profile_services_default, bc_callback_group_);
     rclcpp::PublisherOptions pub_options;
     pub_options.callback_group = bc_callback_group_;
     audio_play_extend_pub =
@@ -145,11 +150,21 @@ private:
     }
   }
 
+  void BmsInfo(
+    const protocol::srv::BmsInfo::Request::SharedPtr,
+    protocol::srv::BmsInfo::Response::SharedPtr response)
+  {
+    response->msg = bms_status_;
+    response->code = 0;
+    return;
+  }
+
 private:
   rclcpp::Node::SharedPtr battery_capacity_info_node_ {nullptr};
   rclcpp::CallbackGroup::SharedPtr bc_callback_group_;
   rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_;
   rclcpp::Publisher<protocol::msg::AudioPlayExtend>::SharedPtr audio_play_extend_pub;
+  rclcpp::Service<protocol::srv::BmsInfo>::SharedPtr bms_info_srv_;
   rclcpp::Client<protocol::srv::AudioTextPlay>::SharedPtr audio_play_client_ {nullptr};
   protocol::msg::BmsStatus bms_status_;
   BCINSOC_CALLBACK batsoc_notify_handler;
