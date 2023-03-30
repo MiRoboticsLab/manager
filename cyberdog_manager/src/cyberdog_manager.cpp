@@ -37,6 +37,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
 : name_(name)
 {
   node_ptr_ = rclcpp::Node::make_shared(name_);
+  env_node_ptr_ = std::make_unique<EnvContex>(node_ptr_);
   query_node_ptr_ = std::make_unique<QueryInfoNode>(node_ptr_);
   account_node_ptr_ = std::make_unique<AccountInfoNode>(node_ptr_);
   mssc_context_ptr_ = std::make_shared<cyberdog::manager::MachineStateSwitchContext>(node_ptr_);

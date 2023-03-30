@@ -29,6 +29,7 @@
 #include "std_msgs/msg/bool.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "std_srvs/srv/set_bool.hpp"
+#include "cyberdog_manager/env_contex.hpp"
 #include "cyberdog_manager/query_info.hpp"
 #include "cyberdog_manager/account_info.hpp"
 #include "cyberdog_manager/power_consumption_info.hpp"
@@ -65,6 +66,7 @@ private:
   std::map<std::string, int32_t> selfcheck_status_;
   rclcpp::Node::SharedPtr node_ptr_ {nullptr};
   rclcpp::executors::MultiThreadedExecutor executor_;
+  std::unique_ptr<EnvContex> env_node_ptr_ {nullptr};
   std::unique_ptr<QueryInfoNode> query_node_ptr_ {nullptr};
   std::unique_ptr<AccountInfoNode> account_node_ptr_ {nullptr};
   std::shared_ptr<PowerConsumptionInfoNode> power_consumption_node_ptr {nullptr};
