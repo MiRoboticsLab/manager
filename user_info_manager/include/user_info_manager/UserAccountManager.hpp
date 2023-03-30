@@ -81,7 +81,7 @@ public:
           vectorUser_[i].id, vectorUser_[i].name.c_str(),
           vectorUser_[i].voiceStatus, vectorUser_[i].faceStatus);
       }
-    return true;
+      return true;
     } else {
       INFO("[UserAccountManager]: search all user failed");
       return false;

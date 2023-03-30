@@ -98,7 +98,7 @@ public:
   bool ModifyUserName(const std::string name, const std::string new_name);
   bool HasUser(const std::string & name);
   bool DataBaseExit(const std::string DB_path);
-  bool GetDataBaseList(int &filed_number);
+  bool GetDataBaseList(int & filed_number);
 
   bool ModifyUnlockStatus(const std::string & details, int status);
   bool readUnlockStatus(int * result);
