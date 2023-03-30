@@ -576,21 +576,18 @@ bool cyberdog::manager::BlackBox::GetDataBaseList(int & filed_number)
 {
   sqlite3 * db;
   std::string filename = filename_ + "/userInformation.db";
-  int rt = sqlite3_open(filename.c_str(), &db); // 打开数据库连接
+  int rt = sqlite3_open(filename.c_str(), &db);
   if (rt) {
     return false;
   }
   sqlite3_stmt * stmt;
-  const char * query = "SELECT COUNT(*) FROM pragma_table_info('USER');"; // 查询PRAGMA语句的结果
-  sqlite3_prepare_v2(db, query, -1, &stmt, nullptr); // 准备查询
-
-  // 获取结果集中的列数
-  // int columns = 0;
+  const char * query = "SELECT COUNT(*) FROM pragma_table_info('USER');";
+  sqlite3_prepare_v2(db, query, -1, &stmt, nullptr);
   if (sqlite3_step(stmt) == SQLITE_ROW) {
     filed_number = sqlite3_column_int(stmt, 0);
   }
-  sqlite3_finalize(stmt); // 释放查询资源
-  sqlite3_close(db); // 关闭数据库连接
+  sqlite3_finalize(stmt);
+  sqlite3_close(db);
   return true;
 }
 bool cyberdog::manager::BlackBox::ModifyUnlockStatus(const std::string & details, int status)
