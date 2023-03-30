@@ -77,10 +77,11 @@ public:
       for (int i = 0; i < vectorUser_.size(); i++) {
         INFO("[UserAccountManager]: enter serachAllUser [for] cycle");
         INFO(
-          "[UserAccountManager]: %s:%d %d", vectorUser_[i].name.c_str(),
+          "[UserAccountManager]:%d %s:%d %d",
+          vectorUser_[i].id, vectorUser_[i].name.c_str(),
           vectorUser_[i].voiceStatus, vectorUser_[i].faceStatus);
       }
-      return true;
+    return true;
     } else {
       INFO("[UserAccountManager]: search all user failed");
       return false;
