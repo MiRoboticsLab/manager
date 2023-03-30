@@ -27,6 +27,9 @@ int main(int argc, char * argv[])
   test_data.AddUser("xiaomi");
   test_data.AddUser("xiaoxiao");
   test_data.ModifyUserName("xiaomi", "mimi");
+  int filed_number;
+  test_data.GetDataBaseList(filed_number);
+  INFO("the filed number is %d \n", filed_number);
   auto black_box_ptr = std::make_shared<cyberdog::manager::BlackBox>(node);
   auto result = black_box_ptr->Init();
   INFO("init: %d", result);

@@ -26,13 +26,13 @@ public:
   {
     RCLCPP_INFO(this->get_logger(), "node name is %s.", name.c_str());
     INFO("enter test!!!!");
-    // cyberdog::common::CyberdogAccountManager account_manager;
+    cyberdog::common::CyberdogAccountManager account_manager;
     // account_manager.AddMember("ding");
     // account_manager.ModifyUserInformation("fff",100,0);
     // int result[2];
     // account_manager.SearchUser("ding",result);
-    // std::vector<cyberdog::common::CyberdogAccountManager::UserInformation> vectorUser;
-    // account_manager.SearAllUser(vectorUser);
+    std::vector<cyberdog::manager::MemberInformaion> vectorUser;
+    account_manager.SearAllUser(vectorUser);
     // account_manager.DeleteVoice("sss");
     // account_manager.DeleteFace("ding");
     // account_manager.DeleteUserInformation("eee");

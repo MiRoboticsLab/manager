@@ -393,18 +393,18 @@ bool cyberdog::manager::BlackBox::SearchUser(
     INFO("[black_box:] %s", sqlite3_errmsg(db));
     return false;
   }
-
   sql = "SELECT * FROM USER";
   rc = sqlite3_get_table(db, sql.c_str(), &dbResult, &nRow, &nColumn, 0);
-
   if (rc == SQLITE_OK) {
     for (int i = 1; i <= nRow; i++) {
+      memberInformation_.id = std::atoi(dbResult[i * nColumn]);
       memberInformation_.name = dbResult[i * nColumn + 1];
       memberInformation_.voiceStatus = std::atoi(dbResult[i * nColumn + 2]);
       memberInformation_.faceStatus = std::atoi(dbResult[i * nColumn + 3]);
       UserVector.push_back(memberInformation_);
       INFO(
-        "[black_box]: Search all:%s:%d %d", memberInformation_.name.c_str(),
+        "[black_box]: Search all:%d %s:%d %d",
+        memberInformation_.id, memberInformation_.name.c_str(),
         memberInformation_.voiceStatus, memberInformation_.faceStatus);
     }
     sqlite3_free_table(dbResult);
@@ -542,12 +542,53 @@ bool cyberdog::manager::BlackBox::ModifyUser(const std::string & name, int statu
  */
 bool cyberdog::manager::BlackBox::DataBaseExit(const std::string DB_path)
 {
+  std::string command = "rm -rf " + DB_path;
   if (boost::filesystem::exists(DB_path)) {
+    int filed_number = 0;
+    GetDataBaseList(filed_number);
+    if (filed_number < 4) {
+      std::cout << command << std::endl;
+      system(command.c_str());
+      sqlite3 * db;
+      char * sql;
+      char * zErrMsg = 0;
+      int rc = sqlite3_open(DB_path.c_str(), &db);
+      if (rc != SQLITE_OK) {
+        INFO("[black_box]: open database error");
+        return false;
+      }
+      sql = "CREATE TABLE USER("
+        "ID             INTEGER PRIMARY KEY autoincrement,"
+        "NAME           TEXT    NOT NULL,"
+        "VOICE          INT     NOT NULL,"
+        "FACE           INT     NOT NULL );";
+      int hc = sqlite3_exec(db, sql, 0, 0, &zErrMsg);
+      INFO("[black_box]: test open database return_CODE:%d", hc);
+      sqlite3_close(db);
+    }
     return true;
   } else {
     INFO("[black_box]:the %s not exit", DB_path.c_str());
     return false;
   }
+}
+bool cyberdog::manager::BlackBox::GetDataBaseList(int & filed_number)
+{
+  sqlite3 * db;
+  std::string filename = filename_ + "/userInformation.db";
+  int rt = sqlite3_open(filename.c_str(), &db);
+  if (rt) {
+    return false;
+  }
+  sqlite3_stmt * stmt;
+  const char * query = "SELECT COUNT(*) FROM pragma_table_info('USER');";
+  sqlite3_prepare_v2(db, query, -1, &stmt, nullptr);
+  if (sqlite3_step(stmt) == SQLITE_ROW) {
+    filed_number = sqlite3_column_int(stmt, 0);
+  }
+  sqlite3_finalize(stmt);
+  sqlite3_close(db);
+  return true;
 }
 bool cyberdog::manager::BlackBox::ModifyUnlockStatus(const std::string & details, int status)
 {
