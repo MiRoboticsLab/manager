@@ -130,6 +130,8 @@ public:
     CyberdogJson::Add(self_check_state, "audio", value);
     CyberdogJson::Add(self_check_state, "motion_manager", value);
     CyberdogJson::Add(self_check_state, "algorithm_manager", value);
+    CyberdogJson::Add(self_check_state, "vp_engine", value);
+    CyberdogJson::Add(self_check_state, "RealSenseActuator", value);
 
     if (2 == state) {
       for (const auto & n : stmap) {
@@ -167,6 +169,11 @@ public:
         }
         if (n.first == "vp_engine") {
           Value & tmp = self_check_state["vp_engine"];
+          tmp.SetInt(n.second);
+          continue;
+        }
+        if (n.first == "RealSenseActuator") {
+          Value & tmp = self_check_state["RealSenseActuator"];
           tmp.SetInt(n.second);
           continue;
         }
