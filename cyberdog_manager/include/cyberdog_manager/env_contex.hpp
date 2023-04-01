@@ -19,6 +19,11 @@
 #include "protocol/srv/trigger.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
+#include "cyberdog_common/cyberdog_json.hpp"
+
+using cyberdog::common::CyberdogJson;
+using rapidjson::Document;
+using rapidjson::kObjectType;
 
 namespace cyberdog
 {
@@ -31,6 +36,18 @@ public:
   explicit EnvContex(rclcpp::Node::SharedPtr node_ptr)
   : env_contex_node_(node_ptr), environment_contex_("pro")
   {
+    auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
+    auto path = local_share_dir + std::string("/toml_config/manager/env.json");
+    Document json_document(kObjectType);
+    auto result = CyberdogJson::ReadJsonFromFile(path, json_document);
+    if (result) {
+      std::string env_str;
+      CyberdogJson::Get(json_document, "environment", env_str);
+      if (!env_str.empty()) {
+        INFO("environment:%s.", env_str.c_str());
+        environment_contex_ = env_str;
+      }
+    }
     env_callback_group_ =
       env_contex_node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
@@ -55,8 +72,15 @@ private:
     const protocol::srv::Trigger::Request::SharedPtr request,
     protocol::srv::Trigger::Response::SharedPtr response)
   {
-    std::string environment_contex_ = request->data;
+    environment_contex_ = request->data;
     INFO("switch nx environment:%s", environment_contex_.c_str());
+    auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
+    auto path = local_share_dir + std::string("/toml_config/manager");
+    auto json_file = path + "/env.json";
+    Document json_document(kObjectType);
+    CyberdogJson::ReadJsonFromFile(json_file, json_document);
+    CyberdogJson::Add(json_document, "environment", environment_contex_);
+    CyberdogJson::WriteJsonToFile(json_file, json_document);
     response->success = true;
   }
 
