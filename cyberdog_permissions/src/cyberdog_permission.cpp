@@ -71,7 +71,7 @@ cyberdog::manager::CyberdogPermission::CyberdogPermission()
     callback_group_);
   realsense_recovery_srv_ =
     this->create_service<std_srvs::srv::Trigger>(
-    "realsense_recovery",
+    "camera/realsense_recovery",
     std::bind(
       &CyberdogPermission::RealsenseRecovery,
       this, std::placeholders::_1, std::placeholders::_2),
