@@ -622,7 +622,7 @@ bool cyberdog::manager::BlackBox::readUnlockStatus(int * result)
   int nColumn;
   cyberdog::manager::MemberInformaion memberInformation_;
   std::string filename = filename_ + "/UnlockStatus.db";
-  if (!DataBaseExit(filename)) {
+  if (!boost::filesystem::exists(filename)) {
     INFO("the unlock status record DB is not exit!!!");
     return false;
   } else {
@@ -655,7 +655,7 @@ bool cyberdog::manager::BlackBox::CreateUnlockStatusDB()
   char * sql;
   char * zErrMsg = 0;
   INFO("[black_box]: enter createUnlockStatusDB");
-  if (!DataBaseExit(filename)) {
+  if (!boost::filesystem::exists(filename)) {
     int rc = sqlite3_open(filename.c_str(), &db);
     INFO("[black_box]: create UnlockStatus sqlite_open = %d", rc);
     INFO("%s", filename.c_str());
