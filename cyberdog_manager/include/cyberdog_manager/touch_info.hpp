@@ -79,10 +79,11 @@ private:
       reporting_time = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch());
       protocol::msg::AudioPlayExtend msg;
-      msg.is_online = true;
+      msg.is_online = false;
       msg.module_name = touch_info_node_->get_name();
-      msg.text = "剩余电量为百分之" + std::to_string(battery_percent);
-      INFO("语言播报的电量为：%s", msg.text.c_str());
+      msg.speech.play_id = 1000+battery_percent;
+      // msg.text = "剩余电量为百分之" + std::to_string(battery_percent);
+      // INFO("语言播报的电量为：%s", msg.text.c_str());
       audio_play_extend_pub->publish(msg);
       if (is_low_power) {  // 通知消费者
         lowPower_cv_.notify_all();
