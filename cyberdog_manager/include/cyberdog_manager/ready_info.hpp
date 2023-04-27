@@ -16,12 +16,14 @@
 
 #include <string>
 #include <map>
+#include <memory>
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "cyberdog_common/cyberdog_json.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 #include "protocol/msg/self_check_status.hpp"
 #include "protocol/msg/state_switch_status.hpp"
+#include "protocol/srv/motion_result_cmd.hpp"
 
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
@@ -35,31 +37,44 @@ namespace manager
 class ReadyNotifyNode final
 {
 public:
-  explicit ReadyNotifyNode(const std::string & node_name)
-  : name_(node_name)
+  explicit ReadyNotifyNode(rclcpp::Node::SharedPtr node_ptr)
   {
-    ready_notify_node_ = rclcpp::Node::make_shared(name_);
+    ready_notify_node_ = node_ptr;
     ready_notify_callback_group_ =
       ready_notify_node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-    rclcpp::PublisherOptions options;
-    options.callback_group = ready_notify_callback_group_;
+    rclcpp::PublisherOptions pub_options;
+    pub_options.callback_group = ready_notify_callback_group_;
+    rclcpp::SubscriptionOptions sub_options;
+    sub_options.callback_group = ready_notify_callback_group_;
     ready_notify_pub_ = ready_notify_node_->create_publisher<std_msgs::msg::Bool>(
       "ready_notify",
       rclcpp::SystemDefaultsQoS(),
-      options
+      pub_options
     );
     self_check_status_pub_ = ready_notify_node_->create_publisher<protocol::msg::SelfCheckStatus>(
       "self_check_status",
       rclcpp::SystemDefaultsQoS(),
-      options
+      pub_options
     );
     state_swith_status_pub_ =
       ready_notify_node_->create_publisher<protocol::msg::StateSwitchStatus>(
-      "state_switch_status", rclcpp::SystemDefaultsQoS(), options);
-    std::thread(
-      [this]() {
-        rclcpp::spin(ready_notify_node_);
-      }).detach();
+      "state_switch_status", rclcpp::SystemDefaultsQoS(), pub_options);
+
+    app_connect_state_sub_ = ready_notify_node_->create_subscription<std_msgs::msg::Bool>(
+      "app_connection_state", rclcpp::SystemDefaultsQoS(),
+      std::bind(&ReadyNotifyNode::AppConnectState, this, std::placeholders::_1),
+      sub_options);
+
+    motion_excute_client_ =
+      ready_notify_node_->create_client<protocol::srv::MotionResultCmd>(
+      "motion_result_cmd",
+      rmw_qos_profile_services_default, ready_notify_callback_group_);
+    // std::thread(
+    //   [this]() {
+    //     executor_.add_node(train_plan_node_ptr_);
+    //     executor_.spin();
+    //      rclcpp::shutdown();
+    //   }).detach();
   }
 
   void Ready(bool ready)
@@ -129,11 +144,13 @@ public:
     CyberdogJson::Add(sensor, "tof", value);
     CyberdogJson::Add(self_check_state, "audio", value);
     CyberdogJson::Add(self_check_state, "motion_manager", value);
+    if (3 == state) {
+      value = -1;
+    }
     CyberdogJson::Add(self_check_state, "algorithm_manager", value);
     CyberdogJson::Add(self_check_state, "vp_engine", value);
     CyberdogJson::Add(self_check_state, "RealSenseActuator", value);
-
-    if (2 == state) {
+    if (2 == state || 4 == state) {
       for (const auto & n : stmap) {
         if (n.first == "algorithm_manager") {
           Value & tmp = self_check_state["algorithm_manager"];
@@ -193,6 +210,39 @@ public:
     state_swith_status_pub_->publish(sss);
   }
 
+  void AppConnectState(const std_msgs::msg::Bool msg)
+  {
+    static bool pre_connect_state{false};
+    if (selfcheck_state_ == -1 || selfcheck_state_ == 1 || selfcheck_state_ == 2) {
+      return;
+    }
+    // INFO_MILLSECONDS(5000, "pre state is %d ,connect state is %d", pre_connect_state, msg.data);
+    // app第一次连接后站立
+    if (pre_connect_state == false && msg.data == true) {
+      // 控制站立
+      INFO("app connected, dog standup");
+      if (!motion_excute_client_->wait_for_service(std::chrono::seconds(5))) {
+        ERROR("call motion server not avalible");
+      }
+      auto request_motion = std::make_shared<protocol::srv::MotionResultCmd::Request>();
+      request_motion->motion_id = 111;
+      request_motion->cmd_source = 0;
+      auto future_result_motion = motion_excute_client_->async_send_request(request_motion);
+      std::future_status status_motion = future_result_motion.wait_for(std::chrono::seconds(5));
+      if (status_motion != std::future_status::ready) {
+        ERROR("call motion service failed");
+      }
+      if (future_result_motion.get()->result != 0) {
+        ERROR("control motion fialed, error code is:%d", future_result_motion.get()->code);
+      }
+      pre_connect_state = true;
+    }
+    // app重连后站立
+    if (pre_connect_state == true && msg.data == false) {
+      pre_connect_state = false;
+    }
+  }
+
   ~ReadyNotifyNode()
   {
     exit_ = true;
@@ -207,10 +257,14 @@ private:
   int32_t selfcheck_state_ {-1};
   std::string name_;
   rclcpp::Node::SharedPtr ready_notify_node_ {nullptr};
+  // rclcpp::executors::MultiThreadedExecutor executor_;
   rclcpp::CallbackGroup::SharedPtr ready_notify_callback_group_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr ready_notify_pub_;
   rclcpp::Publisher<protocol::msg::SelfCheckStatus>::SharedPtr self_check_status_pub_;
   rclcpp::Publisher<protocol::msg::StateSwitchStatus>::SharedPtr state_swith_status_pub_;
+  rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr app_connect_state_sub_;
+  rclcpp::Client<protocol::srv::MotionResultCmd>::SharedPtr motion_excute_client_;
   std::thread notify_message_thread;
   std::thread notify_selfcheck_thread;
   int count_;
