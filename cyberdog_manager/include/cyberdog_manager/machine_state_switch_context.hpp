@@ -81,10 +81,14 @@ public:
 
   ~StateContext() {}
 
-  bool Init()
+  bool Init(bool software_setup = true)
   {
     auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
     auto path = local_share_dir + std::string("/toml_config/manager/state_machine_config.toml");
+    if (!software_setup) {
+      path = local_share_dir +
+        std::string("/toml_config/manager/hardware_state_machine_config.toml");
+    }
     if (!machine_controller_ptr_->MachineControllerInit(
         path, node_ptr_))
     {
@@ -221,9 +225,9 @@ public:
     timer_callback_group_ =
       mssc_node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   }
-  void ExecuteSetUp()
+  void ExecuteSetUp(bool software_setup)
   {
-    if (!machine_state_ptr_->Init()) {
+    if (!machine_state_ptr_->Init(software_setup)) {
       ERROR("[MachineState-Switch]: >>>XXXXX---machine state init error!");
     }
     SetStateHandler(machine_state_ptr_->GetAchieveStates());

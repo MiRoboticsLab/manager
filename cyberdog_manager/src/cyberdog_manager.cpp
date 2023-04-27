@@ -44,7 +44,8 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   power_consumption_node_ptr = std::make_shared<PowerConsumptionInfoNode>(
     node_ptr_,
     std::bind(&MachineStateSwitchContext::KeepDownOverTime, mssc_context_ptr_));
-  ready_node_ptr = std::make_unique<ReadyNotifyNode>(name_ + "_ready");
+  // ready_node_ptr = std::make_unique<ReadyNotifyNode>(name_ + "_ready");
+  ready_node_ptr = std::make_unique<ReadyNotifyNode>(node_ptr_);
   heart_beat_ptr_ = std::make_unique<cyberdog::manager::HeartContext>(
     node_ptr_,
     std::bind(&CyberdogManager::SetState, this, std::placeholders::_1, std::placeholders::_2));
@@ -86,9 +87,11 @@ bool cyberdog::manager::CyberdogManager::Init()
     INFO("exit lowpower:%s", (exit_lowpower ? "true" : "false"));
     ++exit_times;
   }
+  // 开始自检
   ready_node_ptr->SelfCheck(1, selfcheck_status_);
   error_context_ptr_->Init();
-  mssc_context_ptr_->ExecuteSetUp();
+  // 硬件setup
+  mssc_context_ptr_->ExecuteSetUp(false);
   mssc_context_ptr_->SetLowpowerEnterAndExitCallback(
     std::bind(
       &PowerConsumptionInfoNode::EnterLowPower, power_consumption_node_ptr,
@@ -108,13 +111,12 @@ bool cyberdog::manager::CyberdogManager::Init()
   error_context_ptr_->ClearError();
   Config();
   if (!mssc_context_ptr_->ExecuteSelfCheck(selfcheck_status_)) {
-    ERROR(">>>XXXXX---machine state self check error!");
-    // audio_node_ptr->Error("自检失败!自检失败!自检失败!");
+    ERROR(">>>XXXXX--- hardware machine state self check error!");
     ready_node_ptr->SelfCheck(2, selfcheck_status_);
     return false;
   } else {
     audio_node_ptr->Init();
-    ready_node_ptr->SelfCheck(0, selfcheck_status_);
+    ready_node_ptr->SelfCheck(3, selfcheck_status_);
   }
   OnActive();
   power_consumption_node_ptr->Init();
@@ -122,6 +124,17 @@ bool cyberdog::manager::CyberdogManager::Init()
   bcin_node_ptr->Init();
   mssc_context_ptr_->Init();
   heart_beat_ptr_->Init();
+  // 软件setup
+  mssc_context_ptr_->ExecuteSetUp(true);
+  if (!mssc_context_ptr_->ExecuteSelfCheck(selfcheck_status_)) {
+    ERROR(">>>XXXXX---software machine state self check error!");
+    ready_node_ptr->SelfCheck(4, selfcheck_status_);
+    return false;
+  } else {
+    audio_node_ptr->Init();
+    ready_node_ptr->SelfCheck(0, selfcheck_status_);
+  }
+  OnActive();
   return true;
 }
 
