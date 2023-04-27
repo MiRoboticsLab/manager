@@ -81,7 +81,7 @@ private:
       protocol::msg::AudioPlayExtend msg;
       msg.is_online = false;
       msg.module_name = touch_info_node_->get_name();
-      msg.speech.play_id = 1000+battery_percent;
+      msg.speech.play_id = 1000 + battery_percent;
       // msg.text = "剩余电量为百分之" + std::to_string(battery_percent);
       // INFO("语言播报的电量为：%s", msg.text.c_str());
       audio_play_extend_pub->publish(msg);
