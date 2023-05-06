@@ -17,6 +17,7 @@
 #include <string>
 #include <memory>
 #include <chrono>
+#include <mutex>
 #include "rclcpp/rclcpp.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 #include "std_srvs/srv/trigger.hpp"
@@ -141,6 +142,12 @@ public:
     const std_srvs::srv::SetBool::Request::SharedPtr request,
     std_srvs::srv::SetBool::Response::SharedPtr response)
   {
+    if (!motor_mutex_.try_lock()) {
+      WARN(
+        "The motor is powering %s and rejecting duplicate requests",
+        (request->data ? "up" : "down"));
+      return;
+    }
     PM_DEV pd = PM_MOTOR;
     int code = -1;
     unsigned int err;
@@ -168,6 +175,7 @@ public:
       MotionContrl(111);
       INFO("motor start is %s, code is %d", (code ? "failed" : "successed"), code);
     }
+    motor_mutex_.unlock();
   }
 
   void PlayAudio(const std::string & text)
@@ -312,6 +320,7 @@ private:
   bool is_ota_ {false};
   int enter_lowpower_time_ {30};
   std::chrono::steady_clock::time_point start;
+  std::mutex motor_mutex_;
 };
 }  // namespace manager
 }  // namespace cyberdog
