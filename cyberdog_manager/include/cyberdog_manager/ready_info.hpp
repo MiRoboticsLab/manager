@@ -24,6 +24,7 @@
 #include "protocol/msg/self_check_status.hpp"
 #include "protocol/msg/state_switch_status.hpp"
 #include "protocol/srv/motion_result_cmd.hpp"
+#include "protocol/srv/audio_text_play.hpp"
 
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
@@ -68,6 +69,11 @@ public:
     motion_excute_client_ =
       ready_notify_node_->create_client<protocol::srv::MotionResultCmd>(
       "motion_result_cmd",
+      rmw_qos_profile_services_default, ready_notify_callback_group_);
+
+    audio_play_client_ =
+      ready_notify_node_->create_client<protocol::srv::AudioTextPlay>(
+      "speech_text_play",
       rmw_qos_profile_services_default, ready_notify_callback_group_);
     // std::thread(
     //   [this]() {
@@ -216,11 +222,12 @@ public:
     if (selfcheck_state_ == -1 || selfcheck_state_ == 1 || selfcheck_state_ == 2) {
       return;
     }
-    // INFO_MILLSECONDS(5000, "pre state is %d ,connect state is %d", pre_connect_state, msg.data);
     // app第一次连接后站立
     if (pre_connect_state == false && msg.data == true) {
       // 控制站立
+      pre_connect_state = true;
       INFO("app connected, dog standup");
+      PlayAudioService(2002);
       if (!motion_excute_client_->wait_for_service(std::chrono::seconds(5))) {
         ERROR("call motion server not avalible");
       }
@@ -238,8 +245,25 @@ public:
       pre_connect_state = true;
     }
     // app重连后站立
-    if (pre_connect_state == true && msg.data == false) {
-      pre_connect_state = false;
+    // if (pre_connect_state == true && msg.data == false) {
+    //   pre_connect_state = false;
+    // }
+  }
+
+  void PlayAudioService(const uint16_t play_id)
+  {
+    auto request_audio = std::make_shared<protocol::srv::AudioTextPlay::Request>();
+    request_audio->module_name = ready_notify_node_->get_name();
+    request_audio->is_online = false;
+    request_audio->speech.play_id = play_id;
+    auto callback = [](rclcpp::Client<protocol::srv::AudioTextPlay>::SharedFuture future) {
+        INFO("Audio play result: %s", future.get()->status == 0 ? "success" : "failed");
+      };
+    auto future_result_audio = audio_play_client_->async_send_request(request_audio, callback);
+    if (future_result_audio.wait_for(std::chrono::milliseconds(3000)) ==
+      std::future_status::timeout)
+    {
+      ERROR("Cannot get response from AudioPlay");
     }
   }
 
@@ -265,6 +289,7 @@ private:
   rclcpp::Subscription<protocol::msg::BmsStatus>::SharedPtr bms_status_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr app_connect_state_sub_;
   rclcpp::Client<protocol::srv::MotionResultCmd>::SharedPtr motion_excute_client_;
+  rclcpp::Client<protocol::srv::AudioTextPlay>::SharedPtr audio_play_client_ {nullptr};
   std::thread notify_message_thread;
   std::thread notify_selfcheck_thread;
   int count_;
