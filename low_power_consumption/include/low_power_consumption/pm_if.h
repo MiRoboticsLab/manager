@@ -26,19 +26,21 @@ enum PM_DEV
   // bit 0-7 camera
   PM_CAM_REALSNS  = 1 << 0,  // 深度相机
   PM_CAM_AI       = 1 << 1,  // AI相机组件
+  PM_CAM_FISH     = 1<<2,    // 鱼眼相机组件
   PM_CAM_ALL      = 0Xff,
 
   // bit 8-11  motion
   PM_MOTION       = 1 << 8,  // 运动组件
+  PM_MOTOR        = 1 << 9,    //电机断电
   // other
   PM_GPS          = 1 << 12,  // GPS 组件
   PM_LIDAR        = 1 << 13,  // 激光雷达组件,
   PM_TOF          = 1 << 14,  // TOF 组件
   PM_ULTRA        = 1 << 15,  // 超声波组件
   PM_ALL          = 0xffffffff,
-  PM_ALL_NO_MOTION = PM_ALL & (~PM_MOTION),
-  PM_ALL_NO_TOF = PM_ALL & (~PM_TOF),
-  PM_NO_MOTION_TOF = PM_ALL & (~PM_MOTION) & (~PM_TOF)
+  PM_ALL_NO_MOTION = PM_ALL & (~PM_MOTION) & (~PM_MOTOR),
+  PM_ALL_NO_TOF = PM_ALL & (~PM_TOF) & (~PM_MOTOR),
+  PM_NO_MOTION_TOF = PM_ALL & (~PM_MOTION) & (~PM_TOF) & (~PM_MOTOR)
 };
 
 int PmRequest(unsigned int devs, unsigned int * err);
