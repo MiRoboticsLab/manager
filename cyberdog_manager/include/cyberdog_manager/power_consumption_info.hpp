@@ -154,7 +154,7 @@ public:
     if (!request->data) {
       // 控制铁蛋高阻尼趴下,电机下电
       PlayAudio("铁蛋即将趴下后进行断电，请注意安全");
-      sleep(3);
+      sleep(4);
       MotionContrl(101);
       code = lpc_ptr_->LpcRelease(pd, &err);
       response->success = (code ? false : true);
