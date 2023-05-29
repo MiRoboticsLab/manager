@@ -94,18 +94,6 @@ public:
     auto mcpim_iter = module_code_play_id_map.find(code);
     if (mcpim_iter != module_code_play_id_map.end()) {
       uint16_t play_id = mcpim_iter->second;
-      bool is_self_check = ((code % 10) == 9) ? true : false;
-      if (is_self_check) {
-        std::chrono::seconds timeout(2);
-        auto req = std::make_shared<protocol::srv::SdcardPlayIdQuery::Request>();
-        req->play_id = play_id;
-        auto future_result = sdcard_playid_query_client_->async_send_request(req);
-        std::future_status status = future_result.wait_for(timeout);
-        if (status == std::future_status::ready) {
-        } else {
-          play_id = protocol::msg::AudioPlay::PID_SELF_CHECK_FAILED;
-        }
-      }
       std::chrono::seconds timeout(6);
       auto req = std::make_shared<protocol::srv::AudioTextPlay::Request>();
       req->module_name = audio_info_node_->get_name();
