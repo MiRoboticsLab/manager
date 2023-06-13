@@ -238,7 +238,7 @@ public:
   }
   bool ExecuteActive()
   {
-    return SetState(cyberdog::machine::MachineState::MS_Active, stmap_);
+    return SwitchState(MsscMachineState::MSSC_ACTIVE);
   }
   void Init()
   {
@@ -386,6 +386,13 @@ public:
     }
     std::lock_guard<std::mutex> lck(state_mtx_);
     machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
+  }
+  void KeepMsState()
+  {
+    machine_state_keep = !machine_state_keep;
+    INFO(
+      "MachineState %s Activa status", machine_state_keep ?
+      "has maintains" : "ended to maintain");
   }
 
 private:

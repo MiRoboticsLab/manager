@@ -126,14 +126,8 @@ bool cyberdog::manager::CyberdogManager::Init()
   heart_beat_ptr_->Init();
   // 软件setup
   mssc_context_ptr_->ExecuteSetUp(true);
-  if (!mssc_context_ptr_->ExecuteSelfCheck(selfcheck_status_)) {
-    ERROR(">>>XXXXX---software machine state self check error!");
-    ready_node_ptr->SelfCheck(4, selfcheck_status_);
-    return false;
-  } else {
-    audio_node_ptr->Init();
-    ready_node_ptr->SelfCheck(0, selfcheck_status_);
-  }
+  audio_node_ptr->Init();
+  ready_node_ptr->SelfCheck(0, selfcheck_status_);
   OnActive();
   return true;
 }
@@ -156,6 +150,7 @@ void cyberdog::manager::CyberdogManager::OnActive()
   INFO("trigger state:on active");
   bool result = mssc_context_ptr_->ExecuteActive();
   query_node_ptr_->Report(true);
+  mssc_context_ptr_->KeepMsState();
   if (result) {
     INFO("!!! All node in detectedc machine state is acitve ok !!!");
     ready_node_ptr->Ready(true);
