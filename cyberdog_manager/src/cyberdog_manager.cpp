@@ -129,6 +129,7 @@ bool cyberdog::manager::CyberdogManager::Init()
   audio_node_ptr->Init();
   ready_node_ptr->SelfCheck(0, selfcheck_status_);
   OnActive();
+  audio_node_ptr->SpeechNotify(5300);
   return true;
 }
 
