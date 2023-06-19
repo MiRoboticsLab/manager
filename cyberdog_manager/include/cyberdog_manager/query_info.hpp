@@ -362,7 +362,7 @@ public:
     if (is_bat_info) {
       rapidjson::Value bat_val(rapidjson::kObjectType);
       Document::AllocatorType & allocator = json_info.GetAllocator();
-      bat_val.AddMember("capacity", bms_status_.batt_volt, allocator);
+      bat_val.AddMember("capacity", 4500, allocator);
       bat_val.AddMember("power", bms_status_.batt_soc, allocator);
       bat_val.AddMember("voltage", bms_status_.batt_volt, allocator);
       bat_val.AddMember("temperature", bms_status_.batt_temp, allocator);
