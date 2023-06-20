@@ -87,6 +87,7 @@ bool cyberdog::manager::CyberdogManager::Init()
     INFO("exit lowpower:%s", (exit_lowpower ? "true" : "false"));
     ++exit_times;
   }
+  bcin_node_ptr->Init();
   // 开始自检
   ready_node_ptr->SelfCheck(1, selfcheck_status_);
   error_context_ptr_->Init();
@@ -121,7 +122,6 @@ bool cyberdog::manager::CyberdogManager::Init()
   OnActive();
   power_consumption_node_ptr->Init();
   query_node_ptr_->Init();
-  bcin_node_ptr->Init();
   mssc_context_ptr_->Init();
   heart_beat_ptr_->Init();
   // 软件setup
