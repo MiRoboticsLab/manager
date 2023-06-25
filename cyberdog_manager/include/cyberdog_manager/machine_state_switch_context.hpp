@@ -234,20 +234,7 @@ public:
   }
   bool ExecuteSelfCheck(std::map<std::string, int32_t> & state_map)
   {
-    if (SetState(cyberdog::machine::MachineState::MS_SelfCheck, state_map)) {
-      return true;
-    } else {
-      auto it = state_map.find("motion_manager");
-      int error_code = -1;
-      if (it != state_map.end()) {
-        error_code = it->second;
-      }
-      if (is_charging_ && 3009 == error_code) {
-        INFO("cyberdog is charging, and the motion self-check failed normally. continue running.");
-        return true;
-      }
-      return false;
-    }
+    return SetState(cyberdog::machine::MachineState::MS_SelfCheck, state_map);
   }
   bool ExecuteActive()
   {
@@ -813,9 +800,6 @@ private:
   bool SetState(cyberdog::machine::MachineState ms, std::map<std::string, int32_t> & stmap)
   {
     int32_t code = machine_state_ptr_->SetState(ms, stmap);
-    if (3009 == code && is_charging_) {
-      return code == 0;
-    }
     if (code != 0) {
       play_sound(code);
     }
