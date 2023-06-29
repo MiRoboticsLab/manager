@@ -19,6 +19,7 @@
 #include <map>
 #include <mutex>
 #include <vector>
+#include <thread>
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "cyberdog_machine/cyberdog_fs_machine.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -432,6 +433,7 @@ private:
           machine_state_handler_map[static_cast<MachineStateChild>(request->state)]();
         }
         machine_state_keep = true;
+        prohibit_shutdown_ = true;
         INFO("[MachineState-Switch]: keep machine state to start");
         keep_timer_ = mssc_node_->create_wall_timer(
           std::chrono::seconds(request->ticks),
@@ -451,6 +453,7 @@ private:
   {
     keep_timer_->cancel();
     machine_state_keep = false;
+    prohibit_shutdown_ = false;
     INFO("[MachineState-Switch]: keep machine state to stop");
   }
   void MachineStateGet(
@@ -649,13 +652,19 @@ private:
     const std_srvs::srv::Trigger::Request::SharedPtr,
     std_srvs::srv::Trigger::Response::SharedPtr response)
   {
-    if (machine_state_keep) {
+    if (prohibit_shutdown_) {
       return;
     }
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
     }
     // 关机
+    std::thread t{[&]() {
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        shutdown_or_reboot(false);
+      }
+    };
+    t.detach();
     std::lock_guard<std::mutex> lck(state_mtx_);
     machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
     int code = shutdown_or_reboot(false);
@@ -855,6 +864,7 @@ private:
   CONTROL_TAIL_LED_CALLBACK control_tail_led {[](bool, bool) {}};
   std::unique_ptr<cyberdog::manager::StateContext> machine_state_ptr_ {nullptr};
   bool machine_state_keep {false};
+  bool prohibit_shutdown_ {false};
   bool ms_lowpower_only {false};
   rclcpp::TimerBase::SharedPtr keep_timer_;
   rclcpp::CallbackGroup::SharedPtr timer_callback_group_;
