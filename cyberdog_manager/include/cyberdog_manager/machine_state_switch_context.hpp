@@ -658,21 +658,24 @@ private:
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
     }
-    // 关机
+    // 状态机切换超时强制关机
     std::thread t{[&]() {
         std::this_thread::sleep_for(std::chrono::seconds(5));
         shutdown_or_reboot(false);
       }
     };
     t.detach();
-    std::lock_guard<std::mutex> lck(state_mtx_);
-    machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
-    int code = shutdown_or_reboot(false);
-    if (code == 0) {
-      response->success = true;
-    } else {
-      response->success = false;
-    }
+
+    // 先返回关机结果，再执行关机
+    std::thread t_shutdown{[&]() {
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
+        shutdown_or_reboot(false);
+      }
+    };
+    t_shutdown.detach();
+    response->success = true;
   }
 
   void RebootCallback(
@@ -685,15 +688,24 @@ private:
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
     }
-    // 重启
-    std::lock_guard<std::mutex> lck(state_mtx_);
-    machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
-    int code = shutdown_or_reboot(true);
-    if (code == 0) {
-      response->success = true;
-    } else {
-      response->success = false;
-    }
+
+    // 状态机切换超时强制重启
+    std::thread t{[&]() {
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        shutdown_or_reboot(true);
+      }
+    };
+    t.detach();
+
+    std::thread t_reboot{[&]() {
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
+        shutdown_or_reboot(true);
+      }
+    };
+    t_reboot.detach();
+    response->success = true;
   }
 
   bool OnSelfCheck()
