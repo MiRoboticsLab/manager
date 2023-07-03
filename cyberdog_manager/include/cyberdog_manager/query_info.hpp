@@ -23,7 +23,6 @@
 #include "std_srvs/srv/trigger.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/bool.hpp"
-#include "protocol/srv/ota_server_cmd.hpp"
 #include "protocol/srv/audio_volume_get.hpp"
 #include "protocol/srv/audio_execute.hpp"
 #include "protocol/srv/motor_temp.hpp"
@@ -69,10 +68,6 @@ public:
     audio_sn_ger_srv_ =
       query_node_ptr_->create_client<std_srvs::srv::Trigger>(
       "get_dog_sn",
-      rmw_qos_profile_services_default, qdev_callback_group_);
-    ota_ver_get_srv_ =
-      query_node_ptr_->create_client<protocol::srv::OtaServerCmd>(
-      "ota_versions",
       rmw_qos_profile_services_default, qdev_callback_group_);
     audio_volume_get_client_ =
       query_node_ptr_->create_client<protocol::srv::AudioVolumeGet>(
@@ -235,33 +230,7 @@ public:
       }
       CyberdogJson::Add(json_info, "sn", sn_);
     }
-    if (is_version) {
-      if (!ota_ver_get_srv_->wait_for_service(std::chrono::seconds(2))) {
-        ERROR("call ota version not avalible");
-        Document version_doc(kObjectType);
-        CyberdogJson::Add(json_info, "version", version_doc);
-      } else {
-        std::chrono::seconds timeout(3);
-        auto req = std::make_shared<protocol::srv::OtaServerCmd::Request>();
-        req->request.key = "ota_command_version_query";
-        auto future_result = ota_ver_get_srv_->async_send_request(req);
-        std::future_status status = future_result.wait_for(timeout);
-        if (status == std::future_status::ready) {
-          std::string version = future_result.get()->response.value;
-          Document version_doc(kObjectType);
-          if (!CyberdogJson::String2Document(version, version_doc)) {
-            ERROR("error while encoding version info to json");
-            CyberdogJson::Add(version_doc, "version", version_doc);
-          } else {
-            CyberdogJson::Add(json_info, "version", version_doc);
-          }
-        } else {
-          Document version_doc(kObjectType);
-          ERROR("call ota version failed!");
-          CyberdogJson::Add(json_info, "version", version_doc);
-        }
-      }
-    }
+    (void)is_version;
     if (is_uid) {
       CyberdogJson::Add(json_info, "uid", uid_);
     }
@@ -547,7 +516,6 @@ private:
   std::unique_ptr<cyberdog::manager::WifiInfo> wifi_info_ptr_ {nullptr};
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sn_notify_sub_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_sn_ger_srv_;
-  rclcpp::Client<protocol::srv::OtaServerCmd>::SharedPtr ota_ver_get_srv_;
   rclcpp::Client<protocol::srv::AudioVolumeGet>::SharedPtr audio_volume_get_client_;
   rclcpp::Client<protocol::srv::AudioExecute>::SharedPtr audio_execute_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_action_get_client_;
