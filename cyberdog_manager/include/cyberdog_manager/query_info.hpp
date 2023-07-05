@@ -18,6 +18,7 @@
 #include <memory>
 #include <vector>
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
 #include "cyberdog_common/cyberdog_json.hpp"
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "std_srvs/srv/trigger.hpp"
@@ -34,6 +35,7 @@
 #include "protocol/srv/uid_sn.hpp"
 #include "protocol/srv/audio_nick_name.hpp"
 #include "protocol/srv/trigger.hpp"
+#include "protocol/action/over_the_air.hpp"
 
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
@@ -93,6 +95,10 @@ public:
       query_node_ptr_->create_client<std_srvs::srv::Trigger>(
       "low_power_switch_state",
       rmw_qos_profile_services_default, qdev_callback_group_);
+    version_get_client_ = rclcpp_action::create_client<protocol::action::OverTheAir>(
+      query_node_ptr_,
+      "cyberdog_ota_action",
+      qdev_callback_group_);
   }
 
   ~QueryInfo()
@@ -230,7 +236,14 @@ public:
       }
       CyberdogJson::Add(json_info, "sn", sn_);
     }
-    (void)is_version;
+    if (is_version) {
+      if (version_.empty()) {
+        GetVersion();
+      }
+      Document version_doc(kObjectType);
+      CyberdogJson::String2Document(version_, version_doc);
+      CyberdogJson::Add(json_info, "version", version_doc);
+    }
     if (is_uid) {
       CyberdogJson::Add(json_info, "uid", uid_);
     }
@@ -492,6 +505,43 @@ public:
     return info;
   }
 
+  void GetVersion()
+  {
+    if (!version_get_client_->wait_for_action_server(std::chrono::seconds(5))) {
+      ERROR("call ota version not avalible");
+    } else {
+      auto goal = protocol::action::OverTheAir::Goal();
+      goal.goal_msg = "{\"id\": \"query_divice_info\", \"operate\": \"inquire\", \"data\": \"\"}";
+      auto send_goal_options =
+        rclcpp_action::Client<protocol::action::OverTheAir>::SendGoalOptions();
+      using GoalHandleOverTheAir = rclcpp_action::ClientGoalHandle<protocol::action::OverTheAir>;
+      auto get_result = [&](const GoalHandleOverTheAir::WrappedResult & result) -> void {
+          if (result.code != rclcpp_action::ResultCode::SUCCEEDED) {
+            ERROR("get version failed");
+            return;
+          }
+          const std::string version = result.result->result_msg;
+          rapidjson::Document tmp_doc;
+          rapidjson::Value tem_val;
+          std::string tmp_version;
+          if (version.empty()) {
+            INFO("query version is empty");
+            return;
+          }
+          CyberdogJson::String2Document(version, tmp_doc);
+          CyberdogJson::Get(tmp_doc, "version", tem_val);
+          CyberdogJson::Value2String(tem_val, tmp_version);
+          version_ = tmp_version;
+        };
+      send_goal_options.result_callback = get_result;
+      auto goal_handle_futrue = version_get_client_->async_send_goal(goal, send_goal_options);
+      std::future_status status = goal_handle_futrue.wait_for(std::chrono::seconds(3));
+      if (status != std::future_status::ready) {
+        WARN("query version is failed");
+      }
+    }
+  }
+
 private:
   const std::string float_to_string(float & val)
   {
@@ -508,6 +558,7 @@ private:
   std::string node_name_;
   std::string sn_ {""};
   std::string uid_ {""};
+  std::string version_ {""};
   bool name_switch_ {false};
   std::string default_name_ {"铁蛋"};
   std::string nick_name_ {"铁蛋"};
@@ -522,6 +573,7 @@ private:
   rclcpp::Client<protocol::srv::MotorTemp>::SharedPtr motor_temper_client_;
   rclcpp::Client<protocol::srv::Trigger>::SharedPtr audio_active_state_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr low_power_switch_state_client_;
+  rclcpp_action::Client<protocol::action::OverTheAir>::SharedPtr version_get_client_;
 };
 
 class QueryInfoNode final
