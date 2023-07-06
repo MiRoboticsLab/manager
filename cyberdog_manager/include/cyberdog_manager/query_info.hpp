@@ -97,8 +97,7 @@ public:
       rmw_qos_profile_services_default, qdev_callback_group_);
     version_get_client_ = rclcpp_action::create_client<protocol::action::OverTheAir>(
       query_node_ptr_,
-      "cyberdog_ota_action",
-      qdev_callback_group_);
+      "cyberdog_ota_action");
   }
 
   ~QueryInfo()
