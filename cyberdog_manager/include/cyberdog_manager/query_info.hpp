@@ -510,7 +510,9 @@ public:
       ERROR("call ota version not avalible");
     } else {
       auto goal = protocol::action::OverTheAir::Goal();
-      goal.goal_msg = "{\"id\": \"query_divice_info\", \"operate\": \"inquire\", \"data\": \"\"}";
+      goal.id = "query_divice_info";
+      goal.operate = "inquire";
+      goal.user = "cyberdog_manager";
       auto send_goal_options =
         rclcpp_action::Client<protocol::action::OverTheAir>::SendGoalOptions();
       using GoalHandleOverTheAir = rclcpp_action::ClientGoalHandle<protocol::action::OverTheAir>;
