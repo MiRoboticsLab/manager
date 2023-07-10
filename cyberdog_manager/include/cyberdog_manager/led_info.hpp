@@ -85,7 +85,7 @@ public:
       if (!power_charging_) {
         LedMode poweroff_head{true, "bms", 1, 0x01, 0xA3, 0x00, 0x00, 0x00};
         LedMode poweroff_tail{true, "bms", 2, 0x01, 0xA3, 0x00, 0x00, 0x00};
-        LedMode poweroff_mini{true, "bms", 3, 0x02, 0x31, 0xFF, 0x32, 0x32};
+        LedMode poweroff_mini{true, "bms", 3, 0x02, 0x31, 0xFF, 0x00, 0x00};
         bool result = ReqLedService(poweroff_head, poweroff_tail, poweroff_mini);
         INFO("%s set led when the soc is 0", result ? "successed" : "failed");
       }
@@ -98,13 +98,13 @@ public:
       if (power_charging_) {
         LedMode head{true, "bms", 1, 0x02, 0x06, 0xFF, 0x32, 0x32};
         LedMode tail{true, "bms", 2, 0x02, 0x06, 0xFF, 0x32, 0x32};
-        LedMode mini{true, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
+        LedMode mini{true, "bms", 3, 0x02, 0x30, 0xFF, 0x00, 0x00};
         bool result = ReqLedService(head, tail, mini);
         INFO("%s set the charging led when the soc less than 20", result ? "successed" : "failed");
       } else {
         LedMode head{true, "bms", 1, 0x02, 0x09, 0xFF, 0x32, 0x32};
         LedMode tail{true, "bms", 2, 0x02, 0x09, 0xFF, 0x32, 0x32};
-        LedMode mini{true, "bms", 3, 0x02, 0x30, 0xFF, 0x32, 0x32};
+        LedMode mini{true, "bms", 3, 0x02, 0x30, 0xFF, 0x00, 0x00};
         bool result = ReqLedService(head, tail, mini);
         INFO("%s set led when the soc less than 20", result ? "successed" : "failed");
       }
