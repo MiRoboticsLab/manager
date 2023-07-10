@@ -87,6 +87,7 @@ bool cyberdog::manager::CyberdogManager::Init()
     INFO("exit lowpower:%s", (exit_lowpower ? "true" : "false"));
     ++exit_times;
   }
+  query_node_ptr_->Report(true);
   query_node_ptr_->Init();
   bcin_node_ptr->Init();
   // 开始自检
@@ -149,7 +150,6 @@ void cyberdog::manager::CyberdogManager::OnActive()
 {
   INFO("trigger state:on active");
   bool result = mssc_context_ptr_->ExecuteActive();
-  query_node_ptr_->Report(true);
   mssc_context_ptr_->KeepMsState();
   if (result) {
     INFO("!!! All node in detectedc machine state is acitve ok !!!");
