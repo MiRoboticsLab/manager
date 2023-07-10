@@ -541,6 +541,7 @@ public:
         WARN("query version is failed");
       }
     }
+    sleep(5);
   }
 
 private:
@@ -670,7 +671,6 @@ public:
     std::thread(
       [this]() {
         while (rclcpp::ok()) {
-          std::this_thread::sleep_for(std::chrono::milliseconds(30000));
           if (!is_reporting_) {
             continue;
           }
@@ -713,6 +713,7 @@ public:
           INFO_ONCE("To back end server upload info:%s", msg.data.c_str());
           back_to_end_pub_->publish(msg);
           INFO("[stop:back to end upload device info-------------------]");
+          std::this_thread::sleep_for(std::chrono::milliseconds(30000));
         }
       }).detach();
   }
