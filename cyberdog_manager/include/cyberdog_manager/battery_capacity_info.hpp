@@ -96,20 +96,20 @@ private:
           // is_soc_five_ = false;
           PlayAudioService(protocol::msg::AudioPlay::PID_PERCENT_0);
         }
-      } else if (bms_status_.batt_soc <= 5) {
+      } else if (bms_status_.batt_soc < 5) {
         if (!is_soc_five_) {
           is_soc_five_ = true;
           is_soc_twenty_ = false;
           PlayAudio(protocol::msg::AudioPlay::PID_PERCENT_5);
         }
-      } else if (bms_status_.batt_soc <= 20) {
+      } else if (bms_status_.batt_soc < 20) {
         if (!is_soc_twenty_) {
           is_soc_twenty_ = true;
           is_soc_five_ = false;
           is_soc_thirty_ = false;
           PlayAudio(protocol::msg::AudioPlay::PID_PERCENT_20);
         }
-      } else if (bms_status_.batt_soc <= 30) {
+      } else if (bms_status_.batt_soc < 30) {
         if (!is_soc_thirty_) {
           is_soc_thirty_ = true;
           is_soc_twenty_ = false;
