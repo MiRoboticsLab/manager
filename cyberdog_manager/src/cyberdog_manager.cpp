@@ -124,12 +124,11 @@ bool cyberdog::manager::CyberdogManager::Init()
     mssc_context_ptr_->ExecuteSetUp(true);
     OnActive();
     ready_node_ptr->SelfCheck(0, selfcheck_status_);
+    audio_node_ptr->SpeechNotify(5300);
   }
   power_consumption_node_ptr->Init();
   mssc_context_ptr_->Init();
   heart_beat_ptr_->Init();
-  audio_node_ptr->Init();
-  audio_node_ptr->SpeechNotify(5300);
   return true;
 }
 
