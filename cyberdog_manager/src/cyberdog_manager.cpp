@@ -80,16 +80,15 @@ bool cyberdog::manager::CyberdogManager::Init()
   while (!exit_lowpower && exit_times < 3) {
     if (power_consumption_node_ptr->QueryLowPower()) {
       exit_lowpower = power_consumption_node_ptr->EnterLowPower(false);
+      INFO("exit lowpower:%s", (exit_lowpower ? "true" : "false"));
       std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     } else {
       exit_lowpower = true;
     }
-    INFO("exit lowpower:%s", (exit_lowpower ? "true" : "false"));
     ++exit_times;
   }
   query_node_ptr_->Report(true);
   query_node_ptr_->Init();
-  bcin_node_ptr->Init();
   // 开始自检
   ready_node_ptr->SelfCheck(1, selfcheck_status_);
   error_context_ptr_->Init();
@@ -129,6 +128,7 @@ bool cyberdog::manager::CyberdogManager::Init()
   power_consumption_node_ptr->Init();
   mssc_context_ptr_->Init();
   heart_beat_ptr_->Init();
+  bcin_node_ptr->Init();
   return true;
 }
 
@@ -151,7 +151,7 @@ void cyberdog::manager::CyberdogManager::OnActive()
   bool result = mssc_context_ptr_->ExecuteActive();
   mssc_context_ptr_->KeepMsState();
   if (result) {
-    INFO("!!! All node in detectedc machine state is acitve ok !!!");
+    INFO("!!! All node in detected machine state is acitve ok !!!");
     ready_node_ptr->Ready(true);
     ready_node_ptr->MachineState(0);
   } else {
