@@ -59,7 +59,7 @@ public:
   {
     bc_callback_group_ =
       battery_capacity_info_node_->create_callback_group(
-      rclcpp::CallbackGroupType::MutuallyExclusive);
+      rclcpp::CallbackGroupType::Reentrant);
     rclcpp::SubscriptionOptions sub_options;
     sub_options.callback_group = bc_callback_group_;
     bms_status_sub_ = battery_capacity_info_node_->create_subscription<protocol::msg::BmsStatus>(
@@ -121,7 +121,16 @@ private:
       is_soc_thirty_ = false;
       is_soc_five_ = false;
     }
+
+    // 状态机切换过程中，不再重复请求切换
+    if (!ms_switch_mutex_.try_lock()) {
+      WARN_MILLSECONDS(
+        5000, "The machine_state is switching..."
+      );
+      return;
+    }
     batsoc_notify_handler(bms_status_.batt_soc, bms_status_.power_wired_charging);
+    ms_switch_mutex_.unlock();
   }
 
   void PlayAudio(const uint16_t play_id)
@@ -168,6 +177,7 @@ private:
   protocol::msg::BmsStatus bms_status_;
   BCINSOC_CALLBACK batsoc_notify_handler;
   BCINBMS_CALLBACK bms_notify_handler;
+  std::mutex ms_switch_mutex_;
   bool is_soc_zero_;
   bool is_soc_five_;
   bool is_soc_twenty_;
