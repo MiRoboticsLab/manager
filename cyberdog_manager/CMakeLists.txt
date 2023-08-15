@@ -15,6 +15,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(manager_base REQUIRED)
 find_package(protocol REQUIRED)
 find_package(cyberdog_system REQUIRED)
@@ -35,6 +36,7 @@ add_executable(${PROJECT_NAME} src/cyberdog_manager.cpp src/main.cpp)
 
 ament_target_dependencies( ${PROJECT_NAME}
   rclcpp
+  rclcpp_action
   protocol
   manager_base
   cyberdog_system

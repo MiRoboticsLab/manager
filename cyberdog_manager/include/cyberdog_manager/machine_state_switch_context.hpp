@@ -19,6 +19,7 @@
 #include <map>
 #include <mutex>
 #include <vector>
+#include <thread>
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "cyberdog_machine/cyberdog_fs_machine.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -238,7 +239,7 @@ public:
   }
   bool ExecuteActive()
   {
-    return SetState(cyberdog::machine::MachineState::MS_Active, stmap_);
+    return SwitchState(MsscMachineState::MSSC_ACTIVE);
   }
   void Init()
   {
@@ -307,7 +308,7 @@ public:
   }
   void DogWakeup(const std_msgs::msg::Bool::SharedPtr msg)
   {
-    if (machine_state_keep) {
+    if (machine_state_keep_) {
       return;
     }
     if (msg->data && mssc_machine_state != MsscMachineState::MSSC_LOWPOWER) {
@@ -318,9 +319,9 @@ public:
       return;
     }
     INFO("[MachineState-Switch]: dog wakeup...");
-    if (battery_charge_val < 5) {
+    if (battery_charge_val_ < 5) {
       INFO("[MachineState-Switch]: rejected switch, battery soc less than 5 and keep low-power");
-    } else if (battery_charge_val < 20) {
+    } else if (battery_charge_val_ < 20) {
       std::lock_guard<std::mutex> lck(state_mtx_);
       machine_state_handler_map[MachineStateChild::MSC_PROTECTED]();
     } else {
@@ -331,19 +332,19 @@ public:
   }
   void BatteryChargeUpdate(uint8_t bc, bool is_charging)
   {
-    if (machine_state_keep) {
+    if (machine_state_keep_) {
       return;
     }
-    battery_charge_val = bc;
+    battery_charge_val_ = bc;
     is_charging_ = is_charging;
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
-    } else if (battery_charge_val <= 0 && (!is_charging)) {
+    } else if (battery_charge_val_ <= 0 && (!is_charging)) {
       // 关机
       std::lock_guard<std::mutex> lck(state_mtx_);
       machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
       shutdown_or_reboot(false);
-    } else if (battery_charge_val < 5) {
+    } else if (battery_charge_val_ < 5) {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER || is_charging) {
         return;
       }
@@ -351,10 +352,10 @@ public:
       std::lock_guard<std::mutex> lck(state_mtx_);
       SetState(cyberdog::machine::MachineState::MS_LowPower, stmap_);
       mssc_machine_state = MsscMachineState::MSSC_LOWPOWER;
-      ms_lowpower_only = true;
-    } else if (battery_charge_val < 20) {
-      if (ms_lowpower_only) {
-        ms_lowpower_only = false;
+      ms_lowpower_only_ = true;
+    } else if (battery_charge_val_ < 20) {
+      if (ms_lowpower_only_) {
+        ms_lowpower_only_ = false;
         std::lock_guard<std::mutex> lck(state_mtx_);
         SetState(cyberdog::machine::MachineState::MS_Protected, stmap_);
         mssc_machine_state = MsscMachineState::MSSC_PROTECT;
@@ -381,11 +382,18 @@ public:
   }
   void KeepDownOverTime()
   {
-    if (machine_state_keep) {
+    if (machine_state_keep_) {
       return;
     }
     std::lock_guard<std::mutex> lck(state_mtx_);
     machine_state_handler_map[MachineStateChild::MSC_LOWPOWER]();
+  }
+  void KeepMsState()
+  {
+    machine_state_keep_ = !machine_state_keep_;
+    INFO(
+      "MachineState %s Activa status", machine_state_keep_ ?
+      "has maintains" : "ended to maintain");
   }
 
 private:
@@ -418,13 +426,14 @@ private:
     const protocol::srv::MachineState::Request::SharedPtr request,
     protocol::srv::MachineState::Response::SharedPtr response)
   {
-    if (!machine_state_keep) {
+    if (!machine_state_keep_) {
       if (request->ticks > 0) {
         {
           std::lock_guard<std::mutex> lck(state_mtx_);
           machine_state_handler_map[static_cast<MachineStateChild>(request->state)]();
         }
-        machine_state_keep = true;
+        machine_state_keep_ = true;
+        prohibit_shutdown_ = true;
         INFO("[MachineState-Switch]: keep machine state to start");
         keep_timer_ = mssc_node_->create_wall_timer(
           std::chrono::seconds(request->ticks),
@@ -443,7 +452,8 @@ private:
   void KeepTimerCallback()
   {
     keep_timer_->cancel();
-    machine_state_keep = false;
+    machine_state_keep_ = false;
+    prohibit_shutdown_ = false;
     INFO("[MachineState-Switch]: keep machine state to stop");
   }
   void MachineStateGet(
@@ -463,6 +473,9 @@ private:
     const std_srvs::srv::SetBool::Request::SharedPtr request,
     std_srvs::srv::SetBool::Response::SharedPtr response)
   {
+    if (machine_state_keep_) {
+      return;
+    }
     if (request->data) {
       if (mssc_machine_state == MsscMachineState::MSSC_LOWPOWER) {
         lowpower(false);
@@ -555,7 +568,7 @@ private:
   }
   bool SwitchState(MsscMachineState mm)
   {
-    std::lock_guard<std::mutex> lck(switch_mtx);
+    std::lock_guard<std::mutex> lck(switch_mtx_);
     is_switching_ms_ = true;
     bool result = false;
     switch (mm) {
@@ -642,42 +655,60 @@ private:
     const std_srvs::srv::Trigger::Request::SharedPtr,
     std_srvs::srv::Trigger::Response::SharedPtr response)
   {
-    if (machine_state_keep) {
+    if (prohibit_shutdown_) {
       return;
     }
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
     }
-    // 关机
-    std::lock_guard<std::mutex> lck(state_mtx_);
-    machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
-    int code = shutdown_or_reboot(false);
-    if (code == 0) {
-      response->success = true;
-    } else {
-      response->success = false;
-    }
+    // 状态机切换超时强制关机
+    std::thread t{[&]() {
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        shutdown_or_reboot(false);
+      }
+    };
+    t.detach();
+
+    // 先返回关机结果，再执行关机
+    std::thread t_shutdown{[&]() {
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
+        shutdown_or_reboot(false);
+      }
+    };
+    t_shutdown.detach();
+    response->success = true;
   }
 
   void RebootCallback(
     const std_srvs::srv::Trigger::Request::SharedPtr,
     std_srvs::srv::Trigger::Response::SharedPtr response)
   {
-    if (machine_state_keep) {
+    if (prohibit_shutdown_) {
       return;
     }
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
     }
-    // 重启
-    std::lock_guard<std::mutex> lck(state_mtx_);
-    machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
-    int code = shutdown_or_reboot(true);
-    if (code == 0) {
-      response->success = true;
-    } else {
-      response->success = false;
-    }
+
+    // 状态机切换超时强制重启
+    std::thread t{[&]() {
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        shutdown_or_reboot(true);
+      }
+    };
+    t.detach();
+
+    std::thread t_reboot{[&]() {
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::lock_guard<std::mutex> lck(state_mtx_);
+        machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
+        shutdown_or_reboot(true);
+      }
+    };
+    t_reboot.detach();
+    response->success = true;
   }
 
   bool OnSelfCheck()
@@ -764,7 +795,7 @@ private:
     }
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return false;
-    } else if (battery_charge_val <= 0 && (!is_charging_)) {
+    } else if (battery_charge_val_ <= 0 && (!is_charging_)) {
       // 关机
       result = SwitchState(MsscMachineState::MSSC_SHUTDOWN);
     }
@@ -817,8 +848,8 @@ private:
   rclcpp::Publisher<protocol::msg::StateSwitchStatus>::SharedPtr state_swith_status_pub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr wake_up_sub_ {nullptr};
   MsscMachineState mssc_machine_state {MsscMachineState::MSSC_UNKOWN};
-  std::mutex switch_mtx;
-  uint8_t battery_charge_val {100};
+  std::mutex switch_mtx_;
+  uint8_t battery_charge_val_ {100};
   bool is_charging_ {false};
   const std::map<MsscMachineState, std::string> mssc_machine_state_code_map = {
     {MsscMachineState::MSSC_ACTIVE, "active"},
@@ -847,8 +878,9 @@ private:
   SHUTDOWN_REBOOT_CALLBACK shutdown_or_reboot {[](bool) {return 0;}};
   CONTROL_TAIL_LED_CALLBACK control_tail_led {[](bool, bool) {}};
   std::unique_ptr<cyberdog::manager::StateContext> machine_state_ptr_ {nullptr};
-  bool machine_state_keep {false};
-  bool ms_lowpower_only {false};
+  bool machine_state_keep_ {false};
+  bool prohibit_shutdown_ {false};
+  bool ms_lowpower_only_ {false};
   rclcpp::TimerBase::SharedPtr keep_timer_;
   rclcpp::CallbackGroup::SharedPtr timer_callback_group_;
   const std::string CONFIG_DIR = "/home/mi/.cyberdog/manager";

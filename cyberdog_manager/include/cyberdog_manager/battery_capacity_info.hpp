@@ -59,7 +59,7 @@ public:
   {
     bc_callback_group_ =
       battery_capacity_info_node_->create_callback_group(
-      rclcpp::CallbackGroupType::MutuallyExclusive);
+      rclcpp::CallbackGroupType::Reentrant);
     rclcpp::SubscriptionOptions sub_options;
     sub_options.callback_group = bc_callback_group_;
     bms_status_sub_ = battery_capacity_info_node_->create_subscription<protocol::msg::BmsStatus>(
@@ -94,26 +94,26 @@ private:
         if (!is_soc_zero_) {
           is_soc_zero_ = true;
           // is_soc_five_ = false;
-          PlayAudioService("电量为0,关机中!");
+          PlayAudioService(protocol::msg::AudioPlay::PID_PERCENT_0);
         }
-      } else if (bms_status_.batt_soc <= 5) {
+      } else if (bms_status_.batt_soc < 5) {
         if (!is_soc_five_) {
           is_soc_five_ = true;
           is_soc_twenty_ = false;
-          PlayAudio("电量低于5%，电池即将耗尽，请尽快充电!");
+          PlayAudio(protocol::msg::AudioPlay::PID_PERCENT_5);
         }
-      } else if (bms_status_.batt_soc <= 20) {
+      } else if (bms_status_.batt_soc < 20) {
         if (!is_soc_twenty_) {
           is_soc_twenty_ = true;
           is_soc_five_ = false;
           is_soc_thirty_ = false;
-          PlayAudio("电量低于20%，部分功能受限!");
+          PlayAudio(protocol::msg::AudioPlay::PID_PERCENT_20);
         }
-      } else if (bms_status_.batt_soc <= 30) {
+      } else if (bms_status_.batt_soc < 30) {
         if (!is_soc_thirty_) {
           is_soc_thirty_ = true;
           is_soc_twenty_ = false;
-          PlayAudio("电量低于30%，请尽快充电!");
+          PlayAudio(protocol::msg::AudioPlay::PID_PERCENT_30);
         }
       }
     } else {
@@ -121,24 +121,33 @@ private:
       is_soc_thirty_ = false;
       is_soc_five_ = false;
     }
+
+    // 状态机切换过程中，不再重复请求切换
+    if (!ms_switch_mutex_.try_lock()) {
+      WARN_MILLSECONDS(
+        5000, "The machine_state is switching..."
+      );
+      return;
+    }
     batsoc_notify_handler(bms_status_.batt_soc, bms_status_.power_wired_charging);
+    ms_switch_mutex_.unlock();
   }
 
-  void PlayAudio(const std::string & text)
+  void PlayAudio(const uint16_t play_id)
   {
     protocol::msg::AudioPlayExtend msg;
-    msg.is_online = true;
+    msg.is_online = false;
     msg.module_name = battery_capacity_info_node_->get_name();
-    msg.text = text;
+    msg.speech.play_id = play_id;
     audio_play_extend_pub->publish(msg);
   }
 
-  void PlayAudioService(const std::string & text)
+  void PlayAudioService(const uint16_t play_id)
   {
     auto request_audio = std::make_shared<protocol::srv::AudioTextPlay::Request>();
     request_audio->module_name = battery_capacity_info_node_->get_name();
-    request_audio->is_online = true;
-    request_audio->text = text;
+    request_audio->is_online = false;
+    request_audio->speech.play_id = play_id;
     auto callback = [](rclcpp::Client<protocol::srv::AudioTextPlay>::SharedFuture future) {
         INFO("Audio play result: %s", future.get()->status == 0 ? "success" : "failed");
       };
@@ -168,6 +177,7 @@ private:
   protocol::msg::BmsStatus bms_status_;
   BCINSOC_CALLBACK batsoc_notify_handler;
   BCINBMS_CALLBACK bms_notify_handler;
+  std::mutex ms_switch_mutex_;
   bool is_soc_zero_;
   bool is_soc_five_;
   bool is_soc_twenty_;
