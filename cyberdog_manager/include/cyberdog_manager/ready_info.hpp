@@ -25,6 +25,8 @@
 #include "protocol/msg/state_switch_status.hpp"
 #include "protocol/srv/motion_result_cmd.hpp"
 #include "protocol/srv/audio_text_play.hpp"
+#include "protocol/msg/bms_status.hpp"
+
 
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
@@ -75,6 +77,11 @@ public:
       ready_notify_node_->create_client<protocol::srv::AudioTextPlay>(
       "speech_text_play",
       rmw_qos_profile_services_default, ready_notify_callback_group_);
+
+    bms_status_sub_ =
+      ready_notify_node_->create_subscription<protocol::msg::BmsStatus>(
+      "bms_status", rclcpp::SystemDefaultsQoS(),
+      std::bind(&ReadyNotifyNode::BmsStatus, this, std::placeholders::_1), sub_options);
     // std::thread(
     //   [this]() {
     //     executor_.add_node(train_plan_node_ptr_);
@@ -224,8 +231,10 @@ public:
     }
     // app第一次连接后站立
     if (pre_connect_state == false && msg.data == true) {
-      // 控制站立
       pre_connect_state = true;
+      if (is_charging) {
+        return;
+      }
       INFO("app connected, dog standup");
       PlayAudioService(2002);
       if (!motion_excute_client_->wait_for_service(std::chrono::seconds(5))) {
@@ -267,6 +276,12 @@ public:
     }
   }
 
+
+  void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
+  {
+    is_charging = msg->power_wired_charging;
+  }
+
   ~ReadyNotifyNode()
   {
     exit_ = true;
@@ -278,6 +293,7 @@ public:
 private:
   bool exit_ {false};
   bool ready_ {false};
+  bool is_charging {false};
   int32_t selfcheck_state_ {-1};
   std::string name_;
   rclcpp::Node::SharedPtr ready_notify_node_ {nullptr};

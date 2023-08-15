@@ -80,13 +80,15 @@ bool cyberdog::manager::CyberdogManager::Init()
   while (!exit_lowpower && exit_times < 3) {
     if (power_consumption_node_ptr->QueryLowPower()) {
       exit_lowpower = power_consumption_node_ptr->EnterLowPower(false);
+      INFO("exit lowpower:%s", (exit_lowpower ? "true" : "false"));
       std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     } else {
       exit_lowpower = true;
     }
-    INFO("exit lowpower:%s", (exit_lowpower ? "true" : "false"));
     ++exit_times;
   }
+  query_node_ptr_->Report(true);
+  query_node_ptr_->Init();
   // 开始自检
   ready_node_ptr->SelfCheck(1, selfcheck_status_);
   error_context_ptr_->Init();
@@ -113,28 +115,20 @@ bool cyberdog::manager::CyberdogManager::Init()
   if (!mssc_context_ptr_->ExecuteSelfCheck(selfcheck_status_)) {
     ERROR(">>>XXXXX--- hardware machine state self check error!");
     ready_node_ptr->SelfCheck(2, selfcheck_status_);
-    return false;
   } else {
     audio_node_ptr->Init();
     ready_node_ptr->SelfCheck(3, selfcheck_status_);
+    OnActive();
+    // 软件setup
+    mssc_context_ptr_->ExecuteSetUp(true);
+    OnActive();
+    ready_node_ptr->SelfCheck(0, selfcheck_status_);
+    audio_node_ptr->SpeechNotify(5300);
   }
-  OnActive();
   power_consumption_node_ptr->Init();
-  query_node_ptr_->Init();
-  bcin_node_ptr->Init();
   mssc_context_ptr_->Init();
   heart_beat_ptr_->Init();
-  // 软件setup
-  mssc_context_ptr_->ExecuteSetUp(true);
-  if (!mssc_context_ptr_->ExecuteSelfCheck(selfcheck_status_)) {
-    ERROR(">>>XXXXX---software machine state self check error!");
-    ready_node_ptr->SelfCheck(4, selfcheck_status_);
-    return false;
-  } else {
-    audio_node_ptr->Init();
-    ready_node_ptr->SelfCheck(0, selfcheck_status_);
-  }
-  OnActive();
+  bcin_node_ptr->Init();
   return true;
 }
 
@@ -155,9 +149,9 @@ void cyberdog::manager::CyberdogManager::OnActive()
 {
   INFO("trigger state:on active");
   bool result = mssc_context_ptr_->ExecuteActive();
-  query_node_ptr_->Report(true);
+  mssc_context_ptr_->KeepMsState();
   if (result) {
-    INFO("!!! All node in detectedc machine state is acitve ok !!!");
+    INFO("!!! All node in detected machine state is acitve ok !!!");
     ready_node_ptr->Ready(true);
     ready_node_ptr->MachineState(0);
   } else {
