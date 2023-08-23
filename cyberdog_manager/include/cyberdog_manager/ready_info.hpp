@@ -235,8 +235,10 @@ public:
       if (is_charging) {
         return;
       }
+      cyberdog_standing_ = 1;
       INFO("app connected, dog standup");
       PlayAudioService(2002);
+      cyberdog_standing_ = 2;
       if (!motion_excute_client_->wait_for_service(std::chrono::seconds(5))) {
         ERROR("call motion server not avalible");
       }
@@ -282,6 +284,12 @@ public:
     is_charging = msg->power_wired_charging;
   }
 
+  int GetAudioOccupancyState()
+  {
+    std::this_thread::sleep_for(std::chrono::milliseconds(800));
+    return cyberdog_standing_;
+  }
+
   ~ReadyNotifyNode()
   {
     exit_ = true;
@@ -309,6 +317,7 @@ private:
   std::thread notify_message_thread;
   std::thread notify_selfcheck_thread;
   int count_;
+  int cyberdog_standing_ {0};
 };
 }  // namespace manager
 }  // namespace cyberdog
