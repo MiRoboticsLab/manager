@@ -116,9 +116,13 @@ bool cyberdog::manager::CyberdogManager::Init()
     ERROR(">>>XXXXX--- hardware machine state self check error!");
     ready_node_ptr->SelfCheck(2, selfcheck_status_);
   } else {
-    audio_node_ptr->Init();
-    ready_node_ptr->SelfCheck(3, selfcheck_status_);
     OnActive();
+    ready_node_ptr->SelfCheck(3, selfcheck_status_);
+    while (1 == ready_node_ptr->GetAudioOccupancyState()) {
+      INFO("Waiting for the audio to stop");
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+    audio_node_ptr->Init();
     // 软件setup
     mssc_context_ptr_->ExecuteSetUp(true);
     OnActive();
