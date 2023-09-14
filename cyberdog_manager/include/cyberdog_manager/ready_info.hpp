@@ -17,6 +17,7 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <vector>
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "cyberdog_common/cyberdog_json.hpp"
@@ -26,6 +27,9 @@
 #include "protocol/srv/motion_result_cmd.hpp"
 #include "protocol/srv/audio_text_play.hpp"
 #include "protocol/msg/bms_status.hpp"
+#include "protocol/srv/bes_http_send_file.hpp"
+#include "ament_index_cpp/get_package_share_directory.hpp"
+#include "cyberdog_common/cyberdog_toml.hpp"
 
 
 using cyberdog::common::CyberdogJson;
@@ -37,8 +41,35 @@ namespace cyberdog
 {
 namespace manager
 {
+enum SelfcheckState
+{
+  UNKNOW = -1,
+  ALL_SUCCESS = 0,
+  HARDWARE_CHECKING = 1,
+  CRITICAL_HARDWARE_FAILED = 2,
+  HARDWARE_SUCCESS = 3,
+  UNCRITICAL_HARDWARE_FAILED = 4,
+  SOFTWARE_SETUP_FAILED = 5,
+  SOFTWARE_SETUP_SUCCESS = 6
+};
+enum ErrorCode
+{
+  kLedSelfcheckError = 1109,
+  kBmsSelfcheckError = 1409,
+  kTouchSelfcheckError = 1509,
+  kUWBSelfcheckError = 1609,
+  kLidarSelfcheckError = 2109,
+  kTofSelfcheckError = 2209,
+  // kUltrasnoicSelfcheckError = 2309,
+  // kGpsSelfcheckError = 2409,
+
+  kLedAndUWBSelfcheckError = 1109 + 1609,
+  kTofAndLidarSelfcheckError = 2109 + 2209
+};
 class ReadyNotifyNode final
 {
+  using EXCEPTION_PLAYSOUND_CALLBACK = std::function<void (int32_t )>;
+
 public:
   explicit ReadyNotifyNode(rclcpp::Node::SharedPtr node_ptr)
   {
@@ -82,12 +113,16 @@ public:
       ready_notify_node_->create_subscription<protocol::msg::BmsStatus>(
       "bms_status", rclcpp::SystemDefaultsQoS(),
       std::bind(&ReadyNotifyNode::BmsStatus, this, std::placeholders::_1), sub_options);
+
+    upload_events_client_ = ready_notify_node_->create_client<protocol::srv::BesHttpSendFile>(
+      "bes_http_send_file_srv", rmw_qos_profile_services_default);
     // std::thread(
     //   [this]() {
     //     executor_.add_node(train_plan_node_ptr_);
     //     executor_.spin();
     //      rclcpp::shutdown();
     //   }).detach();
+    GetCriticalMoudle();
   }
 
   void Ready(bool ready)
@@ -111,13 +146,14 @@ public:
   void SelfCheck(int32_t state, const std::map<std::string, int32_t> & stmap)
   {
     selfcheck_state_ = state;
+    INFO("current state is %d", selfcheck_state_);
     if (!notify_selfcheck_thread.joinable()) {
       notify_selfcheck_thread = std::thread(
         [this, &stmap]() {
           static int32_t scs = -1;
           while (!exit_ && rclcpp::ok()) {
             protocol::msg::SelfCheckStatus msg;
-            if (0 == selfcheck_state_) {
+            if (0 == selfcheck_state_ || 6 == selfcheck_state_) {
               static std::string describ = UpSelfCheckState(selfcheck_state_, stmap);
               msg.description = describ;
             } else {
@@ -135,10 +171,143 @@ public:
     }
   }
 
+  bool UploadEvents()
+  {
+    if (!upload_events_client_->wait_for_service(std::chrono::seconds(3))) {
+      WARN("call upload events service not avalible!");
+      return false;
+    }
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string events = "{" + std::string("\"timestamp\": ") +
+      std::to_string(now_ms) + ", \"info\": " + state_str_ + "}";
+    INFO("upload events which selfcheck fialed is %s", events.c_str());
+    auto req = std::make_shared<protocol::srv::BesHttpSendFile::Request>();
+    req->method = protocol::srv::BesHttpSendFile::Request::HTTP_METHOD_POST;
+    req->url = "device/system/log";
+    req->info = events;
+    req->milsecs = 60000;  // 60s
+    auto future_result = upload_events_client_->async_send_request(req);
+    std::future_status status = future_result.wait_for(std::chrono::seconds(60));
+    if (status == std::future_status::ready) {
+      auto response = future_result.get()->data;
+      INFO("upload log respon: %s", response.c_str());
+    } else {
+      WARN("calling bes_http_send_file_srv service timeout!");
+      return false;
+    }
+    return true;
+  }
+
+  void SetExceptionPlaySoundCallback(EXCEPTION_PLAYSOUND_CALLBACK callback)
+  {
+    play_sound = callback;
+  }
+
+  void GetCriticalMoudle()
+  {
+    std::vector<std::string> sensor_vec_;
+    std::vector<std::string> device_vec_;
+    auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
+    auto path = local_share_dir + std::string("/toml_config/manager/selfcheck_config.toml");
+    toml::value config;
+    if (common::CyberdogToml::ParseFile(path, config)) {
+      INFO("Parse Selfcheck config file started, toml file is valid");
+      toml::value sensors_sec;
+      if (common::CyberdogToml::Get(config, "sensors", sensors_sec)) {
+        INFO("Selfheck init started, parse sensors config succeed");
+        if (common::CyberdogToml::Get(sensors_sec, "critical", critical_sensor_)) {
+          INFO("Self Check init started, parse sensors jump array succeed");
+        }
+      }
+      toml::value device_sec;
+      if (common::CyberdogToml::Get(config, "devices", device_sec)) {
+        INFO("Selfcheck init started, parse devices config succeed");
+        if (common::CyberdogToml::Get(device_sec, "critical", critical_device_)) {
+          INFO("Selfcheck init started, parse device jump array succeed");
+        }
+      }
+    }
+  }
+
+  bool IsSelfcheckError(const std::map<std::string, int32_t> & stmap)
+  {
+    for (const auto & [moudle, code] : stmap) {
+      (void)moudle;
+      if (code != 0) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool IsCriticalError(const std::map<std::string, int32_t> & stmap)
+  {
+    for (const auto & [module, code] : stmap) {
+      INFO("[moudle,code]:[%s, %d]", module.c_str(), code);
+      if (0 == code) {
+        continue;
+      }
+
+      if ("motion_manager" == module || "audio_manager" == module) {
+        play_sound(code);
+        return true;
+      }
+
+      if ("device_manager" == module) {
+        std::vector<int> error_code;
+        for (auto n : critical_device_) {
+          auto itr = module_map_.find(n);
+          if (itr != module_map_.end()) {
+            error_code.emplace_back(static_cast<int>(itr->second));
+          }
+          INFO("critical devices array is %s", n.c_str());
+        }
+
+        if (std::find(error_code.begin(), error_code.end(), code) != error_code.end()) {
+          play_sound(code);
+          return true;
+        }
+      }
+
+      if ("sensor_manager" == module) {
+        std::vector<int> error_code;
+        for (auto n : critical_sensor_) {
+          auto itr = module_map_.find(n);
+          if (itr != module_map_.end()) {
+            error_code.emplace_back(static_cast<int>(itr->second));
+          }
+          INFO("critical sensors array is %s", n.c_str());
+        }
+
+        if (std::find(error_code.begin(), error_code.end(), code) == error_code.end()) {
+          play_sound(code);
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+
+  void StoreSelfcheckResults()
+  {
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    auto path = SELFCHECK_DIR + "/" + FILE_NAME;
+    if (access(SELFCHECK_DIR.c_str(), F_OK) != 0) {
+      std::string cmd = "mkdir -p " + SELFCHECK_DIR;
+      std::system(cmd.c_str());
+      cmd = "chmod 777 " + SELFCHECK_DIR;
+      std::system(cmd.c_str());
+    }
+    CyberdogJson::WriteJsonToFile(path, selfcheck_info_);
+  }
+
   std::string UpSelfCheckState(const int32_t state, const std::map<std::string, int32_t> & stmap)
   {
     int32_t value {0};
-    std::string state_str {};
     Document self_check_state(kObjectType);
     Document device(kObjectType);
     Document sensor(kObjectType);
@@ -151,10 +320,12 @@ public:
     CyberdogJson::Add(device, "touch", value);
     CyberdogJson::Add(device, "uwb", value);
     CyberdogJson::Add(device, "bluetooth", value);
+    CyberdogJson::Add(device, "others", value);
     CyberdogJson::Add(sensor, "lidar", value);
-    CyberdogJson::Add(sensor, "gps", value);
-    CyberdogJson::Add(sensor, "ultrasonic", value);
+    // CyberdogJson::Add(sensor, "gps", value);
+    // CyberdogJson::Add(sensor, "ultrasonic", value);
     CyberdogJson::Add(sensor, "tof", value);
+    CyberdogJson::Add(sensor, "others", value);
     CyberdogJson::Add(self_check_state, "audio", value);
     CyberdogJson::Add(self_check_state, "motion_manager", value);
     if (3 == state) {
@@ -163,56 +334,107 @@ public:
     CyberdogJson::Add(self_check_state, "algorithm_manager", value);
     CyberdogJson::Add(self_check_state, "vp_engine", value);
     CyberdogJson::Add(self_check_state, "RealSenseActuator", value);
-    if (2 == state || 4 == state) {
-      for (const auto & n : stmap) {
-        if (n.first == "algorithm_manager") {
+    if (2 == state || 4 == state || 6 == state) {
+      for (const auto & [moudle, code] : stmap) {
+        if (moudle == "algorithm_manager") {
           Value & tmp = self_check_state["algorithm_manager"];
-          tmp.SetInt(n.second);
+          tmp.SetInt(code);
           continue;
         }
-        if (n.first == "device_manager") {
-          Value & tmp = device["bms"];
-          tmp.SetInt(n.second);
-          Value & tmp2 = device["led"];
-          tmp2.SetInt(n.second);
-          Value & tmp3 = device["touch"];
-          tmp3.SetInt(n.second);
-          Value & tmp4 = device["uwb"];
-          tmp4.SetInt(n.second);
+        if (moudle == "device_manager") {
+          switch (static_cast<ErrorCode>(code)) {
+            case kLedSelfcheckError: {
+                Value & tmp = device["led"];
+                tmp.SetInt(static_cast<int>(kLedSelfcheckError));
+                break;
+              }
+            case kBmsSelfcheckError: {
+                Value & tmp = device["bms"];
+                tmp.SetInt(static_cast<int>(kBmsSelfcheckError));
+                break;
+              }
+            case kTouchSelfcheckError: {
+                Value & tmp = device["touch"];
+                tmp.SetInt(static_cast<int>(kTouchSelfcheckError));
+                break;
+              }
+            case kUWBSelfcheckError: {
+                Value & tmp = device["uwb"];
+                tmp.SetInt(static_cast<int>(kUWBSelfcheckError));
+                break;
+              }
+            case kLedAndUWBSelfcheckError: {
+                Value & tmp = device["led"];
+                tmp.SetInt(static_cast<int>(kLedSelfcheckError));
+                Value & tmp2 = device["uwb"];
+                tmp2.SetInt(static_cast<int>(kUWBSelfcheckError));
+                break;
+              }
+            case kTofAndLidarSelfcheckError:
+            case kTofSelfcheckError:
+            case kLidarSelfcheckError:
+            default: {
+                Value & tmp = device["others"];
+                tmp.SetInt(static_cast<int>(code));
+                break;
+              }
+          }
           continue;
         }
-        if (n.first == "motion_manager") {
+        if (moudle == "motion_manager") {
           Value & tmp = self_check_state["motion_manager"];
-          tmp.SetInt(n.second);
+          tmp.SetInt(code);
           continue;
         }
-        if (n.first == "sensor_manager") {
-          Value & tmp = sensor["lidar"];
-          tmp.SetInt(n.second);
-          Value & tmp2 = sensor["gps"];
-          tmp2.SetInt(n.second);
-          Value & tmp3 = sensor["ultrasonic"];
-          tmp3.SetInt(n.second);
-          Value & tmp4 = sensor["tof"];
-          tmp4.SetInt(n.second);
+        if (moudle == "sensor_manager") {
+          switch (static_cast<ErrorCode>(code)) {
+            case kLidarSelfcheckError: {
+                Value & tmp = sensor["lidar"];
+                tmp.SetInt(static_cast<int>(kLidarSelfcheckError));
+                break;
+              }
+            case kTofSelfcheckError: {
+                Value & tmp = sensor["tof"];
+                tmp.SetInt(static_cast<int>(kTofSelfcheckError));
+                break;
+              }
+            case kTofAndLidarSelfcheckError: {
+                Value & tmp = sensor["lidar"];
+                tmp.SetInt(static_cast<int>(kLidarSelfcheckError));
+                Value & tmp2 = sensor["tof"];
+                tmp2.SetInt(static_cast<int>(kTofSelfcheckError));
+                break;
+              }
+            case kLedSelfcheckError:
+            case kBmsSelfcheckError:
+            case kTouchSelfcheckError:
+            case kUWBSelfcheckError:
+            case kLedAndUWBSelfcheckError:
+            default: {
+                Value & tmp = sensor["others"];
+                tmp.SetInt(static_cast<int>(code));
+                break;
+              }
+          }
           continue;
         }
-        if (n.first == "vp_engine") {
+        if (moudle == "vp_engine") {
           Value & tmp = self_check_state["vp_engine"];
-          tmp.SetInt(n.second);
+          tmp.SetInt(code);
           continue;
         }
-        if (n.first == "RealSenseActuator") {
+        if (moudle == "RealSenseActuator") {
           Value & tmp = self_check_state["RealSenseActuator"];
-          tmp.SetInt(n.second);
+          tmp.SetInt(code);
           continue;
         }
       }
     }
     self_check_state.AddMember("device", device, allocator);
     self_check_state.AddMember("sensor", sensor, allocator);
-    CyberdogJson::Document2String(self_check_state, state_str);
-    return state_str;
+    CyberdogJson::Document2String(self_check_state, state_str_);
+    selfcheck_info_.CopyFrom(self_check_state, allocator);
+    return state_str_;
   }
 
   void MachineState(int32_t state)
@@ -278,7 +500,6 @@ public:
     }
   }
 
-
   void BmsStatus(const protocol::msg::BmsStatus::SharedPtr msg)
   {
     is_charging = msg->power_wired_charging;
@@ -314,10 +535,27 @@ private:
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr app_connect_state_sub_;
   rclcpp::Client<protocol::srv::MotionResultCmd>::SharedPtr motion_excute_client_;
   rclcpp::Client<protocol::srv::AudioTextPlay>::SharedPtr audio_play_client_ {nullptr};
+  rclcpp::Client<protocol::srv::BesHttpSendFile>::SharedPtr upload_events_client_ {nullptr};
   std::thread notify_message_thread;
   std::thread notify_selfcheck_thread;
   int count_;
   int cyberdog_standing_ {0};
+  std::string state_str_ {};
+  EXCEPTION_PLAYSOUND_CALLBACK play_sound {[](int32_t) {}};
+  rapidjson::Document selfcheck_info_;
+  const std::string SELFCHECK_DIR {"/home/mi/.ros/log"};
+  const std::string FILE_NAME {"last_selfcheck_info.json"};
+  std::vector<std::string> critical_sensor_;
+  std::vector<std::string> critical_device_;
+  const std::map<std::string, ErrorCode> module_map_ {
+    {"led", kLedSelfcheckError},
+    {"bms", kBmsSelfcheckError},
+    {"touch", kTouchSelfcheckError},
+    {"lidar", kLidarSelfcheckError},
+    {"tof", kBmsSelfcheckError},
+    // {"Ultrasnoic", kUltrasnoicSelfcheckError},
+    // {"Gps", kGpsSelfcheckError},
+  };
 };
 }  // namespace manager
 }  // namespace cyberdog
