@@ -181,7 +181,8 @@ public:
     int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::system_clock::now().time_since_epoch()).count();
     std::string events = "{" + std::string("\"timestamp\": ") +
-      std::to_string(now_ms) + ", \"info\": " + state_str_ + "}";
+      std::to_string(now_ms) + std::string(" , \"type\": \"selfcheck\"") +
+      ", \"info\": " + state_str_ + "}";
     INFO("upload events which selfcheck fialed is %s", events.c_str());
     auto req = std::make_shared<protocol::srv::BesHttpSendFile::Request>();
     req->method = protocol::srv::BesHttpSendFile::Request::HTTP_METHOD_POST;
@@ -207,8 +208,6 @@ public:
 
   void GetCriticalMoudle()
   {
-    std::vector<std::string> sensor_vec_;
-    std::vector<std::string> device_vec_;
     auto local_share_dir = ament_index_cpp::get_package_share_directory("params");
     auto path = local_share_dir + std::string("/toml_config/manager/selfcheck_config.toml");
     toml::value config;
@@ -282,7 +281,7 @@ public:
           INFO("critical sensors array is %s", n.c_str());
         }
 
-        if (std::find(error_code.begin(), error_code.end(), code) == error_code.end()) {
+        if (std::find(error_code.begin(), error_code.end(), code) != error_code.end()) {
           play_sound(code);
           return true;
         }
@@ -368,6 +367,10 @@ public:
                 tmp.SetInt(static_cast<int>(kLedSelfcheckError));
                 Value & tmp2 = device["uwb"];
                 tmp2.SetInt(static_cast<int>(kUWBSelfcheckError));
+                Value & tmp3 = device["others"];
+                tmp3.SetInt(
+                  static_cast<int>(kUWBSelfcheckError) +
+                  static_cast<int>(kLedSelfcheckError));
                 break;
               }
             case kTofAndLidarSelfcheckError:
@@ -403,6 +406,10 @@ public:
                 tmp.SetInt(static_cast<int>(kLidarSelfcheckError));
                 Value & tmp2 = sensor["tof"];
                 tmp2.SetInt(static_cast<int>(kTofSelfcheckError));
+                Value & tmp3 = sensor["others"];
+                tmp3.SetInt(
+                  static_cast<int>(kLidarSelfcheckError) +
+                  static_cast<int>(kTofSelfcheckError));
                 break;
               }
             case kLedSelfcheckError:
