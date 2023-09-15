@@ -155,7 +155,7 @@ public:
       // 控制铁蛋高阻尼趴下,电机下电
       PlayAudio("铁蛋即将趴下后进行断电，请注意安全");
       sleep(4);
-      MotionContrl(101);
+      MotionContrl(102);
       code = lpc_ptr_->LpcRelease(pd, &err);
       response->success = (code ? false : true);
       INFO("motor shutdown is %s, code is %d", (code ? "failed" : "successed"), code);

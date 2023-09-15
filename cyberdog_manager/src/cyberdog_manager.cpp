@@ -90,7 +90,7 @@ bool cyberdog::manager::CyberdogManager::Init()
   query_node_ptr_->Report(true);
   query_node_ptr_->Init();
   // 开始自检
-  ready_node_ptr->SelfCheck(1, selfcheck_status_);
+  ready_node_ptr->SelfCheck(SelfcheckState::HARDWARE_CHECKING, selfcheck_status_);
   error_context_ptr_->Init();
   // 硬件setup
   mssc_context_ptr_->ExecuteSetUp(false);
@@ -99,6 +99,10 @@ bool cyberdog::manager::CyberdogManager::Init()
       &PowerConsumptionInfoNode::EnterLowPower, power_consumption_node_ptr,
       std::placeholders::_1));
   mssc_context_ptr_->SetExceptionPlaySoundCallback(
+    std::bind(
+      &AudioInfoNode::SpeechNotify, audio_node_ptr,
+      std::placeholders::_1));
+  ready_node_ptr->SetExceptionPlaySoundCallback(
     std::bind(
       &AudioInfoNode::SpeechNotify, audio_node_ptr,
       std::placeholders::_1));
@@ -112,23 +116,46 @@ bool cyberdog::manager::CyberdogManager::Init()
       std::placeholders::_1, std::placeholders::_2));
   error_context_ptr_->ClearError();
   Config();
-  if (!mssc_context_ptr_->ExecuteSelfCheck(selfcheck_status_)) {
+  mssc_context_ptr_->ExecuteSelfCheck(selfcheck_status_);
+  if (ready_node_ptr->IsSelfcheckError(selfcheck_status_)) {
     ERROR(">>>XXXXX--- hardware machine state self check error!");
-    ready_node_ptr->SelfCheck(2, selfcheck_status_);
+    if (ready_node_ptr->IsCriticalError(selfcheck_status_)) {
+      ready_node_ptr->SelfCheck(SelfcheckState::CRITICAL_HARDWARE_FAILED, selfcheck_status_);
+      ready_node_ptr->UploadEvents();
+    } else {
+      ready_node_ptr->SelfCheck(SelfcheckState::UNCRITICAL_HARDWARE_FAILED, selfcheck_status_);
+      OnActive();
+      while (1 == ready_node_ptr->GetAudioOccupancyState()) {
+        INFO("Waiting for the audio to stop");
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      }
+      audio_node_ptr->Init();
+      // 软件setup
+      mssc_context_ptr_->ExecuteSetUp(true);
+      OnActive();
+      ready_node_ptr->SelfCheck(SelfcheckState::SOFTWARE_SETUP_SUCCESS, selfcheck_status_);
+      audio_node_ptr->SpeechNotify(5300);
+      ready_node_ptr->UploadEvents();
+    }
   } else {
-    audio_node_ptr->Init();
-    ready_node_ptr->SelfCheck(3, selfcheck_status_);
     OnActive();
+    ready_node_ptr->SelfCheck(SelfcheckState::HARDWARE_SUCCESS, selfcheck_status_);
+    while (1 == ready_node_ptr->GetAudioOccupancyState()) {
+      INFO("Waiting for the audio to stop");
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+    audio_node_ptr->Init();
     // 软件setup
     mssc_context_ptr_->ExecuteSetUp(true);
     OnActive();
-    ready_node_ptr->SelfCheck(0, selfcheck_status_);
+    ready_node_ptr->SelfCheck(SelfcheckState::ALL_SUCCESS, selfcheck_status_);
     audio_node_ptr->SpeechNotify(5300);
   }
   power_consumption_node_ptr->Init();
   mssc_context_ptr_->Init();
   heart_beat_ptr_->Init();
   bcin_node_ptr->Init();
+  ready_node_ptr->StoreSelfcheckResults();
   return true;
 }
 
