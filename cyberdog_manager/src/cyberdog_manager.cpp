@@ -151,7 +151,6 @@ bool cyberdog::manager::CyberdogManager::Init()
     ready_node_ptr->SelfCheck(SelfcheckState::ALL_SUCCESS, selfcheck_status_);
     audio_node_ptr->SpeechNotify(5300);
   }
-  OnActive();
   power_consumption_node_ptr->Init();
   mssc_context_ptr_->Init();
   heart_beat_ptr_->Init();
