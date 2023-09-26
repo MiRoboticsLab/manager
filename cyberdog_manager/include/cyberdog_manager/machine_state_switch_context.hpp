@@ -434,7 +434,7 @@ private:
         }
         machine_state_keep_ = true;
         prohibit_shutdown_ = true;
-        INFO("[MachineState-Switch]: keep machine state to start");
+        INFO("[MachineState-Switch]: keep machine state to start, duration is %ds", request->ticks);
         keep_timer_ = mssc_node_->create_wall_timer(
           std::chrono::seconds(request->ticks),
           std::bind(&MachineStateSwitchContext::KeepTimerCallback, this), timer_callback_group_);
@@ -445,6 +445,15 @@ private:
       response->success = true;
       response->code = 0;
     } else {
+      // 复用服务接口，强行退出状态保持
+      if (request->ticks == 0) {
+        machine_state_keep_ = false;
+        prohibit_shutdown_ = false;
+        INFO("[MachineState-Switch]: request received, keep machine state to stop");
+        response->success = true;
+        response->code = 0;
+        return;
+      }
       response->success = true;
       response->code = -1;
     }
