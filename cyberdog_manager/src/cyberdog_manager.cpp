@@ -44,7 +44,8 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
   power_consumption_node_ptr = std::make_shared<PowerConsumptionInfoNode>(
     node_ptr_,
     std::bind(&MachineStateSwitchContext::KeepDownOverTime, mssc_context_ptr_));
-  ready_node_ptr = std::make_unique<ReadyNotifyNode>(name_ + "_ready");
+  // ready_node_ptr = std::make_unique<ReadyNotifyNode>(name_ + "_ready");
+  ready_node_ptr = std::make_unique<ReadyNotifyNode>(node_ptr_);
   heart_beat_ptr_ = std::make_unique<cyberdog::manager::HeartContext>(
     node_ptr_,
     std::bind(&CyberdogManager::SetState, this, std::placeholders::_1, std::placeholders::_2));
@@ -79,21 +80,29 @@ bool cyberdog::manager::CyberdogManager::Init()
   while (!exit_lowpower && exit_times < 3) {
     if (power_consumption_node_ptr->QueryLowPower()) {
       exit_lowpower = power_consumption_node_ptr->EnterLowPower(false);
+      INFO("exit lowpower:%s", (exit_lowpower ? "true" : "false"));
       std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     } else {
       exit_lowpower = true;
     }
-    INFO("exit lowpower:%s", (exit_lowpower ? "true" : "false"));
     ++exit_times;
   }
-  ready_node_ptr->SelfCheck(1, selfcheck_status_);
+  query_node_ptr_->Report(true);
+  query_node_ptr_->Init();
+  // 开始自检
+  ready_node_ptr->SelfCheck(SelfcheckState::HARDWARE_CHECKING, selfcheck_status_);
   error_context_ptr_->Init();
-  mssc_context_ptr_->ExecuteSetUp();
+  // 硬件setup
+  mssc_context_ptr_->ExecuteSetUp(false);
   mssc_context_ptr_->SetLowpowerEnterAndExitCallback(
     std::bind(
       &PowerConsumptionInfoNode::EnterLowPower, power_consumption_node_ptr,
       std::placeholders::_1));
   mssc_context_ptr_->SetExceptionPlaySoundCallback(
+    std::bind(
+      &AudioInfoNode::SpeechNotify, audio_node_ptr,
+      std::placeholders::_1));
+  ready_node_ptr->SetExceptionPlaySoundCallback(
     std::bind(
       &AudioInfoNode::SpeechNotify, audio_node_ptr,
       std::placeholders::_1));
@@ -107,21 +116,46 @@ bool cyberdog::manager::CyberdogManager::Init()
       std::placeholders::_1, std::placeholders::_2));
   error_context_ptr_->ClearError();
   Config();
-  if (!mssc_context_ptr_->ExecuteSelfCheck(selfcheck_status_)) {
-    ERROR(">>>XXXXX---machine state self check error!");
-    // audio_node_ptr->Error("自检失败!自检失败!自检失败!");
-    ready_node_ptr->SelfCheck(2, selfcheck_status_);
-    return false;
+  mssc_context_ptr_->ExecuteSelfCheck(selfcheck_status_);
+  if (ready_node_ptr->IsSelfcheckError(selfcheck_status_)) {
+    ERROR(">>>XXXXX--- hardware machine state self check error!");
+    if (ready_node_ptr->IsCriticalError(selfcheck_status_)) {
+      ready_node_ptr->SelfCheck(SelfcheckState::CRITICAL_HARDWARE_FAILED, selfcheck_status_);
+      ready_node_ptr->UploadEvents();
+    } else {
+      ready_node_ptr->SelfCheck(SelfcheckState::UNCRITICAL_HARDWARE_FAILED, selfcheck_status_);
+      OnActive();
+      while (1 == ready_node_ptr->GetAudioOccupancyState()) {
+        INFO("Waiting for the audio to stop");
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      }
+      audio_node_ptr->Init();
+      // 软件setup
+      mssc_context_ptr_->ExecuteSetUp(true);
+      OnActive();
+      ready_node_ptr->SelfCheck(SelfcheckState::SOFTWARE_SETUP_SUCCESS, selfcheck_status_);
+      audio_node_ptr->SpeechNotify(5300);
+      ready_node_ptr->UploadEvents();
+    }
   } else {
+    OnActive();
+    ready_node_ptr->SelfCheck(SelfcheckState::HARDWARE_SUCCESS, selfcheck_status_);
+    while (1 == ready_node_ptr->GetAudioOccupancyState()) {
+      INFO("Waiting for the audio to stop");
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
     audio_node_ptr->Init();
-    ready_node_ptr->SelfCheck(0, selfcheck_status_);
+    // 软件setup
+    mssc_context_ptr_->ExecuteSetUp(true);
+    OnActive();
+    ready_node_ptr->SelfCheck(SelfcheckState::ALL_SUCCESS, selfcheck_status_);
+    audio_node_ptr->SpeechNotify(5300);
   }
-  OnActive();
   power_consumption_node_ptr->Init();
-  query_node_ptr_->Init();
-  bcin_node_ptr->Init();
   mssc_context_ptr_->Init();
   heart_beat_ptr_->Init();
+  bcin_node_ptr->Init();
+  ready_node_ptr->StoreSelfcheckResults();
   return true;
 }
 
@@ -142,9 +176,9 @@ void cyberdog::manager::CyberdogManager::OnActive()
 {
   INFO("trigger state:on active");
   bool result = mssc_context_ptr_->ExecuteActive();
-  query_node_ptr_->Report(true);
+  mssc_context_ptr_->KeepMsState();
   if (result) {
-    INFO("!!! All node in detectedc machine state is acitve ok !!!");
+    INFO("!!! All node in detected machine state is acitve ok !!!");
     ready_node_ptr->Ready(true);
     ready_node_ptr->MachineState(0);
   } else {

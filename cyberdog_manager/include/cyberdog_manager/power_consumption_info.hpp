@@ -17,6 +17,7 @@
 #include <string>
 #include <memory>
 #include <chrono>
+#include <mutex>
 #include "rclcpp/rclcpp.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 #include "std_srvs/srv/trigger.hpp"
@@ -24,6 +25,8 @@
 #include "protocol/msg/motion_status.hpp"
 #include "low_power_consumption/low_power_consumption.hpp"
 #include "protocol/msg/state_switch_status.hpp"
+#include "protocol/msg/audio_play_extend.hpp"
+#include "protocol/srv/motion_result_cmd.hpp"
 
 namespace cyberdog
 {
@@ -49,10 +52,27 @@ public:
     lpc_ptr_ = std::make_unique<cyberdog::manager::LowPowerConsumption>();
     power_consumption_callback_group_ =
       power_consumption_info_node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+    rclcpp::PublisherOptions pub_options;
+    pub_options.callback_group = power_consumption_callback_group_;
     led_excute_client_ =
       power_consumption_info_node_->create_client<protocol::srv::LedExecute>(
       "led_execute",
       rmw_qos_profile_services_default, power_consumption_callback_group_);
+    motion_excute_client_ =
+      power_consumption_info_node_->create_client<protocol::srv::MotionResultCmd>(
+      "motion_result_cmd",
+      rmw_qos_profile_services_default, power_consumption_callback_group_);
+    dog_leg_calibration_srv_ =
+      power_consumption_info_node_->create_service<std_srvs::srv::SetBool>(
+      "dog_leg_calibration",
+      std::bind(
+        &PowerConsumptionInfoNode::MotorControl, this, std::placeholders::_1,
+        std::placeholders::_2),
+      rmw_qos_profile_services_default, power_consumption_callback_group_);
+    audio_play_extend_pub_ =
+      power_consumption_info_node_->create_publisher<protocol::msg::AudioPlayExtend>(
+      "speech_play_extend",
+      rclcpp::SystemDefaultsQoS(), pub_options);
 
     // sub motion init
     rclcpp::SubscriptionOptions options;
@@ -116,6 +136,75 @@ public:
       ++r_count;
     }
     return result;
+  }
+
+  void MotorControl(
+    const std_srvs::srv::SetBool::Request::SharedPtr request,
+    std_srvs::srv::SetBool::Response::SharedPtr response)
+  {
+    if (!motor_mutex_.try_lock()) {
+      WARN(
+        "The motor is powering %s and rejecting duplicate requests",
+        (request->data ? "up" : "down"));
+      return;
+    }
+    PM_DEV pd = PM_MOTOR;
+    int code = -1;
+    unsigned int err;
+    if (!request->data) {
+      // 控制铁蛋高阻尼趴下,电机下电
+      PlayAudio("铁蛋即将趴下后进行断电，请注意安全");
+      sleep(4);
+      MotionContrl(102);
+      code = lpc_ptr_->LpcRelease(pd, &err);
+      response->success = (code ? false : true);
+      INFO("motor shutdown is %s, code is %d", (code ? "failed" : "successed"), code);
+      if (code != 0) {
+        return;
+      }
+      PlayAudio("断电成功，请帮我把腿摆放正常后，点击上电");
+    } else {
+      // 电机上电
+      code = lpc_ptr_->LpcRequest(pd, &err);
+      response->success = (code ? false : true);
+      if (code != 0) {
+        return;
+      }
+      PlayAudio("铁蛋上电成功后将站立，请注意安全");
+      sleep(3);
+      MotionContrl(111);
+      INFO("motor start is %s, code is %d", (code ? "failed" : "successed"), code);
+    }
+    motor_mutex_.unlock();
+  }
+
+  void PlayAudio(const std::string & text)
+  {
+    protocol::msg::AudioPlayExtend msg;
+    msg.is_online = true;
+    msg.module_name = power_consumption_info_node_->get_name();
+    msg.text = text;
+    audio_play_extend_pub_->publish(msg);
+  }
+
+  bool MotionContrl(const int motion_id)
+  {
+    if (!motion_excute_client_->wait_for_service(std::chrono::seconds(5))) {
+      ERROR("call led_excute server not avalible");
+      return false;
+    }
+    auto request_motion = std::make_shared<protocol::srv::MotionResultCmd::Request>();
+    request_motion->motion_id = motion_id;
+    request_motion->cmd_source = 0;
+    auto future_result_motion = motion_excute_client_->async_send_request(request_motion);
+    std::future_status status_motion = future_result_motion.wait_for(std::chrono::seconds(5));
+    if (status_motion == std::future_status::timeout) {
+      ERROR("call motion service failed");
+    }
+    if (future_result_motion.get()->code != 0) {
+      ERROR("control motion fialed, error code is:%d", future_result_motion.get()->code);
+    }
+    return true;
   }
 
   bool QueryLowPower()
@@ -216,8 +305,11 @@ private:
   rclcpp::Node::SharedPtr power_consumption_info_node_ {nullptr};
   rclcpp::CallbackGroup::SharedPtr power_consumption_callback_group_;
   rclcpp::Client<protocol::srv::LedExecute>::SharedPtr led_excute_client_;
+  rclcpp::Client<protocol::srv::MotionResultCmd>::SharedPtr motion_excute_client_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr dog_leg_calibration_srv_;
   std::unique_ptr<cyberdog::manager::LowPowerConsumption> lpc_ptr_ {nullptr};
   rclcpp::Subscription<protocol::msg::MotionStatus>::SharedPtr motion_status_sub_ {nullptr};
+  rclcpp::Publisher<protocol::msg::AudioPlayExtend>::SharedPtr audio_play_extend_pub_ {nullptr};
   rclcpp::Subscription<protocol::msg::StateSwitchStatus>::SharedPtr \
     state_swith_status_sub_ {nullptr};
   PCIN_CALLBACK request_handler;
@@ -228,6 +320,7 @@ private:
   bool is_ota_ {false};
   int enter_lowpower_time_ {30};
   std::chrono::steady_clock::time_point start;
+  std::mutex motor_mutex_;
 };
 }  // namespace manager
 }  // namespace cyberdog

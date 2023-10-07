@@ -94,18 +94,6 @@ public:
     auto mcpim_iter = module_code_play_id_map.find(code);
     if (mcpim_iter != module_code_play_id_map.end()) {
       uint16_t play_id = mcpim_iter->second;
-      bool is_self_check = ((code % 10) == 9) ? true : false;
-      if (is_self_check) {
-        std::chrono::seconds timeout(2);
-        auto req = std::make_shared<protocol::srv::SdcardPlayIdQuery::Request>();
-        req->play_id = play_id;
-        auto future_result = sdcard_playid_query_client_->async_send_request(req);
-        std::future_status status = future_result.wait_for(timeout);
-        if (status == std::future_status::ready) {
-        } else {
-          play_id = protocol::msg::AudioPlay::PID_SELF_CHECK_FAILED;
-        }
-      }
       std::chrono::seconds timeout(6);
       auto req = std::make_shared<protocol::srv::AudioTextPlay::Request>();
       req->module_name = audio_info_node_->get_name();
@@ -140,6 +128,8 @@ private:
     {1609, 31013},    // Uwb自检失败
     {5109, 31014},    // Audio自检失败
     {3009, 31015},    // Motion自检失败
+    // {4409, 31056},    // Realsense自检失败
+    {5300, 31058},    // algorithm加载完成
     {2403, 31016},    // GPS切换工作模式失败
     {2103, 31017},    // 雷达切换工作模式失败
     {2203, 31018},    // TOF切换工作模式失败

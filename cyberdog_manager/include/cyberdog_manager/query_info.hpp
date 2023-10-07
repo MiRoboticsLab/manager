@@ -18,12 +18,12 @@
 #include <memory>
 #include <vector>
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
 #include "cyberdog_common/cyberdog_json.hpp"
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/bool.hpp"
-#include "protocol/srv/ota_server_cmd.hpp"
 #include "protocol/srv/audio_volume_get.hpp"
 #include "protocol/srv/audio_execute.hpp"
 #include "protocol/srv/motor_temp.hpp"
@@ -35,6 +35,7 @@
 #include "protocol/srv/uid_sn.hpp"
 #include "protocol/srv/audio_nick_name.hpp"
 #include "protocol/srv/trigger.hpp"
+#include "protocol/action/over_the_air.hpp"
 
 using cyberdog::common::CyberdogJson;
 using rapidjson::Document;
@@ -70,10 +71,6 @@ public:
       query_node_ptr_->create_client<std_srvs::srv::Trigger>(
       "get_dog_sn",
       rmw_qos_profile_services_default, qdev_callback_group_);
-    ota_ver_get_srv_ =
-      query_node_ptr_->create_client<protocol::srv::OtaServerCmd>(
-      "ota_versions",
-      rmw_qos_profile_services_default, qdev_callback_group_);
     audio_volume_get_client_ =
       query_node_ptr_->create_client<protocol::srv::AudioVolumeGet>(
       "audio_volume_get",
@@ -98,6 +95,9 @@ public:
       query_node_ptr_->create_client<std_srvs::srv::Trigger>(
       "low_power_switch_state",
       rmw_qos_profile_services_default, qdev_callback_group_);
+    version_get_client_ = rclcpp_action::create_client<protocol::action::OverTheAir>(
+      query_node_ptr_,
+      "cyberdog_ota_action");
   }
 
   ~QueryInfo()
@@ -236,31 +236,12 @@ public:
       CyberdogJson::Add(json_info, "sn", sn_);
     }
     if (is_version) {
-      if (!ota_ver_get_srv_->wait_for_service(std::chrono::seconds(2))) {
-        ERROR("call ota version not avalible");
-        Document version_doc(kObjectType);
-        CyberdogJson::Add(json_info, "version", version_doc);
-      } else {
-        std::chrono::seconds timeout(3);
-        auto req = std::make_shared<protocol::srv::OtaServerCmd::Request>();
-        req->request.key = "ota_command_version_query";
-        auto future_result = ota_ver_get_srv_->async_send_request(req);
-        std::future_status status = future_result.wait_for(timeout);
-        if (status == std::future_status::ready) {
-          std::string version = future_result.get()->response.value;
-          Document version_doc(kObjectType);
-          if (!CyberdogJson::String2Document(version, version_doc)) {
-            ERROR("error while encoding version info to json");
-            CyberdogJson::Add(version_doc, "version", version_doc);
-          } else {
-            CyberdogJson::Add(json_info, "version", version_doc);
-          }
-        } else {
-          Document version_doc(kObjectType);
-          ERROR("call ota version failed!");
-          CyberdogJson::Add(json_info, "version", version_doc);
-        }
+      if (version_.empty()) {
+        GetVersion();
       }
+      Document version_doc(kObjectType);
+      CyberdogJson::String2Document(version_, version_doc);
+      CyberdogJson::Add(json_info, "version", version_doc);
     }
     if (is_uid) {
       CyberdogJson::Add(json_info, "uid", uid_);
@@ -362,7 +343,7 @@ public:
     if (is_bat_info) {
       rapidjson::Value bat_val(rapidjson::kObjectType);
       Document::AllocatorType & allocator = json_info.GetAllocator();
-      bat_val.AddMember("capacity", bms_status_.batt_volt, allocator);
+      bat_val.AddMember("capacity", 4500, allocator);
       bat_val.AddMember("power", bms_status_.batt_soc, allocator);
       bat_val.AddMember("voltage", bms_status_.batt_volt, allocator);
       bat_val.AddMember("temperature", bms_status_.batt_temp, allocator);
@@ -523,6 +504,46 @@ public:
     return info;
   }
 
+  void GetVersion()
+  {
+    if (!version_get_client_->wait_for_action_server(std::chrono::seconds(5))) {
+      ERROR("call ota version not avalible");
+    } else {
+      auto goal = protocol::action::OverTheAir::Goal();
+      goal.id = "query_divice_info";
+      goal.operate = "inquire";
+      goal.user = "cyberdog_manager";
+      auto send_goal_options =
+        rclcpp_action::Client<protocol::action::OverTheAir>::SendGoalOptions();
+      using GoalHandleOverTheAir = rclcpp_action::ClientGoalHandle<protocol::action::OverTheAir>;
+      auto get_result = [&](const GoalHandleOverTheAir::WrappedResult & result) -> void {
+          if (result.code != rclcpp_action::ResultCode::SUCCEEDED) {
+            ERROR("get version failed");
+            return;
+          }
+          const std::string version = result.result->result_msg;
+          rapidjson::Document tmp_doc;
+          rapidjson::Value tem_val;
+          std::string tmp_version;
+          if (version.empty()) {
+            INFO("query version is empty");
+            return;
+          }
+          CyberdogJson::String2Document(version, tmp_doc);
+          CyberdogJson::Get(tmp_doc, "version", tem_val);
+          CyberdogJson::Value2String(tem_val, tmp_version);
+          version_ = tmp_version;
+        };
+      send_goal_options.result_callback = get_result;
+      auto goal_handle_futrue = version_get_client_->async_send_goal(goal, send_goal_options);
+      std::future_status status = goal_handle_futrue.wait_for(std::chrono::seconds(3));
+      if (status != std::future_status::ready) {
+        WARN("query version is failed");
+      }
+    }
+    sleep(5);
+  }
+
 private:
   const std::string float_to_string(float & val)
   {
@@ -539,6 +560,7 @@ private:
   std::string node_name_;
   std::string sn_ {""};
   std::string uid_ {""};
+  std::string version_ {""};
   bool name_switch_ {false};
   std::string default_name_ {"铁蛋"};
   std::string nick_name_ {"铁蛋"};
@@ -547,13 +569,13 @@ private:
   std::unique_ptr<cyberdog::manager::WifiInfo> wifi_info_ptr_ {nullptr};
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sn_notify_sub_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_sn_ger_srv_;
-  rclcpp::Client<protocol::srv::OtaServerCmd>::SharedPtr ota_ver_get_srv_;
   rclcpp::Client<protocol::srv::AudioVolumeGet>::SharedPtr audio_volume_get_client_;
   rclcpp::Client<protocol::srv::AudioExecute>::SharedPtr audio_execute_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_action_get_client_;
   rclcpp::Client<protocol::srv::MotorTemp>::SharedPtr motor_temper_client_;
   rclcpp::Client<protocol::srv::Trigger>::SharedPtr audio_active_state_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr low_power_switch_state_client_;
+  rclcpp_action::Client<protocol::action::OverTheAir>::SharedPtr version_get_client_;
 };
 
 class QueryInfoNode final
@@ -649,7 +671,6 @@ public:
     std::thread(
       [this]() {
         while (rclcpp::ok()) {
-          std::this_thread::sleep_for(std::chrono::milliseconds(30000));
           if (!is_reporting_) {
             continue;
           }
@@ -692,6 +713,7 @@ public:
           INFO_ONCE("To back end server upload info:%s", msg.data.c_str());
           back_to_end_pub_->publish(msg);
           INFO("[stop:back to end upload device info-------------------]");
+          std::this_thread::sleep_for(std::chrono::milliseconds(30000));
         }
       }).detach();
   }
