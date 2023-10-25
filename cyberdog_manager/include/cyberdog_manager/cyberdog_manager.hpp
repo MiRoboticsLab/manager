@@ -41,6 +41,7 @@
 #include "cyberdog_manager/error_context.hpp"
 #include "cyberdog_manager/machine_state_switch_context.hpp"
 #include "cyberdog_manager/led_info.hpp"
+#include "cyberdog_manager/power_brd_info.hpp"
 
 namespace cyberdog
 {
@@ -79,6 +80,7 @@ private:
   std::unique_ptr<cyberdog::manager::ErrorContext> error_context_ptr_ {nullptr};
   std::shared_ptr<cyberdog::manager::MachineStateSwitchContext> mssc_context_ptr_ {nullptr};
   std::shared_ptr<BlackBox> black_box_ptr_ {nullptr};
+  std::shared_ptr<cyberdog::manager::PowerboardIndoNode> power_brd_node_ptr_ {nullptr};
 };  // class CyberdogManager
 }  // namespace manager
 }  // namespace cyberdog

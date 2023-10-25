@@ -83,10 +83,7 @@ public:
 
     if ((pre_battery_soc_ == 1 && battery_soc_ == 0) || start_battery_soc == 0) {
       if (!power_charging_) {
-        LedMode poweroff_head{true, "bms", 1, 0x01, 0xA3, 0x00, 0x00, 0x00};
-        LedMode poweroff_tail{true, "bms", 2, 0x01, 0xA3, 0x00, 0x00, 0x00};
-        LedMode poweroff_mini{true, "bms", 3, 0x02, 0x31, 0xFF, 0x00, 0x00};
-        bool result = ReqLedService(poweroff_head, poweroff_tail, poweroff_mini);
+        bool result = ShutdownLightEffect();
         INFO("%s set led when the soc is 0", result ? "successed" : "failed");
       }
     }
@@ -163,6 +160,14 @@ public:
     start_battery_soc = -1;
     pre_battery_soc_ = battery_soc_;
     pre_charging_status_ = power_charging_;
+  }
+
+  bool ShutdownLightEffect()
+  {
+    LedMode poweroff_head{true, "bms", 1, 0x01, 0xA3, 0x00, 0x00, 0x00};
+    LedMode poweroff_tail{true, "bms", 2, 0x01, 0xA3, 0x00, 0x00, 0x00};
+    LedMode poweroff_mini{true, "bms", 3, 0x02, 0x31, 0xFF, 0x00, 0x00};
+    return ReqLedService(poweroff_head, poweroff_tail, poweroff_mini);
   }
 
 private:
