@@ -721,7 +721,6 @@ private:
     };
     t.detach();
     response->success = true;
-
   }
 
   bool OnSelfCheck()

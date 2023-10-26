@@ -24,6 +24,8 @@
 #include <linux/can/raw.h>
 #include <linux/input.h>
 #include <thread>
+#include <string>
+#include <memory>
 
 #include "std_srvs/srv/trigger.hpp"
 #include "protocol/srv/motion_result_cmd.hpp"
@@ -152,7 +154,7 @@ private:
       }
       read(fd, &esync, sizeof(e));  // read sync event
       if (e.type == EV_KEY) {
-        if (e.value == 1) { // press down
+        if (e.value == 1) {  // press down
           if (WaitPowerKeyEvent(fd, 3, 0) <= 0) {
             INFO("[power_button]:powerkey long press");
             MotionContrl(102);  // Control the dog to lie down
@@ -162,7 +164,7 @@ private:
           } else {
             INFO("[power_button]:powerkey short press");
           }
-        } else {} // press up
+        } else {}  // press up
       }
     }
   }
@@ -215,8 +217,8 @@ private:
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr shutdown_client_;
   rclcpp::Client<protocol::srv::LedExecute>::SharedPtr led_excute_client_ {nullptr};
 };
-}
-}
+}  // namespace manager
+}  // namespace cyberdog
 
 
 #endif  // CYBERDOG_MANAGER__POWER_BRD_INFO_HPP_
