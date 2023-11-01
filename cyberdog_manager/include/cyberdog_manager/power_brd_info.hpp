@@ -29,7 +29,6 @@
 
 #include "std_srvs/srv/trigger.hpp"
 #include "protocol/srv/motion_result_cmd.hpp"
-#include "protocol/srv/led_execute.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 
@@ -52,10 +51,6 @@ public:
       rmw_qos_profile_services_default, power_brd_callback_group_);
     shutdown_client_ = power_brd_info_node_->create_client<std_srvs::srv::Trigger>(
       "poweroff",
-      rmw_qos_profile_services_default, power_brd_callback_group_);
-    led_excute_client_ =
-      power_brd_info_node_->create_client<protocol::srv::LedExecute>(
-      "led_execute",
       rmw_qos_profile_services_default, power_brd_callback_group_);
     Init();
   }
@@ -157,7 +152,9 @@ private:
         if (e.value == 1) {  // press down
           if (WaitPowerKeyEvent(fd, 3, 0) <= 0) {
             INFO("[power_button]:powerkey long press");
-            MotionContrl(102);  // Control the dog to lie down
+            // control_led_shutdown(true);
+            // INFO("call led finsihed");
+            // MotionContrl(102);  // Control the dog to lie down
             INFO("[power_button]: The dog has lied down");
             Shutdown();
             std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -188,6 +185,7 @@ private:
         "[power_button]:control motion fialed, error code is:%d",
         future_result_motion.get()->code);
     }
+    INFO("[power_button]:control motion success, return is %d", future_result_motion.get()->code);
     return true;
   }
 
@@ -215,7 +213,6 @@ private:
   rclcpp::CallbackGroup::SharedPtr power_brd_callback_group_;
   rclcpp::Client<protocol::srv::MotionResultCmd>::SharedPtr motion_excute_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr shutdown_client_;
-  rclcpp::Client<protocol::srv::LedExecute>::SharedPtr led_excute_client_ {nullptr};
 };
 }  // namespace manager
 }  // namespace cyberdog

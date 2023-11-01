@@ -117,7 +117,7 @@ bool cyberdog::manager::CyberdogManager::Init()
       std::placeholders::_1, std::placeholders::_2));
   mssc_context_ptr_->SetControlLedShutdownCallback(
     std::bind(
-      &LedInfoNode::ShutdownLightEffect, led_node_ptr));
+      &LedInfoNode::ShutdownLightEffect, led_node_ptr, std::placeholders::_1));
   error_context_ptr_->ClearError();
   Config();
   mssc_context_ptr_->ExecuteSelfCheck(selfcheck_status_);

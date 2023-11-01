@@ -136,7 +136,7 @@ class MachineStateSwitchContext final
   using SHUTDOWN_REBOOT_CALLBACK = std::function<int (bool)>;
   using EXCEPTION_PLAYSOUND_CALLBACK = std::function<void (int32_t )>;
   using CONTROL_TAIL_LED_CALLBACK = std::function<void (bool, bool)>;
-  using LED_SHUTDOWN_CALLBACK = std::function<bool ()>;
+  using LED_SHUTDOWN_CALLBACK = std::function<bool (bool)>;
 
 public:
   explicit MachineStateSwitchContext(rclcpp::Node::SharedPtr node_ptr)
@@ -667,7 +667,7 @@ private:
       return;
     }
     // 展示关机灯效
-    control_led_shutdown();
+    control_led_shutdown(true);
 
     // 先返回关机结果，再执行关机
     std::thread t_shutdown{[&]() {
@@ -701,7 +701,7 @@ private:
       return;
     }
     // 展示关机灯效
-    control_led_shutdown();
+    control_led_shutdown(true);
 
     std::thread t_reboot{[&]() {
         std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -889,7 +889,7 @@ private:
   EXCEPTION_PLAYSOUND_CALLBACK play_sound {[](int32_t) {}};
   SHUTDOWN_REBOOT_CALLBACK shutdown_or_reboot {[](bool) {return 0;}};
   CONTROL_TAIL_LED_CALLBACK control_tail_led {[](bool, bool) {}};
-  LED_SHUTDOWN_CALLBACK control_led_shutdown {[]() {return 0;}};
+  LED_SHUTDOWN_CALLBACK control_led_shutdown {[](bool) {return 0;}};
   std::unique_ptr<cyberdog::manager::StateContext> machine_state_ptr_ {nullptr};
   bool machine_state_keep_ {false};
   bool prohibit_shutdown_ {false};
