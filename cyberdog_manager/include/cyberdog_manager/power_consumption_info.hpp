@@ -197,7 +197,7 @@ public:
     request_motion->motion_id = motion_id;
     request_motion->cmd_source = 0;
     auto future_result_motion = motion_excute_client_->async_send_request(request_motion);
-    std::future_status status_motion = future_result_motion.wait_for(std::chrono::seconds(5));
+    std::future_status status_motion = future_result_motion.wait_for(std::chrono::seconds(10));
     if (status_motion == std::future_status::timeout) {
       ERROR("call motion service failed");
     }
