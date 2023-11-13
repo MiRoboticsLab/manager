@@ -29,6 +29,7 @@
 
 #include "std_srvs/srv/trigger.hpp"
 #include "protocol/srv/motion_result_cmd.hpp"
+#include "protocol/srv/bes_http_send_file.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "cyberdog_common/cyberdog_log.hpp"
 
@@ -45,12 +46,21 @@ public:
     power_brd_callback_group_ =
       power_brd_info_node_->create_callback_group(
       rclcpp::CallbackGroupType::MutuallyExclusive);
+
     motion_excute_client_ =
       power_brd_info_node_->create_client<protocol::srv::MotionResultCmd>(
       "motion_result_cmd",
       rmw_qos_profile_services_default, power_brd_callback_group_);
-    shutdown_client_ = power_brd_info_node_->create_client<std_srvs::srv::Trigger>(
+
+    shutdown_client_ =
+      power_brd_info_node_->create_client<std_srvs::srv::Trigger>(
       "poweroff",
+      rmw_qos_profile_services_default, power_brd_callback_group_);
+
+    bes_http_send_event_client_ =
+      power_brd_info_node_->create_client<
+      protocol::srv::BesHttpSendFile>(
+      "bes_http_send_file_srv",
       rmw_qos_profile_services_default, power_brd_callback_group_);
     Init();
   }
@@ -155,7 +165,7 @@ private:
             // control_led_shutdown(true);
             // INFO("call led finsihed");
             // MotionContrl(102);  // Control the dog to lie down
-            INFO("[power_button]: The dog has lied down");
+            SendEvent("shutdown by long pressing the powerkey");
             Shutdown();
             std::this_thread::sleep_for(std::chrono::seconds(1));
           } else {
@@ -208,11 +218,38 @@ private:
     return 0;
   }
 
+  bool SendEvent(const std::string & msg)
+  {
+    if (!bes_http_send_event_client_->wait_for_service(std::chrono::seconds(3))) {
+      WARN("bes_http_send_file_srv server not avalible");
+      return false;
+    }
+    int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string event = "{" + std::string("\"type\": \"shutdown\"") +
+      ", \"info\": " + msg + std::string(", \"timestamp\": ") +
+      std::to_string(now_ms) + "}";
+    auto request = std::make_shared<protocol::srv::BesHttpSendFile::Request>();
+    request->method = protocol::srv::BesHttpSendFile::Request::HTTP_METHOD_POST;
+    request->url = "device/system/log";
+    request->info = event;
+    request->milsecs = 10000;  // 10s
+    auto future_result = bes_http_send_event_client_->async_send_request(request);
+    std::future_status status = future_result.wait_for(std::chrono::seconds(5));
+    if (status != std::future_status::ready) {
+      WARN("call bes_http_send_file_srv service failed");
+      return false;
+    }
+    INFO("successed send event of shoutdown");
+    return true;
+  }
+
 private:
   rclcpp::Node::SharedPtr power_brd_info_node_{nullptr};
   rclcpp::CallbackGroup::SharedPtr power_brd_callback_group_;
   rclcpp::Client<protocol::srv::MotionResultCmd>::SharedPtr motion_excute_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr shutdown_client_;
+  rclcpp::Client<protocol::srv::BesHttpSendFile>::SharedPtr bes_http_send_event_client_;
 };
 }  // namespace manager
 }  // namespace cyberdog
