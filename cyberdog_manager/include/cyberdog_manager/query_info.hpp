@@ -350,6 +350,8 @@ public:
       bat_val.AddMember(
         "is_charging", (bms_status_.power_wired_charging || bms_status_.power_wp_charging),
         allocator);
+      bat_val.AddMember("charge_over_current", bms_status_.charge_over_current, allocator);
+      bat_val.AddMember("discharge_over_current", bms_status_.discharge_over_current, allocator);
       bat_val.AddMember("discharge_time", 120, allocator);
       CyberdogJson::Add(json_info, "bat_info", bat_val);
     }
