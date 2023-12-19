@@ -136,6 +136,7 @@ class MachineStateSwitchContext final
   using SHUTDOWN_REBOOT_CALLBACK = std::function<int (bool)>;
   using EXCEPTION_PLAYSOUND_CALLBACK = std::function<void (int32_t )>;
   using CONTROL_TAIL_LED_CALLBACK = std::function<void (bool, bool)>;
+  using LED_SHUTDOWN_CALLBACK = std::function<bool (bool)>;
 
 public:
   explicit MachineStateSwitchContext(rclcpp::Node::SharedPtr node_ptr)
@@ -306,6 +307,10 @@ public:
   {
     control_tail_led = callback;
   }
+  void SetControlLedShutdownCallback(LED_SHUTDOWN_CALLBACK callback)
+  {
+    control_led_shutdown = callback;
+  }
   void DogWakeup(const std_msgs::msg::Bool::SharedPtr msg)
   {
     if (machine_state_keep_) {
@@ -434,7 +439,7 @@ private:
         }
         machine_state_keep_ = true;
         prohibit_shutdown_ = true;
-        INFO("[MachineState-Switch]: keep machine state to start");
+        INFO("[MachineState-Switch]: keep machine state to start, duration is %ds", request->ticks);
         keep_timer_ = mssc_node_->create_wall_timer(
           std::chrono::seconds(request->ticks),
           std::bind(&MachineStateSwitchContext::KeepTimerCallback, this), timer_callback_group_);
@@ -445,6 +450,15 @@ private:
       response->success = true;
       response->code = 0;
     } else {
+      // 复用服务接口，强行退出状态保持
+      if (request->ticks == 0) {
+        machine_state_keep_ = false;
+        prohibit_shutdown_ = false;
+        INFO("[MachineState-Switch]: request received, keep machine state to stop");
+        response->success = true;
+        response->code = 0;
+        return;
+      }
       response->success = true;
       response->code = -1;
     }
@@ -661,23 +675,27 @@ private:
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
     }
-    // 状态机切换超时强制关机
-    std::thread t{[&]() {
-        std::this_thread::sleep_for(std::chrono::seconds(5));
-        shutdown_or_reboot(false);
-      }
-    };
-    t.detach();
+    // 展示关机灯效
+    control_led_shutdown(true);
 
     // 先返回关机结果，再执行关机
     std::thread t_shutdown{[&]() {
-        std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::this_thread::sleep_for(std::chrono::seconds(2));
         std::lock_guard<std::mutex> lck(state_mtx_);
         machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
         shutdown_or_reboot(false);
       }
     };
     t_shutdown.detach();
+
+    // 状态机切换超时强制关机
+    std::thread t{[&]() {
+        std::this_thread::sleep_for(std::chrono::seconds(15));
+        WARN("[MachineState-Switch]: shutdown timeout, force shutdown");
+        shutdown_or_reboot(false);
+      }
+    };
+    t.detach();
     response->success = true;
   }
 
@@ -691,23 +709,26 @@ private:
     if (mssc_machine_state == MsscMachineState::MSSC_OTA) {
       return;
     }
-
-    // 状态机切换超时强制重启
-    std::thread t{[&]() {
-        std::this_thread::sleep_for(std::chrono::seconds(5));
-        shutdown_or_reboot(true);
-      }
-    };
-    t.detach();
+    // 展示关机灯效
+    control_led_shutdown(true);
 
     std::thread t_reboot{[&]() {
-        std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::this_thread::sleep_for(std::chrono::seconds(2));
         std::lock_guard<std::mutex> lck(state_mtx_);
         machine_state_handler_map[MachineStateChild::MSC_TEARDOWN]();
         shutdown_or_reboot(true);
       }
     };
     t_reboot.detach();
+
+    // 状态机切换超时强制重启
+    std::thread t{[&]() {
+        WARN("[MachineState-Switch]: reboot timeout, force reboot");
+        std::this_thread::sleep_for(std::chrono::seconds(15));
+        shutdown_or_reboot(true);
+      }
+    };
+    t.detach();
     response->success = true;
   }
 
@@ -877,6 +898,7 @@ private:
   EXCEPTION_PLAYSOUND_CALLBACK play_sound {[](int32_t) {}};
   SHUTDOWN_REBOOT_CALLBACK shutdown_or_reboot {[](bool) {return 0;}};
   CONTROL_TAIL_LED_CALLBACK control_tail_led {[](bool, bool) {}};
+  LED_SHUTDOWN_CALLBACK control_led_shutdown {[](bool) {return 0;}};
   std::unique_ptr<cyberdog::manager::StateContext> machine_state_ptr_ {nullptr};
   bool machine_state_keep_ {false};
   bool prohibit_shutdown_ {false};
