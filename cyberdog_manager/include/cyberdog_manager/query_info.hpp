@@ -139,6 +139,11 @@ public:
     return standed_;
   }
 
+  bool & GetNonStand()
+  {
+    return non_stand_;
+  }
+
   std::unique_ptr<cyberdog::manager::WifiInfo> & GetWifiPtr()
   {
     return wifi_info_ptr_;
@@ -350,6 +355,8 @@ public:
       bat_val.AddMember(
         "is_charging", (bms_status_.power_wired_charging || bms_status_.power_wp_charging),
         allocator);
+      bat_val.AddMember("charge_over_current", bms_status_.charge_over_current, allocator);
+      bat_val.AddMember("discharge_over_current", bms_status_.discharge_over_current, allocator);
       bat_val.AddMember("discharge_time", 120, allocator);
       CyberdogJson::Add(json_info, "bat_info", bat_val);
     }
@@ -495,6 +502,7 @@ public:
       bool charging = (bms_status_.power_wired_charging | bms_status_.power_wp_charging);
       CyberdogJson::Add(json_info, "charging", charging);
     }
+    CyberdogJson::Add(json_info, "non-standing", non_stand_);
     if (!CyberdogJson::Document2String(json_info, info)) {
       ERROR("error while encoding to json");
       info = "{\"error\": \"unkown encoding json error!\"}";
@@ -566,6 +574,7 @@ private:
   std::string nick_name_ {"铁蛋"};
   protocol::msg::BmsStatus bms_status_;
   bool standed_{false};
+  bool non_stand_{false};
   std::unique_ptr<cyberdog::manager::WifiInfo> wifi_info_ptr_ {nullptr};
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sn_notify_sub_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr audio_sn_ger_srv_;
@@ -793,10 +802,19 @@ private:
 
   void MotionStatus(const protocol::msg::MotionStatus::SharedPtr msg)
   {
-    if (msg->motion_id == protocol::msg::MotionID::RECOVERYSTAND) {
+    // get standing state
+    int motion_state = msg->motion_id;
+    if (motion_state == protocol::msg::MotionID::RECOVERYSTAND) {
       query_node_ptr_->GetStand() = true;
     } else {
       query_node_ptr_->GetStand() = false;
+    }
+
+    // get non-standing state
+    if (motion_state == 0 || motion_state == 101 || motion_state == 102) {
+      query_node_ptr_->GetNonStand() = true;
+    } else {
+      query_node_ptr_->GetNonStand() = false;
     }
   }
 

@@ -60,6 +60,7 @@ cyberdog::manager::CyberdogManager::CyberdogManager(const std::string & name)
       &MachineStateSwitchContext::BatteryChargeUpdate, mssc_context_ptr_,
       std::placeholders::_1, std::placeholders::_2),
     std::bind(&LedInfoNode::BmsStatus, led_node_ptr, std::placeholders::_1));
+  power_brd_node_ptr_ = std::make_unique<PowerboardIndoNode>(node_ptr_);
   executor_.add_node(node_ptr_);
 }
 
@@ -114,6 +115,9 @@ bool cyberdog::manager::CyberdogManager::Init()
     std::bind(
       &PowerConsumptionInfoNode::TailLedControl, power_consumption_node_ptr,
       std::placeholders::_1, std::placeholders::_2));
+  mssc_context_ptr_->SetControlLedShutdownCallback(
+    std::bind(
+      &LedInfoNode::ShutdownLightEffect, led_node_ptr, std::placeholders::_1));
   error_context_ptr_->ClearError();
   Config();
   mssc_context_ptr_->ExecuteSelfCheck(selfcheck_status_);
